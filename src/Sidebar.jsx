@@ -13,7 +13,7 @@ const Sidebar = ({children}) => {
   const [expanded, setExpanded] = useState(true);
 
 
-
+    // Sidebar component with state for expanded/collapsed
     return(
         <aside className={`row-span-5 h-screen mt-3 ml-3 transition-all duration-500 ${ expanded ? 'w-70' : 'w-12'}`} >
             <nav className=" relative h-145 flex flex-col bg-woodsmoke-200 border-1 border-black rounded-lg shadow-neutral-500 shadow-lg">
@@ -29,13 +29,12 @@ const Sidebar = ({children}) => {
 
             {/* Search bar*/}
             <div className="ml-0.5 px-1 py-2 overflow-hidden relative">
-                <FontAwesomeIcon icon={faSearch} className="absolute text-zuccini-800 ml-3.5 mt-3.5" />
+                <FontAwesomeIcon icon={faSearch} className={`absolute text-zuccini-800 ml-3.5 mt-3.5 ${expanded ? '' : 'cursor-pointer'}`} />
                 <input 
                     type="text" 
                     placeholder="Search..." 
-                    className="w-65 p-2 pl-10 text-black placeholder-neutral-200 rounded-xl bg-woodsmoke-300 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-zuccini-900"
+                    className={`w-65 p-2 pl-10 text-black placeholder-neutral-200 rounded-xl bg-woodsmoke-300 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-zuccini-900 ${expanded ? '' : 'cursor-pointer'}`}
                 />
-
             </div>
             {/* Nav Links */}
             <SidebarContext.Provider value={{expanded}}>
@@ -53,7 +52,7 @@ const Sidebar = ({children}) => {
 export const SidebarLinks = ({link, icon, text, active, alert, onClick}) => {
   const {expanded} = useContext(SidebarContext);
     return (
-        <li className="relative flex items-center text-neutral-800 text-shadow-lg overflow-hidden transition-all duration-500 min-h-[42px]">
+        <li className="relative flex items-center text-neutral-800 text-shadow-lg transition-all duration-500 min-h-[42px] group">
       <a
         href={link}
         onClick={onClick}
@@ -72,6 +71,16 @@ export const SidebarLinks = ({link, icon, text, active, alert, onClick}) => {
           </span>
         )}
       </a>
+        {!expanded && <div className="
+        absolute left-full w-30 rounded-md px-2 py-1 ml-6 text-sm text-center font-bold
+        bg-zuccini-600 text-neutral-200 shadow-lg invisible opacity-20 -translate-x-3
+        transition-all duration 300 group-hover:visible group-hover:opacity-100
+        group-hover:translate-x-0
+        ">{text}</div>
+          
+        }
+      
+
     </li>
     );
 };
