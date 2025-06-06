@@ -28,12 +28,12 @@ const Sidebar = ({children}) => {
             
 
             {/* Search bar*/}
-            <div className="ml-0.5 px-1 py-2 overflow-hidden relative">
+            <div className="ml-1 px-1 py-2 overflow-hidden relative">
                 <FontAwesomeIcon icon={faSearch} className={`absolute text-zuccini-800 ml-3.5 mt-3.5 ${expanded ? '' : 'cursor-pointer'}`} />
                 <input 
                     type="text" 
                     placeholder="Search..." 
-                    className={`w-65 p-2 pl-10 text-black placeholder-neutral-200 rounded-xl bg-woodsmoke-300 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-zuccini-900 ${expanded ? '' : 'cursor-pointer'}`}
+                    className={`w-65 p-2 pl-10 text-black placeholder-neutral-200 rounded-xl bg-woodsmoke-300 border border-gray-900 focus:outline-none focus:ring-2 focus:ring-zuccini-900 ${expanded ? '' : 'cursor-pointer'}`}
                 />
             </div>
             {/* Nav Links */}
@@ -49,7 +49,7 @@ const Sidebar = ({children}) => {
 
 };
 
-export const SidebarLinks = ({link, icon, text, active, alert, onClick}) => {
+export const SidebarLinks = ({children, link, icon, text, active, alert, onClick}) => {
   const {expanded} = useContext(SidebarContext);
     return (
         <li className="relative flex items-center text-neutral-800 text-shadow-lg transition-all duration-500 min-h-[42px] group">
@@ -60,7 +60,7 @@ export const SidebarLinks = ({link, icon, text, active, alert, onClick}) => {
           ${expanded ? 'w-65' : 'w-12'}
           ${active ? 'bg-zuccini-800 text-white hover:bg-zuccini-900' : ''}`}
       >
-        {/* icon rendering */}
+        
         <span className={`${expanded ? 'ml-2 mr-3' : 'mx-auto'} ${active ? 'text-white' : 'text-zuccini-800'} transition-all duration-500 flex-shrink-0`}>
           <FontAwesomeIcon icon={icon} className='text-center shadow-xl mr-1 transition-all duration-500' />
         </span>
@@ -70,6 +70,7 @@ export const SidebarLinks = ({link, icon, text, active, alert, onClick}) => {
             {alert}
           </span>
         )}
+        {children && <span className={`ml-auto overflow-hidden transition-all duration 300 ${expanded ? 'w-11' : 'w-0'}`}>{children}</span>}
       </a>
         {!expanded && <div className="
         absolute left-full w-30 rounded-md px-2 py-1 ml-6 text-sm text-center font-bold

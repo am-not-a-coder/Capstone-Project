@@ -3,6 +3,7 @@ import './App.css'
 import Sidebar, { SidebarLinks } from './Sidebar'
 import Dashboard from './Dashboard';
 import Header from './Header';
+import Switch from './Switch';
 import{
   faLayerGroup, 
     faSchool, 
@@ -32,11 +33,13 @@ function App() {
         <SidebarLinks icon={faFileAlt} link="#documents" text="Documents" active={activeLink === "Documents"} onClick={() =>setActiveLink("Documents")} />
         <hr className="my-3 border-t border-neutral-400 w-full " />
         {/* Dark Mode and Log out */}
-        <SidebarLinks icon={faMoon} text="Dark Mode" />
+        <SidebarLinks icon={faMoon} text="Dark Mode"> 
+       <Switch />
+        </SidebarLinks> 
         <SidebarLinks icon={faArrowRightFromBracket} text="Log Out" />
      </Sidebar>
-      <Header/>
-      <Dashboard />
+    <Header/>
+    <Dashboard />
     </div>
     </>
   )
