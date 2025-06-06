@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+*{
+    @apply box-border;
+}
+
+html{
+    @apply overflow-hidden;
+}
