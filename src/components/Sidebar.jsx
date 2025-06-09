@@ -5,17 +5,17 @@ import {
     faSearch,
     } 
         from '@fortawesome/free-solid-svg-icons';
-import udmsLogo from './assets/udms-logo.png';
+import udmsLogo from '../assets/udms-logo.png';
 import { createContext, useState, useContext } from 'react';
 
 const SidebarContext = createContext();
 const Sidebar = ({children}) => {
-  const [expanded, setExpanded] = useState(true);
+const [expanded, setExpanded] = useState(true);
 
 
     // Sidebar component with state for expanded/collapsed
     return(
-        <aside className={`row-span-5 h-screen mt-3 ml-3 transition-all duration-500 ${ expanded ? 'w-70' : 'w-12'}`} >
+        <aside className={`row-span-5 h-screen mt-5 ml-3 transition-all duration-500 ${ expanded ? 'w-70' : 'w-12'} z-1`} >
             <nav className=" relative h-145 flex flex-col bg-woodsmoke-200 border-1 border-black rounded-lg shadow-neutral-500 shadow-lg">
             {/* Title and Logo */}
             <div className="pt-3 pl-2 pr-10 pb-2 flex justify-between items-center transition-all duration-500">
@@ -49,12 +49,11 @@ const Sidebar = ({children}) => {
 
 };
 
-export const SidebarLinks = ({children, link, icon, text, active, alert, onClick}) => {
+export const SidebarLinks = ({children, icon, text, active, alert, onClick}) => {
   const {expanded} = useContext(SidebarContext);
     return (
-        <li className="relative flex items-center text-neutral-800 text-shadow-lg transition-all duration-500 min-h-[42px] group">
+        <li className="relative flex items-center text-neutral-800 text-shadow-lg transition-all duration-500 min-h-[42px] group cursor-pointer ">
       <a
-        href={link}
         onClick={onClick}
         className={`flex items-center mb-0.5 py-2 px-0.5 text-xl rounded-l-xl font-semibold hover:bg-neutral-400 ease-in-out transition-all duration-500
           ${expanded ? 'w-65' : 'w-12'}

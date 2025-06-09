@@ -11,11 +11,13 @@ import{
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 
+
 const Dashboard = () => {
     return (
-        <main className="flex-1 p-4 h-full  col-span-4 row-span-4 col-start-2 row-start-2 overflow-y-auto">
+        <>
+        <main  className="flex-1 p-4 h-full  col-span-4 row-span-4 col-start-2 row-start-2 overflow-y-auto">
             {/* Dashboard links */}
-            <section className="grid grid-cols-4 gap-4">   
+            <section className="grid grid-cols-4 gap-3">   
             <DashboardLinks icon={faUsers} text="Users" />            
             <DashboardLinks icon={faGraduationCap} text="Programs" />            
             <DashboardLinks icon={faSchool} text="Institutes" />            
@@ -39,7 +41,7 @@ const Dashboard = () => {
                 </div>
             </section>
 
-            {/* Pending Documents and Audit Logs*/}
+            {/* Pending Documents */}
 
             <section className='grid grid-cols-2 gap-4 mt-4'>
             <div className="mt-4 p-5 text-neutral-800 border-1 border-neutral-900 rounded-3xl shadow-xl" >
@@ -49,8 +51,9 @@ const Dashboard = () => {
                 </div>
                 <div className="flex items-center justify-center h-60 bg-neutral-400 p-5 rounded-lg">
                     <p className="p-5 text-gray-700 text-center">No pending documents at the moment.</p>
-                </div> 
+                </div>
             </div>
+            {/* Audit Logs */}
             
             <div className="mt-4 p-5 text-neutral-800 border-1 border-neutral-900 rounded-3xl shadow-xl">
                 <div className='flex flex-row'>
@@ -66,12 +69,13 @@ const Dashboard = () => {
 
 
         </main>
+        </>
     );
 }
 
 export const DashboardLinks = ({icon, text}) =>{
     return (
-     <div className='flex flex-row items-center text-neutral-800 border-1 border-neutral-900 rounded-3xl w-60 h-20 p-4 m-1 relative shadow-xl'>
+     <div className='flex flex-row items-center text-neutral-800 border-1 border-neutral-900 rounded-3xl  h-20 p-4 m-1 relative shadow-xl'>
         <div className='flex items-center justify-center p-2 w-12 h-12 bg-[#5ADF9C] rounded-full mr-3'>
             <FontAwesomeIcon icon={icon} className="text-neutral-800 text-2xl text-center" />
         </div>

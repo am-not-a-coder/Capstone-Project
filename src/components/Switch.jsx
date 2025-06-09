@@ -16,7 +16,7 @@ const StyledWrapper = styled.div`
     background-color: #ffffff2b;
     border-radius: 100px;
     padding: 1px;
-    margin-right: 15px;
+    margin-right: 20px;
     cursor: pointer;
     transition: box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0s;
     align-items: center;
