@@ -4,9 +4,10 @@ import {
     faAngleLeft,
     faSearch,
     } 
-        from '@fortawesome/free-solid-svg-icons';
+from '@fortawesome/free-solid-svg-icons';
 import udmsLogo from '../assets/udms-logo.png';
 import { createContext, useState, useContext } from 'react';
+import { Link } from 'react-router-dom';
 
 const SidebarContext = createContext();
 const Sidebar = ({children}) => {
@@ -15,8 +16,9 @@ const [expanded, setExpanded] = useState(true);
 
     // Sidebar component with state for expanded/collapsed
     return(
-        <aside className={`row-span-5 h-screen mt-5 ml-3 transition-all duration-500 ${ expanded ? 'w-70' : 'w-12'} z-1`} >
+        <aside className={`row-span-5 h-screen mt-3 ml-3 transition-all duration-500 ${ expanded ? 'w-70' : 'w-12'} z-1`} >
             <nav className=" relative h-145 flex flex-col bg-woodsmoke-200 border-1 border-black rounded-lg shadow-neutral-500 shadow-lg">
+
             {/* Title and Logo */}
             <div className="pt-3 pl-2 pr-10 pb-2 flex justify-between items-center transition-all duration-500">
                 <img src={udmsLogo} alt="UDMS Logo" className={`m-2 h-10 rounded-full w-10 transition-all duration-500 ${expanded ? 'opacity-100 w-10' : 'opacity-0 w-0'}`} />
@@ -36,6 +38,7 @@ const [expanded, setExpanded] = useState(true);
                     className={`w-65 p-2 pl-10 text-black placeholder-neutral-200 rounded-xl bg-woodsmoke-300 border border-gray-900 focus:outline-none focus:ring-2 focus:ring-zuccini-900 ${expanded ? '' : 'cursor-pointer'}`}
                 />
             </div>
+
             {/* Nav Links */}
             <SidebarContext.Provider value={{expanded}}>
             <ul className={`flex flex-col flex-1 ml-1 mt-1 ${expanded ? 'items-end' : ''}`}>{children}</ul> 
@@ -49,39 +52,46 @@ const [expanded, setExpanded] = useState(true);
 
 };
 
-export const SidebarLinks = ({children, icon, text, active, alert, onClick}) => {
+export const SidebarLinks = ({children, icon, text, active, alert, onClick, isButton}) => {
   const {expanded} = useContext(SidebarContext);
-    return (
-        <li className="relative flex items-center text-neutral-800 text-shadow-lg transition-all duration-500 min-h-[42px] group cursor-pointer ">
-      <a
-        onClick={onClick}
-        className={`flex items-center mb-0.5 py-2 px-0.5 text-xl rounded-l-xl font-semibold hover:bg-neutral-400 ease-in-out transition-all duration-500
-          ${expanded ? 'w-65' : 'w-12'}
-          ${active ? 'bg-zuccini-800 text-white hover:bg-zuccini-900' : ''}`}
-      >
-        
-        <span className={`${expanded ? 'ml-2 mr-3' : 'mx-auto'} ${active ? 'text-white' : 'text-zuccini-800'} transition-all duration-500 flex-shrink-0`}>
+  //Sidebar Contents
+  const content = (
+    <>
+      <span className={`${expanded ? 'ml-2 mr-3' : 'mx-auto'} ${active ? 'text-white' : 'text-zuccini-800'} transition-all duration-500 flex-shrink-0`}>
           <FontAwesomeIcon icon={icon} className='text-center shadow-xl mr-1 transition-all duration-500' />
-        </span>
-        <span className={`text-[15px] transition-all duration-500 whitespace-nowrap overflow-hidden ${expanded ? 'w-32 opacity-100 ml-1' : 'w-0 opacity-0 ml-0'}`}>{text}</span>
-        {alert && (
-          <span className={`absolute right-3 bg-zuccini-900 px-1.5 py-1.5 shadow-lg rounded-full transition-all duration-500 ${expanded ? 'top-3.5' : 'top-2'}`}>
-            {alert}
-          </span>
-        )}
-        {children && <span className={`ml-auto overflow-hidden transition-all duration 300 ${expanded ? 'w-11' : 'w-0'}`}>{children}</span>}
-      </a>
-        {!expanded && <div className="
-        absolute left-full w-30 rounded-md px-2 py-1 ml-6 text-sm text-center font-bold
-        bg-zuccini-600 text-neutral-200 shadow-lg invisible opacity-20 -translate-x-3
-        transition-all duration 300 group-hover:visible group-hover:opacity-100
-        group-hover:translate-x-0
-        ">{text}</div>
-          
-        }
-      
+      </span>
 
-    </li>
+      <span className={`text-[15px] transition-all duration-500 whitespace-nowrap overflow-hidden ${expanded ? 'w-32 opacity-100 ml-1' : 'w-0 opacity-0 ml-0'}`}>{text}</span>
+
+      {alert && (
+      <span className={`absolute right-3 bg-zuccini-900 px-1.5 py-1.5 shadow-lg rounded-full transition-all duration-500 ${expanded ? 'top-3.5' : 'top-2'}`}>{alert}</span>)}
+        
+        {children && <span className={`ml-auto overflow-hidden transition-all duration 300 ${expanded ? 'w-11' : 'w-0'}`}>{children}</span>}
+      
+        {/* Labels for sections when sidebar is collapsed */}
+      {!expanded && <div className="absolute left-full w-30 rounded-md px-2 py-1 ml-6 text-sm text-center font-bold
+      bg-zuccini-600 text-neutral-200 shadow-lg invisible opacity-20 -translate-x-3
+      transition-all duration 300 group-hover:visible group-hover:opacity-100
+      group-hover:translate-x-0">{text}</div>}
+
+    </>
+);
+
+    return isButton ? (
+          <li className="relative flex items-center text-neutral-800 text-shadow-lg transition-all duration-500 min-h-[42px] group cursor-pointer">
+              <div  
+                className={`flex items-center mb-0.5 py-2 px-0.5 text-xl rounded-l-xl font-semibold hover:bg-neutral-400 ease-in-out transition-all duration-500 ${expanded ? 'w-65' : 'w-12'} ${active ? 'bg-zuccini-800 text-white hover:bg-zuccini-900' : ''}`}>
+                  {content}
+              </div>
+          </li>
+         
+        ): (
+           <li className="relative flex items-center text-neutral-800 text-shadow-lg transition-all duration-500 min-h-[42px] group cursor-pointer">
+             <Link to={`/${text}`} onClick={onClick} className={`flex items-center mb-0.5 py-2 px-0.5 text-xl rounded-l-xl font-semibold hover:bg-neutral-400 ease-in-out transition-all duration-500 ${expanded ? 'w-65' : 'w-12'} ${active ? 'bg-zuccini-800 text-white hover:bg-zuccini-900' : ''}`}>
+                 {content}
+             </Link>
+          </li>
+
     );
 };
 
