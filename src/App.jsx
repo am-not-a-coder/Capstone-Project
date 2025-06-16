@@ -16,7 +16,7 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<Login />}/>
         {/* Main Layout with nested routes */}
         <Route path="/" element={<MainLayout />}>
               <Route path="/Dashboard" element={<Dashboard />} />

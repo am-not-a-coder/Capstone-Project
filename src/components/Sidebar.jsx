@@ -32,7 +32,7 @@ const [expanded, setExpanded] = useState(true);
             {/* Search bar*/}
             <div className="ml-1 px-1 py-2 overflow-hidden relative">
                 <FontAwesomeIcon icon={faSearch} className={`absolute text-zuccini-800 ml-3.5 mt-3.5 ${expanded ? '' : 'cursor-pointer'}`} />
-                <input 
+                <input
                     type="text" 
                     placeholder="Search..." 
                     className={`w-65 p-2 pl-10 text-black placeholder-neutral-200 rounded-xl bg-woodsmoke-300 border border-gray-900 focus:outline-none focus:ring-2 focus:ring-zuccini-900 ${expanded ? '' : 'cursor-pointer'}`}
@@ -46,7 +46,6 @@ const [expanded, setExpanded] = useState(true);
             {/* SidebarLinks is are generated below */}
 
             </nav>
-            
         </aside>
     );
 
@@ -54,6 +53,8 @@ const [expanded, setExpanded] = useState(true);
 
 export const SidebarLinks = ({children, icon, text, active, alert, onClick, isButton}) => {
   const {expanded} = useContext(SidebarContext);
+  
+
   //Sidebar Contents
   const content = (
     <>
@@ -78,19 +79,19 @@ export const SidebarLinks = ({children, icon, text, active, alert, onClick, isBu
 );
 
     return isButton ? (
-          <li className="relative flex items-center text-neutral-800 text-shadow-lg transition-all duration-500 min-h-[42px] group cursor-pointer">
-              <div  
-                className={`flex items-center mb-0.5 py-2 px-0.5 text-xl rounded-l-xl font-semibold hover:bg-neutral-400 ease-in-out transition-all duration-500 ${expanded ? 'w-65' : 'w-12'} ${active ? 'bg-zuccini-800 text-white hover:bg-zuccini-900' : ''}`}>
-                  {content}
-              </div>
-          </li>
+            <li className="relative flex items-center text-neutral-800 text-shadow-lg transition-all duration-500 min-h-[42px] group cursor-pointer">
+            <div  
+                 className={`flex items-center mb-0.5 py-2 px-0.5 text-xl rounded-l-xl font-semibold hover:bg-neutral-400 ease-in-out transition-all duration-500 ${expanded ? 'w-65' : 'w-12'} ${active ? 'bg-zuccini-800 text-white hover:bg-zuccini-900' : ''}`}>
+                 {content}
+            </div>
+            </li>
          
         ): (
-           <li className="relative flex items-center text-neutral-800 text-shadow-lg transition-all duration-500 min-h-[42px] group cursor-pointer">
+            <li className="relative flex items-center text-neutral-800 text-shadow-lg transition-all duration-500 min-h-[42px] group cursor-pointer">
              <Link to={`/${text}`} onClick={onClick} className={`flex items-center mb-0.5 py-2 px-0.5 text-xl rounded-l-xl font-semibold hover:bg-neutral-400 ease-in-out transition-all duration-500 ${expanded ? 'w-65' : 'w-12'} ${active ? 'bg-zuccini-800 text-white hover:bg-zuccini-900' : ''}`}>
                  {content}
              </Link>
-          </li>
+            </li>
 
     );
 };
