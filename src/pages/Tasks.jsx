@@ -10,13 +10,34 @@ const Tasks = () => {
     const [percentage, setPercentage] = useState(30);
     const deadLines = [
     {
-        areaTitle: 'Area I-A: Administrative Organization', 
+        title: 'Area I-A: Administrative Organization', 
         date: '2025-06-15'
     },
     {
-        areaTitle: 'Area I-C: Administration of Non-Academic Personnel', 
+        title: 'Area I-C: Administration of Non-Academic Personnel', 
         date: '2025-06-18' 
+    }];
+    
+    const area =[
+    {
+        title: "Area I",
+        desc: "Governance and Administration",
+        program: "BSIT",
+        percentage: 50
+    },
+    {
+        title: "Area I",
+        desc: "Faculty",
+        program: "BSIT",
+        percentage: 30
+    },
+    {
+        title: "Area I",
+        desc: "Governance and Administration",
+        program: "BSED",
+        percentage: 45
     }
+    
     ]
     return(
         
@@ -26,17 +47,22 @@ const Tasks = () => {
 
             {/* Area Progress */}
             <h1 className="mx-3 mb-3 text-xl font-semibold">Area Progress</h1>
-            <section className="relative grid grid-cols-3 gap-2 p-3 text-neutral-800 border-1 border-neutral-900 rounded-lg shadow-xl overflow-hidden">
+            <section className="relative grid grid-cols-3 gap-2 p-3 min-h-[220px] text-neutral-800 border-1 border-neutral-900 rounded-lg shadow-xl overflow-hidden">
                 {/* Areas */}
 
-            <Area areaTitle="Area I" description="Governance and Administration Governance and Administration" program="BSIT" percentage={50}/>
-            <Area areaTitle="Area II" description="Faculty" program="BSIT" percentage={30}/>
-            <Area areaTitle="Area I" description="Governance and Administration" program="BSED" percentage={45}/>
-
-            <div className='absolute right-0 col-start-3 flex items-center justify-center min-w-[275px] h-full overflow-hidden opacity-90 transition-all duration-500 hover:min-w-[278px] hover:opacity-95 hover:scale-110 bg-gradient-to-r from-transparent via-neutral-800 to-neutral-900 cursor-pointer'>
-                <h1 className='z-10 text-neutral-200 text-xl font-semibold'>View All</h1>
-            </div>
-
+            {area && area.length > 0 ? (
+            <>
+            {area.map((area, index) => (
+                <Area key={index} areaTitle={area.title} desc={area.desc} program={area.program} percentage={area.percentage}/>)
+            )}
+                <div className='absolute right-0 col-start-3 flex items-center justify-center min-w-[275px] h-full overflow-hidden opacity-90 transition-all duration-500 hover:min-w-[278px] hover:opacity-95 hover:scale-110 bg-gradient-to-r from-transparent via-neutral-800 to-neutral-900 cursor-pointer'>
+                        <h1 className='z-10 text-neutral-200 text-xl font-semibold'>View All</h1>
+                    </div>
+            </>        
+        ) : (
+                <p className="col-span-3 text-center m-auto text-lg text-gray-500">No areas found.</p> 
+            )}
+            
 
             {/* the percentage should be changed based on the progress of area */}
             {/*Temp. control for progress bar = <input type="range" min="0" max="100" value={percentage} onChange={(e) => setPercentage(e.target.value)} />*/}   
@@ -109,9 +135,9 @@ const Tasks = () => {
                         {/* Deadline container */}
                         <div className='flex flex-col items-center mt-2 min-h-[500px] min-w-full p-1 bg-neutral-300 rounded-md border relative'>
                             {deadLines && deadLines.length > 0 ? deadLines.map((deadline, index) => (
-                                <Deadline key={index} areaTitle={deadline.areaTitle} date={deadline.date} />
+                                <Deadline key={index} areaTitle={deadline.title} date={deadline.date} />
                             )) : (
-                                 <p className="place-self-center text-center m-auto text-lg text-gray-500">No deadlines ahead.</p>
+                                 <p className=" text-center m-auto text-lg text-gray-500">No deadlines ahead.</p>
                             )
                             }            
                         </div>
@@ -148,7 +174,7 @@ const Tasks = () => {
 
 //Generates the areas
 
-export const Area = ({percentage, program, areaTitle, description}) =>{
+export const Area = ({percentage, program, areaTitle, desc}) =>{
 
     return(
         <div className="relative  mr-4 min-w-[300px] h-[210px] border-black border rounded-lg shadow-lg overflow-hidden transition-all duration-500 hover:scale-105 cursor-pointer">
@@ -159,7 +185,7 @@ export const Area = ({percentage, program, areaTitle, description}) =>{
 
             <div className='text-right h-[50%] p-3 bg-neutral-200 border-t-1'>
                 <h1 className='text-2xl font-semibold mb-4 text-wrap'>{areaTitle}</h1>
-                <h2 className='text-lg truncate'>{description}</h2>
+                <h2 className='text-lg truncate'>{desc}</h2>
             </div>
         </div> 
         
