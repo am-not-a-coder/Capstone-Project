@@ -10,7 +10,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 const Header = ({title}) => {
 
     return(
-        <header className="flex items-center col-start-2 col-span-5 text-white p-4 relative">
+        <header className="flex items-center col-start-2 col-span-5 mb-1 text-white p-4 relative">
              <HeaderTitle title={title}/>
              {/* Profile Tab */}
             <div className="absolute top-2 right-2 flex justify-center items-center w-45 h-16 p-1 shadow-[5px_5px_10px_rgba(0,0,0,0.5)] rounded-3xl">

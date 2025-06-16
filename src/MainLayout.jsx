@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { HashRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
+import { useLocation, Outlet } from 'react-router-dom';
 
 //Importing Components
 import './App.css'
@@ -20,18 +20,55 @@ import{
 } from '@fortawesome/free-solid-svg-icons';
 
 const MainLayout = () => {
-  const [activePage, setActivePage] = useState('Dashboard');
+  const location = useLocation();
+  const activePage = location.pathname.replace('/','') || 'Dashboard';
 
   return(
     <div className="grid grid-cols-[auto_1fr] grid-rows-[100px_1fr] h-screen w-screen bg-neutral-200 relative">
           <Sidebar>      
-                <SidebarLinks icon={faLayerGroup} text="Dashboard" active = {activePage === "Dashboard"} onClick={ () => setActivePage("Dashboard")} />
-                <SidebarLinks icon={faSchool} text="Institutes"active={activePage === "Institutes"} onClick={() =>setActivePage("Institutes")} />
-                <SidebarLinks icon={faGraduationCap} text="Programs" active={activePage === "Programs"} onClick={() =>setActivePage("Programs")}  />
-                <SidebarLinks icon={faIdCardClip} text="Accreditation" active={activePage === "Accreditation"} onClick={() =>setActivePage("Accreditation")} />
-                <SidebarLinks icon={faUsers} text="Users" active={activePage === "Users"} onClick={() =>setActivePage("Users")} />
-                <SidebarLinks icon={faCircleCheck} text="Tasks" active={activePage === "Tasks"} onClick={() =>setActivePage("Tasks")} />
-                <SidebarLinks icon={faFileAlt} text="Documents" active={activePage === "Documents"} onClick={() =>setActivePage("Documents")} />
+                <SidebarLinks
+                  icon={faLayerGroup}
+                  text="Dashboard"
+                  active={activePage === 'Dashboard'}
+                  onClick={() => (window.location.hash = '#/Dashboard')}
+                />
+                <SidebarLinks
+                  icon={faSchool}
+                  text="Institutes"
+                  active={activePage === 'Institutes'}
+                  onClick={() => (window.location.hash = '#/Institutes')}
+                />
+                <SidebarLinks
+                  icon={faGraduationCap}
+                  text="Programs"
+                  active={activePage === 'Programs'}
+                  onClick={() => (window.location.hash = '#/Programs')}
+                />
+                <SidebarLinks
+                  icon={faIdCardClip}
+                  text="Accreditation"
+                  active={activePage === 'Accreditation'}
+                  onClick={() => (window.location.hash = '#/Accreditation')}
+                />
+                <SidebarLinks
+                  icon={faUsers}
+                  text="Users"
+                  active={activePage === 'Users'}
+                  onClick={() => (window.location.hash = '#/Users')}
+                />
+                <SidebarLinks
+                  icon={faCircleCheck}
+                  text="Tasks"
+                  active={activePage === 'Tasks'}
+                  onClick={() => (window.location.hash = '#/Tasks')}
+                />
+                <SidebarLinks
+                  icon={faFileAlt}
+                  text="Documents"
+                  active={activePage === 'Documents'}
+                  onClick={() => (window.location.hash = '#/Documents')}
+                />
+
               <hr className="my-3 border-t border-neutral-400 w-full " />
 
               {/* Dark Mode and Log out */}
@@ -43,7 +80,7 @@ const MainLayout = () => {
           
           {/* Main Content */}
 
-          <main className="flex-1 p-4 h-full  col-span-4 row-span-5 col-start-2 row-start-1 overflow-y-auto">
+          <main className="flex-1 p-4 h-full col-span-4 row-span-5 col-start-2 row-start-1 overflow-y-auto">
             <Header title={activePage} />
             <Outlet />
           </main>

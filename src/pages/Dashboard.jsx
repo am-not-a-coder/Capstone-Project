@@ -30,14 +30,15 @@ const Dashboard = () => {
                     <h2 className="text-neutral-800 text-xl font-semibold mb-4">Announcements</h2>
                 </div>
 
-                <div className="absolute top-5 right-5 flex flex-row items-center justify-around px-2 cursor-pointer" >
+                <div className="absolute top-5 right-5 flex flex-row items-center justify-around px-5 py-1 cursor-pointer rounded-3xl transition-all duration-300 hover:bg-zuccini-600 active:bg-zuccini-500" >
                     <FontAwesomeIcon icon={faPlus} className="mr-2" />
                     <h1 className="text-lg">New</h1>
                 </div>
                 
-                <div className="bg-neutral-400 p-4 rounded-lg">
+                <div className="bg-neutral-300 p-4 rounded-lg">
                     <p className="p-5 text-gray-700 text-center">No new announcements at the moment.</p>
                 </div>
+
             </section>
 
             {/* Pending Documents */}
@@ -48,8 +49,8 @@ const Dashboard = () => {
                     <FontAwesomeIcon icon={faHourglassHalf}  className=" p-2" />
                     <h2 className="text-neutral-800 text-xl font-semibold mb-4">Pending Documents</h2>
                 </div>
-                <div className="flex items-center justify-center h-60 bg-neutral-400 p-5 rounded-lg">
-                    <p className="p-5 text-gray-700 text-center">No pending documents at the moment.</p>
+                <div className="flex items-center justify-center h-60 bg-neutral-300 p-5 rounded-lg">
+                    <p className="m-auto p-5 text-gray-700 text-center">No pending documents.</p>
                 </div>
             </div>
             {/* Audit Logs */}
@@ -60,7 +61,7 @@ const Dashboard = () => {
                     <h2 className="text-neutral-800 text-xl font-semibold mb-4">Audit Logs</h2>
                 </div>
 
-                <div className="flex items-center justify-center h-60 bg-neutral-400 p-4 rounded-lg">
+                <div className="flex items-center justify-center h-60 bg-neutral-300 p-4 rounded-lg">
                     <p className="p-5 text-gray-700 text-center">No logs at the moment.</p>
                 </div> 
             </div>
@@ -74,7 +75,7 @@ const Dashboard = () => {
 
 export const DashboardLinks = ({icon, text}) =>{
     return (
-     <div className='flex flex-row items-center text-neutral-800 border-1 border-neutral-900 rounded-3xl  h-20 p-4 m-1 relative shadow-xl'>
+     <div className='flex flex-row items-center text-neutral-800 border-1 border-neutral-900 rounded-3xl  h-20 p-4 m-1 relative shadow-xl cursor-pointer'>
         <div className='flex items-center justify-center p-2 w-12 h-12 bg-[#5ADF9C] rounded-full mr-3'>
             <FontAwesomeIcon icon={icon} className="text-neutral-800 text-2xl text-center" />
         </div>

@@ -154,13 +154,9 @@ const Tasks = () => {
                             center: '',
                             end: 'today prev next'
                         }}
-                        events={[
-                            // deadlines
-                            { title: 'Deadline 1', date: '2025-06-15' },
-                            { title: 'Deadline 2', date: '2025-06-18' }
-                         ]}
-                        height={'500px'}
-                        expandRows={false}
+                        events={deadLines}
+                        height={'500px'}                    
+                        expandRows={true}
                         
                         />
 
