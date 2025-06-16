@@ -70,7 +70,7 @@ const Tasks = () => {
             </section>
 
             {/* Reports */}
-            <h1 className="mx-3 mt-5 mb-3 text-xl font-semibold dark: text-white">Reports</h1>
+            <h1 className="mx-3 mt-5 mb-3 text-xl font-semibold dark:text-white">Reports</h1>
              <section className="grid grid-cols-2 grid-rows-[auto_1fr] relative p-3 gap-5 text-neutral-800 border-1 border-neutral-900 rounded-lg shadow-xl transition-all duration-500 dark:bg-woodsmoke-950">
                 {/* Create Deadlines */}
                     <div className="col-span-2 transition-all duration-500  dark:text-white">
