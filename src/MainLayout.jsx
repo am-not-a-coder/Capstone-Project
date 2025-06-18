@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect} from 'react';
 import { useLocation, Outlet } from 'react-router-dom';
 
 //Importing Components
@@ -20,11 +20,27 @@ import{
 } from '@fortawesome/free-solid-svg-icons';
 
 const MainLayout = () => {
+  //sets the active pages' path in the link
   const location = useLocation();
   const activePage = location.pathname.replace('/','') || 'Dashboard';
 
+  //toggles Dark Mode
+  const [darkMode, setDarkMode] = useState(() =>{
+    return localStorage.getItem('darkMode') ===  "true"; 
+  });
+  useEffect( () => {
+    if(darkMode){
+      document.documentElement.classList.add('dark');
+    }else{
+      document.documentElement.classList.remove('dark');
+    }
+
+    localStorage.setItem('darkMode', darkMode)
+  }, [darkMode])
+
+
   return(
-    <div className="grid grid-cols-[auto_1fr] grid-rows-[100px_1fr] h-screen w-screen bg-neutral-200 relative">
+    <div className="grid grid-cols-[auto_1fr] grid-rows-[100px_1fr] h-screen w-screen bg-neutral-200 relative dark:bg-woodsmoke-950">
           <Sidebar>      
                 <SidebarLinks
                   icon={faLayerGroup}
@@ -69,11 +85,11 @@ const MainLayout = () => {
                   onClick={() => (window.location.hash = '#/Documents')}
                 />
 
-              <hr className="my-3 border-t border-neutral-400 w-full " />
+              <hr className="my-3 w-full border-x border-neutral-400 dark:border-neutral-800" />
 
               {/* Dark Mode and Log out */}
               <SidebarLinks icon={faMoon} text="Dark Mode" isButton> 
-                <Switch />
+                <Switch isChecked={darkMode} onChange={() => {setDarkMode ((current) => !current)}}/>
               </SidebarLinks> 
               <SidebarLinks icon={faArrowRightFromBracket} text="Log Out" isButton/>
           </Sidebar>
