@@ -15,7 +15,7 @@ const Header = ({title}) => {
              {/* Profile Tab */}
             <div className="absolute top-2 right-2 flex justify-center items-center w-45 h-16 p-1 shadow-[5px_5px_10px_rgba(0,0,0,0.5)] rounded-3xl">
                 <FontAwesomeIcon icon={faComment} className="bg-neutral-300 text-zuccini-800 text-xl p-2 rounded-lg cursor-pointer" />
-                <FontAwesomeIcon icon={faBell} className="bg-neutral-300 text-zuccini-800 text-center text-xl p-2 rounded-lg ml-2  cursor-pointer" />
+                <FontAwesomeIcon icon={faBell} className="bg-neutral-300 text-zuccini-800 text-center text-xl p-2 rounded-lg ml-2 cursor-pointer" />
                 <FontAwesomeIcon icon={faCircleUser} className="text-zuccini-800 text-4xl ml-8 cursor-pointer" />
             </div>
         </header>
