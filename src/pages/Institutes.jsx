@@ -1,12 +1,11 @@
-//for imports
 
 
 const Institutes = () => {
     return(
-        <main  className="flex-1 p-4 h-full col-span-4 row-span-4 col-start-2 row-start-2 overflow-y-auto">
-
-        </main>
+        <section className="flex justify-around border border-neutral-700 min-h-[85%] rounded-xl">
+            
+        </section>
     )
 };
 
-export default Institutes;
+export default Institutes;  

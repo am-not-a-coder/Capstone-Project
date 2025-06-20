@@ -44,11 +44,11 @@ const Tasks = () => {
         
         <>
         {/* Container */}
-        <div className="relative w-full p-5 border-2 border-neutral-700 text-neutral-800 rounded-2xl dark:border-none dark:bg-[#19181A]">
+        <div className="relative w-full p-5 border-2 border-neutral-700 text-neutral-800 rounded-2xl dark:border-none dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-900">
 
             {/* Area Progress */}
             <h1 className="mx-3 mb-3 text-xl font-semibold dark:text-white transition-all duration-500">Area Progress</h1>
-            <section className="relative grid grid-cols-3 gap-2 p-3 min-h-[220px] text-neutral-800 border-1 border-neutral-900 rounded-lg shadow-2xl overflow-hidden dark:bg-woodsmoke-950">
+            <section className="relative grid grid-cols-3 gap-2 p-3 min-h-[220px] text-neutral-800 border-1 border-neutral-900 rounded-lg shadow-2xl overflow-hidden dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-900">
                 {/* Areas */}
 
             {area && area.length > 0 ? (
@@ -71,11 +71,11 @@ const Tasks = () => {
 
             {/* Reports */}
             <h1 className="mx-3 mt-5 mb-3 text-xl font-semibold dark:text-white">Reports</h1>
-             <section className="grid grid-cols-2 grid-rows-[auto_1fr] relative p-3 gap-5 text-neutral-800 border-1 border-neutral-900 rounded-lg shadow-xl transition-all duration-500 dark:bg-woodsmoke-950">
+             <section className="grid grid-cols-2 grid-rows-[auto_1fr] relative p-3 gap-5 text-neutral-800 border-1 border-neutral-900 rounded-lg shadow-xl transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-woodsmoke-950">
                 {/* Create Deadlines */}
                     <div className="col-span-2 transition-all duration-500  dark:text-white">
                         <h1 className="mx-3 mb-1 text-md font-medium">Create Submission Deadlines</h1>
-                        <div className="col-span-2 min-h-[100px] border rounded-md transition-all duration-500 dark:border-none dark:bg-[#19181A]">
+                        <div className="col-span-2 min-h-[100px] border rounded-md transition-all duration-500 dark:border-none dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-[#19181A]">
                             <form action="#"
                             className='grid grid-cols-4 gap-2'
                             >
@@ -128,13 +128,13 @@ const Tasks = () => {
                     </div>
                     
                 {/* Deadlines */}
-                    <div className="flex items-center flex-col row-start-2 p-3 border rounded-md relative dark:bg-[#19181A]">                    
+                    <div className="flex items-center flex-col row-start-2 p-3 border rounded-md relative dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-900">                    
                         <div className='grid grid-cols-3 text-center font-medium w-full dark:text-white '>
                             <h2>Task</h2>
                             <h2>Deadline</h2>
                         </div>
                         {/* Deadline container */}
-                        <div className='flex flex-col items-center mt-2 min-h-[500px] min-w-full p-1 bg-neutral-300 rounded-md border relative dark:bg-woodsmoke-950'>
+                        <div className='flex flex-col items-center mt-2 min-h-[500px] min-w-full p-1 bg-neutral-300 rounded-md border relative dark:bg-woodsmoke-950 ' >
                             {deadLines && deadLines.length > 0 ? deadLines.map((deadline, index) => (
                                 <Deadline key={index} areaTitle={deadline.title} date={deadline.date} />
                             )) : (
@@ -146,7 +146,7 @@ const Tasks = () => {
 
                 
                 {/* Calendar */}
-                    <div className="row-start-2 col-start-2 border rounded-md p-5 transition-all duration-500 dark:text-white dark:bg-[#19181A] dark:border-none">
+                    <div className="row-start-2 col-start-2 border rounded-md p-5 transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:text-white dark:bg-[#19181A] dark:border-none">
                         <FullCalendar 
                         plugins={[dayGridPlugin]}
                         initialView='dayGridMonth'
