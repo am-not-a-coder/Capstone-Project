@@ -1,10 +1,14 @@
 import styled from 'styled-components';
 
-const Switch = () => {
+const Switch = ({isChecked, onChange}) => {
   return (
     <StyledWrapper>
       <label className="switch">
-        <input type="checkbox" />
+        <input 
+        type="checkbox"
+        checked={isChecked}
+        onChange={onChange}
+        />
         <span className="slider" />
       </label>
     </StyledWrapper>
