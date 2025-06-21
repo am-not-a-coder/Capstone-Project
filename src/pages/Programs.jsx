@@ -1,6 +1,7 @@
 //for imports
 import ProgramCard from "../components/ProgramCard";
 import CreateCard from "../components/CreateCard";
+import CreateForm from "../components/CreateForm";
 import { useState } from "react";
 
 
@@ -118,140 +119,21 @@ import { useState } from "react";
             ))}
 
             {/*Form*/}
-            {showForm &&(
-              
-              <div className="fixed inset-0 bg-opacity-50 flex items-center justify-center z-50 text-black">
-                <div className="bg-white p-8 rounded-lg shadow-lg min-w-[400px] flex flex-col items-center">
-                  <div className="flex gap-4 mb-4 w-full justify-center">
-                    <button onClick={() => handleModify("add")}
-                      className={`px-4 py-2 rounded font-semibold transition text-white ${activeModify === "add" ? "bg-green-700" : "bg-green-500 hover:bg-green-600"}`}>Add Program</button>
-                    <button onClick={() => handleModify("edit")}
-                      className={`px-4 py-2 rounded font-semibold transition text-white ${activeModify === "edit" ? "bg-yellow-700" : "bg-yellow-500 hover:bg-yellow-600"}`}>Edit Program</button>
-                    <button onClick={() => handleModify("delete")}
-                      className={`px-4 py-2 rounded font-semibold transition text-white ${activeModify === "delete" ? "bg-red-700" : "bg-red-500 hover:bg-red-600"}`}>Delete Program</button>
-                  </div>
-                  {/* Add Program Form */}
-                  {activeModify === "add" && (
-                    <form 
-                      onSubmit={handleSubmit} 
-                      className="bg-white p-6 rounded-lg shadow-lg flex flex-col gap-4 min-w-[350px] w-full">
-                      <h2 className="text-lg font-bold mb-2">Add New Program</h2>
-                      <input 
-                        type="text" name="code" 
-                        placeholder="Program Name (e.g. BSIT)" 
-                        className="border rounded p-2" 
-                        value={form.code} 
-                        onChange={handleChange} 
-                        required
-                      />
-                      <input
-                        type="text"
-                        name="name"
-                        placeholder="Program Full Name"
-                        className="border rounded p-2"
-                        value={form.name}
-                        onChange={handleChange}
-                        required
-                      />
-                      <input
-                        type="text"
-                        name="programDean"
-                        placeholder="Program Dean"
-                        className="border rounded p-2"
-                        value={form.programDean}
-                        onChange={handleChange}
-                        required
-                      />
-                      <input
-                        type="color"
-                        name="color"
-                        placeholder="Program Color"
-                        className="border rounded p-2 w-full"
-                        value={form.color}
-                        onChange={handleChange}
-                        required
-                      />
-                      <div className="flex gap-2 justify-end">
-                        <button type="button" className="px-4 py-2 rounded bg-gray-300" onClick={() => setShowForm(false)}>Cancel</button>
-                        <button type="submit" className="px-4 py-2 rounded bg-blue-500 text-white">Submit</button>
-                      </div>
-                    </form>
-                  )}
-                  {/* Edit Program Form */}
-                  {activeModify === "edit" && (
-                    <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-lg flex flex-col gap-4 min-w-[350px] w-full">
-                      <h2 className="text-lg font-bold mb-2">Edit Program</h2>
-                      <select className="border rounded p-2" value={editIndex ?? ""} onChange={handleEditSelect} required>
-                        <option value="" disabled>Select a program to edit</option>
-                        {programs.map((p, idx) => (
-                          <option value={idx} key={p.code}>{p.code} - {p.name}</option>
-                        ))}
-                      </select>
-                      {editIndex !== null && (
-                        <>
-                          <input
-                            type="text"
-                            name="code"
-                            placeholder="Program Name (e.g. BSIT)"
-                            className="border rounded p-2"
-                            value={form.code}
-                            onChange={handleChange}
-                            required
-                          />
-                          <input
-                            type="text"
-                            name="name"
-                            placeholder="Program Full Name"
-                            className="border rounded p-2"
-                            value={form.name}
-                            onChange={handleChange}
-                            required
-                          />
-                          <input
-                            type="text"
-                            name="programDean"
-                            placeholder="Program Dean"
-                            className="border rounded p-2"
-                            value={form.programDean}
-                            onChange={handleChange}
-                            required
-                          />
-                          <input
-                            type="color"
-                            name="color"
-                            placeholder="Program Color"
-                            className="border rounded p-2 w-full"
-                            value={form.color}
-                            onChange={handleChange}
-                            required
-                          />
-                        </>
-                      )}
-                      <div className="flex gap-2 justify-end">
-                        <button type="button" className="px-4 py-2 rounded bg-gray-300" onClick={() => setShowForm(false)}>Cancel</button>
-                        <button type="submit" className="px-4 py-2 rounded bg-blue-500 text-white" disabled={editIndex === null}>Save</button>
-                      </div>
-                    </form>
-                  )}
-                  {/* Delete Program Form */}
-                  {activeModify === "delete" && (
-                    <form onSubmit={handleDelete} className="bg-white p-6 rounded-lg shadow-lg flex flex-col gap-4 min-w-[350px] w-full">
-                      <h2 className="text-lg font-bold mb-2">Delete Program</h2>
-                      <select className="border rounded p-2" value={editIndex ?? ""} onChange={handleDeleteSelect} required>
-                        <option value="" disabled>Select a program to delete</option>
-                        {programs.map((p, idx) => (
-                          <option value={idx} key={p.code}>{p.code} - {p.name}</option>
-                        ))}
-                      </select>
-                      <div className="flex gap-2 justify-end">
-                        <button type="button" className="px-4 py-2 rounded bg-gray-300" onClick={() => setShowForm(false)}>Cancel</button>
-                        <button type="submit" className="px-4 py-2 rounded bg-red-500 text-white" disabled={editIndex === null}>Delete</button>
-                      </div>
-                    </form>
-                  )}
-                </div>
-              </div>
-            )}
+            {showForm && 
+            <CreateForm 
+              title="Program"
+              data={programs}
+              onSubmit={handleSubmit}
+              onClose={() => setShowForm(false)}
+              onEditSelect={handleEditSelect}
+              onDeleteSelect={handleDeleteSelect}
+              onDelete={handleDelete}
+              activeModify={activeModify}
+              editIndex={editIndex}
+              form={form}
+              handleChange={handleChange}
+              handleModify={handleModify}
+            />}
           </div>
         </div>
       </main>
