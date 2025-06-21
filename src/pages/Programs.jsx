@@ -1,9 +1,9 @@
 //for imports
+import ProgramCard from "../components/ProgramCard";
+import CreateCard from "../components/CreateCard";
 import { useState } from "react";
 
 
-
-  
   const Programs = () => {
 
     {/*use state function*/}
@@ -32,6 +32,7 @@ import { useState } from "react";
         color: "#008000",
         programDean: "John Coe",
       },
+      
     ])
 
 
@@ -110,25 +111,10 @@ import { useState } from "react";
         <div className="border rounded-lg p-6 bg-white">
           <div className="flex flex-wrap gap-15 mb-8">
             {/* Create Card */}
-            <button className="w-full sm:w-1/2 md:w-1/3 lg:w-1/5 h-48 bg-gray-500 rounded-lg flex items-center justify-center text-4xl text-white cursor-pointer
-            " onClick={() => setShowForm(true)}>
-              ✎
-            </button>
+            <CreateCard setShowForm={setShowForm}/>
             {/*Program Cards Row */}
-            {programs.map((program) => (
-              <div
-                key={program.code}
-                className="w-full sm:w-1/2 md:w-1/3 lg:w-1/5 h-48 bg-white rounded-lg shadow flex flex-col overflow-hidden"
-              >
-                <div className="h-2/5" style={{backgroundColor: program.color}}></div>
-                <div className="flex-1 flex flex-col justify-between p-2">
-                  <div>
-                    <div className="font-semibold text-black text-lg">{program.code}</div>
-                    <div className="text-xs text-gray-500 mb-5">{program.name}</div>
-                    <div className="text-lg text-gray-500 ">Facilitator: {program.programDean}</div>
-                  </div>
-                </div>
-              </div>
+            {programs.map(program=> (
+              <ProgramCard program={program} key={program.code}/>
             ))}
 
             {/*Form*/}
