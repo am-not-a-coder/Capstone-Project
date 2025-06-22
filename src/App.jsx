@@ -9,6 +9,7 @@ import Documents from './pages/Documents';
 import Programs from './pages/Programs';
 import Users from './pages/Users';
 import Tasks from './pages/Tasks';
+import Profile from './pages/Profile'
 
 
 function App() {
@@ -29,7 +30,12 @@ function App() {
           <Route path="/Users" element={<Users />} />
           <Route path="/Tasks" element={<Tasks />} />
           <Route path="/Documents" element={<Documents />} />
+        {/* Profile page */}
+         <Route path='/Profile' element={<Profile />}/>
         </Route>
+
+
+       
       </Routes>
     </Router>
   )

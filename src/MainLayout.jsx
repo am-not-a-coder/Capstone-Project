@@ -1,4 +1,4 @@
-import React, { useState, useEffect} from 'react';
+import { useState, useEffect} from 'react';
 import { useLocation, Outlet } from 'react-router-dom';
 
 //Importing Components
@@ -85,7 +85,7 @@ const MainLayout = () => {
                   onClick={() => (window.location.hash = '#/Documents')}
                 />
 
-              <hr className="my-3 w-full border-x border-neutral-400 dark:border-neutral-800" />
+              <hr className="w-full my-3 border-x border-neutral-400 dark:border-neutral-800" />
 
               {/* Dark Mode and Log out */}
               <SidebarLinks icon={faMoon} text="Dark Mode" isButton> 
@@ -96,7 +96,7 @@ const MainLayout = () => {
           
           {/* Main Content */}
 
-          <main className="flex-1 p-4 h-full col-span-4 row-span-5 col-start-2 row-start-1 overflow-y-auto">
+          <main id="main-scroll" className="flex-1 h-full col-span-4 col-start-2 row-span-5 row-start-1 p-4 overflow-y-auto">
             <Header title={activePage} />
             <Outlet />
           </main>
