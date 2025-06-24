@@ -108,13 +108,12 @@ import { useState } from "react";
     };
 
     return (
-      <main className="flex-1 p-4 h-full col-span-4 row-span-4 col-start-2 row-start-2 overflow-y-auto">
-        <div className="border rounded-lg p-6 bg-white">
-          <div className="flex flex-wrap gap-15 mb-8">
+      <main className="flex-1 h-full col-span-4 col-start-2 row-span-4 row-start-2 p-4 overflow-y-auto">
+        <div className="p-6 border rounded-xl border-neutral-800 dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
+          <div className="flex flex-wrap mb-8 gap-15">
 
             {/* Create Card */} 
-            <button className="w-full sm:w-1/2 md:w-1/3 lg:w-1/5 h-48 bg-gray-500 rounded-lg flex items-center justify-center text-4xl text-white cursor-pointer
-            " onClick={() => setShowForm(true)}>
+            <button className="flex items-center justify-center w-full text-4xl text-white bg-gray-500 rounded-lg cursor-pointer min-h-48 sm:w-1/2 md:w-1/3 lg:w-1/5 " onClick={() => setShowForm(true)}>
               +
             </button>
 

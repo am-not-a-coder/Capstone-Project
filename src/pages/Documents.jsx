@@ -44,19 +44,19 @@ const Documents = () => {
   };
 
   return (
-    <main className="flex-1 p-6 h-full col-span-4 row-span-4 col-start-2 row-start-2 overflow-y-auto font-sans text-gray-800">
+    <main className="flex-1 h-full col-span-4 col-start-2 row-span-4 row-start-2 p-2 overflow-y-auto font-sans text-gray-800">
       {/* Outer container for the document panel */}
-      <div className="border border-gray-300 rounded-[20px] max-w-[950px] mx-auto bg-white shadow-md p-6">
+      <div className="border border-neutral-800 rounded-[20px] min-w-[950px] min-h-[450px] shadow-md p-6 dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
         
         {/* Search Bar Section */}
         <div className="flex max-w-[500px] items-center mx-auto mb-4">
-          <label className="text-lg font-semibold mr-2">Search</label>
+          <label className="mr-2 text-lg font-semibold dark:text-white">Search</label>
           
           {/* Input field for typing search query */}
           <input
             type="text"
             placeholder="Search Document"
-            className="flex-grow px-3 py-2 text-base bg-gray-200 border border-gray-400 border-r-0 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-300 transition"
+            className="flex-grow px-3 py-2 text-base transition duration-300 bg-gray-200 border border-r-0 rounded-l-md focus:outline-none focus:ring focus:ring-zuccini-600 placeholder-neutral-500 dark:text-white dark:border-none dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:bg-woodsmoke-950"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -66,22 +66,22 @@ const Documents = () => {
 
           {/* Button to trigger search when clicked */}
           <button
-            className="px-6 w-[45px] h-[42px] flex items-center justify-center border border-gray-400 rounded-r-md cursor-pointer hover:bg-gray-300 transition"
+            className="px-6 w-[45px] h-[42px] flex items-center justify-center border rounded-r-md cursor-pointer bg-zuccini-600 hover:bg-zuccini-500 transition-all duration-500"
             onClick={handleSearch}
           >
-            <FontAwesomeIcon icon={faMagnifyingGlass} className="text-gray-600 text-lg" />
+            <FontAwesomeIcon icon={faMagnifyingGlass} className="text-lg text-white" />
           </button>
         </div>
 
         {/* Filter Tags Section */}
-        <div className="border border-gray-300 bg-gray-50 rounded-[20px] px-5 py-4">
+        <div className="border border-neutral-800 rounded-[20px] px-5 py-4 dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
           
           {/* Header + removable tag chip (inline using flex) */}
           <div className="flex flex-wrap items-center gap-3 mb-3">
-            <p className="text-sm font-medium">Filter by:</p>
+            <p className="text-sm font-medium dark:text-white">Filter by:</p>
 
             {/* Example selected filter with remove "✕" */}
-            <div className="inline-block text-sm bg-white text-gray-700 border border-gray-300 px-4 py-1 rounded-full">
+            <div className="inline-block px-4 py-1 text-sm text-gray-700 border rounded-full cursor-pointer border-neutral-400 dark:text-white">
               Tags
               <button className="ml-3 text-sm text-gray-500 cursor-pointer hover:text-red-600"
               onClick={handleClearTags}
@@ -90,11 +90,11 @@ const Documents = () => {
           </div>
 
           {/* Filter tags buttons */}
-          <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex flex-wrap items-center gap-2">
             {tags.map((tag) => (
               <div
                 key={tag}
-                className="text-sm border border-gray-400 px-4 py-1 rounded-full cursor-pointer hover:bg-gray-200" 
+                className="px-4 py-1 text-sm border rounded-full cursor-pointer border-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-600 dark:text-white" 
               >
                 {tag}
               </div>
@@ -111,26 +111,26 @@ const Documents = () => {
             filteredFiles.map((file, index) => (
               <div
                 key={index}
-                className="border border-gray-300 bg-gray-100 rounded-[20px] px-4 py-3 flex justify-between items-center hover:shadow transition"
+                className="border border-neutral-800 shadow-md rounded-[20px] px-4 py-5 flex justify-between items-center cursor-pointer hover:shadow-lg dark:hover:shadow-md dark:hover:shadow-zuccini-800 transition dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800"
               >
                 <div className="flex items-center space-x-3">
                   {/* Icon for PDF */}
-                  <FontAwesomeIcon icon={faFilePdf} className="text-red-600 text-xl cursor-pointer" />
+                  <FontAwesomeIcon icon={faFilePdf} className="text-xl text-red-600 cursor-pointer dark:text-red-500" />
 
                   {/* Filename */}
-                  <span className="hover:underline cursor-pointer text-sm font-medium">
+                  <span className="text-sm font-medium cursor-pointer hover:underline dark:text-white">
                     {file}
                   </span>
                 </div>
 
                 {/* Menu icon (⋮) */}
-                <FontAwesomeIcon icon={faEllipsisVertical} className="text-gray-500 text-xl hover:text-black cursor-pointer" />
+                <FontAwesomeIcon icon={faEllipsisVertical} className="text-xl text-gray-500 cursor-pointer hover:text-black" />
               </div>
             ))
           ) : (
             // Message when no files found
-            <div className="col-span-3 flex justify-center items-center py-10">
-                <p className="text-gray-500 text-base italic font-semibold">No documents found</p>
+            <div className="flex items-center justify-center col-span-3 py-10">
+                <p className="text-base italic font-semibold text-gray-500">No documents found</p>
             </div>
           )}
         </div>
