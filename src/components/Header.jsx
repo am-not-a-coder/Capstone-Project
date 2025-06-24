@@ -115,13 +115,13 @@ const Header = ({title}) => {
 
 
     return(
-        <header className="relative flex items-center col-span-5 col-start-2 p-4 mb-1 text-white">
+        <header className="relative flex items-center col-span-5 col-start-2 p-4 mb-3 text-white">
              <HeaderTitle title={title}/>
              {/* Profile, messages, notifications */}
         <div className='relative w-full'>
             <div 
             ref={iconContainerRef}
-            className="fixed top-5 right-10 flex justify-center items-center w-45 h-16 p-1 shadow-[5px_5px_10px_rgba(0,0,0,0.5)] bg-neutral-200 rounded-3xl dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-[#19181A] z-20">
+            className="fixed top-4 right-10 flex justify-center items-center w-45 h-16 p-1 shadow-[5px_5px_10px_rgba(0,0,0,0.5)] bg-neutral-200 rounded-3xl dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-[#19181A] z-20">
                 {/* Message button */}
                 <FontAwesomeIcon 
                     icon={faComment} 

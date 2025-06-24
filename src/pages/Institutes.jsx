@@ -11,19 +11,19 @@ const Institutes = () => {
           {
             code: "CCS",
             name: "College of Computing Studies",
-            img: "../src/instituteImage/CET-logo.webp",
+            img: "../src/assets/instituteImage/CET-logo.webp",
             instituteHead: "John Doe",
           },
           {
             code: "CED",
             name: "College of Education",
-            img: "../src/instituteImage/CED-LOGO.webp",
+            img: "../src/assets/instituteImage/CED-LOGO.webp",
             instituteHead: "John Joe",
           },
           {
             code: "CAS",
             name: "College of Arts and Sciences",
-            img: "../src/instituteImage/CAS-logo.webp",
+            img: "../src/assets/instituteImage/CAS-logo.webp",
             instituteHead: "John Boe",
           },
         ])
@@ -99,13 +99,8 @@ const Institutes = () => {
         };
         
     return(
-
-        <section className="flex justify-around border border-neutral-700 min-h-[85%] rounded-xl">
-            
-        </section>
-
-        <main  className="flex-1 p-4 h-full col-span-4 row-span-4 col-start-2 row-start-2 overflow-y-auto">
-            <div className="border rounded-lg p-6 bg-white">
+        <main  className="flex-1 h-full col-span-4 col-start-2 row-span-4 row-start-2 p-4 overflow-y-auto">
+            <div className="p-6 border border-neutral-800 rounded-xl dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:bg-[#19181A]">
                 <div className="flex flex-wrap gap-16 mb-8">
                   <CreateCard setShowForm={setShowForm}/>
                 {institutes.map(institute => (
