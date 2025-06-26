@@ -104,7 +104,7 @@ const Users = () => {
 
                         <div className='relative'>
                             <select name="department" id="department"  value={department} onChange={(e) => setDepartment(e.target.value)} className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-500 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'>
-                                <option value="" disabled hidden>Select department</option>
+                                <option value="" disabled hidden>Select Program</option>
                                 <option value="BSIT">Information Technology</option>
                                 <option value="Criminology">Criminology</option>
                                 <option value="Accounting">Accounting</option>
