@@ -1,15 +1,15 @@
 import {BrowserRouter as Router, Routes, Route, Navigate} from 'react-router-dom';
 // Importing Pages
-import Login from './pages/Login';
+import Login from './frontend/pages/Login';
 import MainLayout from './MainLayout';
-import Dashboard from './pages/Dashboard';
-import Institutes from './pages/Institutes';
-import Accreditation from './pages/Accreditation';
-import Documents from './pages/Documents';
-import Programs from './pages/Programs';
-import Users from './pages/Users';
-import Tasks from './pages/Tasks';
-import Profile from './pages/Profile'
+import Dashboard from './frontend/pages/Dashboard';
+import Institutes from './frontend/pages/Institutes';
+import Accreditation from './frontend/pages/Accreditation';
+import Documents from './frontend/pages/Documents';
+import Programs from './frontend/pages/Programs';
+import Users from './frontend/pages/Users';
+import Tasks from './frontend/pages/Tasks';
+import Profile from './frontend/pages/Profile';
 
 
 function App() {
