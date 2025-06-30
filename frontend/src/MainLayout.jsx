@@ -3,9 +3,9 @@ import { useLocation, Outlet } from 'react-router-dom';
 
 //Importing Components
 import './App.css'
-import Sidebar, { SidebarLinks } from './frontend/components/Sidebar';
-import Switch from './frontend/components/Switch';
-import Header from './frontend/components/Header';
+import Sidebar, { SidebarLinks } from './components/Sidebar';
+import Switch from './components/Switch';
+import Header from './components/Header';
 //Importing  Icons
 import{
   faLayerGroup, 
