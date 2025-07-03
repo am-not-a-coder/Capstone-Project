@@ -16,21 +16,21 @@ const [expanded, setExpanded] = useState(true);
 
     // Sidebar component with state for expanded/collapsed
     return(
-        <aside className={`row-span-5 h-screen mt-3 ml-3 transition-all duration-500 ${ expanded ? 'w-70' : 'w-12'} z-1`} >
+        <aside className={`row-span-5 h-screen mt-3 ml-3 transition-all duration-500 ${ expanded ? 'w-70' : 'w-12'} z-1`}>
             <nav className="relative flex flex-col bg-woodsmoke-200 border-1 border-black rounded-lg shadow-neutral-500 shadow-lg transition-all duration-500 dark:bg-[#19181A] dark:shadow-none dark:border-none">
 
             {/* Title and Logo */}
-            <div className="pt-3 pl-2 pr-10 pb-2 flex justify-between items-center transition-all duration-500">
-                <img src={udmsLogo} alt="UDMS Logo" className={`m-2 h-10 rounded-full w-10 transition-all duration-500 ${expanded ? 'opacity-100 w-10' : 'opacity-0 w-0'}`} />
+            <div className="flex items-center justify-between pt-3 pb-2 pl-2 pr-10 transition-all duration-500">
+                <img src={udmsLogo} alt="UDMS Logo" className={`m-2 h-10 rounded-full w-10 transition-all duration-500 ${expanded ? 'opacity-100 w-10' : 'opacity-0 w-0'}`}/>
                 <h4 className={`overflow-hidden transition-all m-1 line-clamp-2 font-semibold text-neutral-950 ${expanded ? 'w-42 opacity-100 ml-2' : 'w-0 opacity-0 ml-0'} dark:text-white transition-all duration-500`}>University Document Management System</h4>
-                <button onClick={() => setExpanded(current => !current)} className="p-2 px-4 absolute -right-3 bg-zuccini-900 rounded-lg transition-all duration-500">
+                <button onClick={() => setExpanded(current => !current)} className="absolute p-2 px-4 transition-all duration-500 rounded-lg -right-3 bg-zuccini-900">
                     { expanded ? <FontAwesomeIcon icon={faAngleRight} /> : <FontAwesomeIcon icon={faAngleLeft} /> }
                 </button>
             </div>
             
 
             {/* Search bar*/}
-            <div className="ml-1 px-1 py-2 overflow-hidden relative">
+            <div className="relative px-1 py-2 ml-1 overflow-hidden">
                 <FontAwesomeIcon icon={faSearch} className={`absolute text-zuccini-800 ml-3.5 mt-3.5 ${expanded ? '' : 'cursor-pointer'}`} />
                 <input
                     type="text" 
@@ -59,7 +59,7 @@ export const SidebarLinks = ({children, icon, text, active, alert, onClick, isBu
   const content = (
     <>
       <span className={`${expanded ? 'ml-2 mr-3' : 'mx-auto'} ${active ? 'text-white' : 'text-zuccini-800'} transition-all duration-500 flex-shrink-0`}>
-          <FontAwesomeIcon icon={icon} className='text-center shadow-xl mr-1 transition-all duration-500' />
+          <FontAwesomeIcon icon={icon} className='mr-1 text-center transition-all duration-500 shadow-xl' />
       </span>
 
       <span className={`text-[15px] transition-all duration-500 whitespace-nowrap overflow-hidden ${expanded ? 'w-32 opacity-100 ml-1' : 'w-0 opacity-0 ml-0'} dark:text-white`}>{text}</span>
@@ -70,10 +70,7 @@ export const SidebarLinks = ({children, icon, text, active, alert, onClick, isBu
         {children && <span className={`ml-auto overflow-hidden transition-all duration 500 ${expanded ? 'w-11' : 'w-0'}`}>{children}</span>}
       
         {/* Labels for sections when sidebar is collapsed */}
-      {!expanded && <div className="absolute left-full w-30 rounded-md px-2 py-1 ml-6 text-sm text-center font-bold
-      bg-zuccini-600 text-neutral-200 shadow-lg invisible opacity-20 -translate-x-3
-      transition-all duration 500 group-hover:visible group-hover:opacity-100
-      group-hover:translate-x-0">{text}</div>}
+      {!expanded && <div className="absolute invisible px-2 py-1 ml-6 text-sm font-bold text-center transition-all -translate-x-3 rounded-md shadow-lg left-full w-30 bg-zuccini-600 text-neutral-200 opacity-20 duration 500 group-hover:visible group-hover:opacity-100 group-hover:translate-x-0">{text}</div>}
 
     </>
 );
