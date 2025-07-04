@@ -2,21 +2,18 @@ from flask import jsonify, request, session
 from app.models import User
 from app import db
 from werkzeug.security import check_password_hash
-from app.decorator import login_required
+
+from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
+
 
 def register_routes(app):
+    # CHECKS IF THE BACKEND IS WORKING
     @app.route('/api/checkdb', methods=['GET'])
     def checkdb():
         return jsonify({'message': "The backend is working"})
     
-    @app.route('/api/users', methods=['GET'])
-    @login_required
-    def get_users():
-        users = User.query.all()
-        return jsonify({'employeeID': u.employeeID, 'password': u.password} for u in users)
-    
+    #LOGIN API
     @app.route('/api/login', methods=["POST"])
-    @login_required
     def login():
         #Get the JSON from the request
         data = request.get_json()
@@ -38,16 +35,28 @@ def register_routes(app):
             session["isAdmin"] = user.isAdmin
             session["isOnline"] = user.isOnline
             user.isOnline = True
-            db.session.commit()
-            return jsonify({'success': True, 'message': 'Login successful'})
-            
+            db.session.commit()      
+            access_token = create_access_token(identity=empID)      
+            return jsonify({'success': True, 'message': 'Login successful', 'access_token': access_token})        
         else:
             return jsonify({'success': False,'message': "Invalid password"})
         
+    @app.route('/api/protected', methods=["GET"])
+    @jwt_required()
+    def protected():
+        # Access the identity of the current user with get_jwt_identity
+        current_user = get_jwt_identity()
+        return jsonify(logged_in_as=current_user), 200
+        
+    
+            
+            
+    #LOGOUT API
     @app.route('/api/logout', methods=["POST"])
     def logout():
         session["isOnline"] = False
         session.clear()
         return jsonify({"message":"You have logged out the system"})
     
+
     

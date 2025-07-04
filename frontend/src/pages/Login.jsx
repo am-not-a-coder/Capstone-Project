@@ -35,12 +35,13 @@ const Login = () => {
             if (response.data.success) {
                 setError(null);
                 navigate('/Dashboard');
-                localStorage.setItem('isLoggedIn', 'true')
+                localStorage.setItem('token', response.data.access_token);
+               
             } else {
                 setError(response.data.message);
             }
         } catch (err) {
-            setError('Server error. Please try again.');
+            alert('Server error. Please try again.');
         }
     }
 
@@ -90,7 +91,7 @@ const Login = () => {
                             <label htmlFor='password' className='block text-sm font-medium text-gray-700'>Password</label>
                             <FontAwesomeIcon icon={faKey} className='absolute top-9.5 left-2 text-md text-gray-400' />
                             <div className='absolute top-8.5 left-8 h-6 border-l border-gray-400'></div>  
-                            <input type={showPassword ? "password" : "text"} 
+                            <input type={showPassword ? "text" : "password"} 
                             name='password' 
                             placeholder="Password"
                             value={password}

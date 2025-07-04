@@ -78,6 +78,7 @@ export const SidebarLinks = ({children, icon, text, active, alert, onClick, isBu
     return isButton ? (
             <li className="relative flex items-center text-neutral-800 text-shadow-lg transition-all duration-500 min-h-[42px] group cursor-pointer">
             <div  
+                onClick={onClick}
                  className={`flex items-center mb-0.5 py-2 px-0.5 text-xl rounded-l-xl font-semibold hover:bg-neutral-400 dark:hover:bg-neutral-800 ease-in-out transition-all duration-500 ${expanded ? 'w-65' : 'w-12'}`}>
                  {content}
             </div>
