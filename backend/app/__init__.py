@@ -21,7 +21,7 @@ def create_app():
     db.init_app(app)
     migrate.init_app(app, db)
     JWTManager(app)
-    CORS(app)
+    CORS(app, origins=["http://localhost:5173"], supports_credentials=True)
 
     from app.routes import register_routes
     register_routes(app)

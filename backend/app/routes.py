@@ -2,7 +2,6 @@ from flask import jsonify, request, session
 from app.models import User
 from app import db
 from werkzeug.security import check_password_hash
-
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
 
 
@@ -49,8 +48,6 @@ def register_routes(app):
         return jsonify(logged_in_as=current_user), 200
         
     
-            
-            
     #LOGOUT API
     @app.route('/api/logout', methods=["POST"])
     def logout():
