@@ -1,5 +1,5 @@
 import { useState, useEffect} from 'react';
-import { useLocation, Outlet } from 'react-router-dom';
+import { useLocation, Outlet, useNavigate } from 'react-router-dom';
 
 //Importing Components
 import './App.css'
@@ -38,8 +38,24 @@ const MainLayout = () => {
     localStorage.setItem('darkMode', darkMode)
   }, [darkMode])
 
+  const [showLogout, setShowLogout] = useState(false);
+  const [logout, setLogout] = useState()
+  const navigate = useNavigate()
+ 
+  const loginCancel = () =>{
+    setLogout(false)
+    setShowLogout(false)
+  }
+
+  useEffect(() => {
+    if (logout){
+      localStorage.removeItem('token')
+      navigate('/login')
+    } 
+  }, [logout])
 
   return(
+    <>
     <div className="grid grid-cols-[auto_1fr] grid-rows-[100px_1fr] h-screen w-screen bg-neutral-200 relative dark:bg-woodsmoke-950">
           <Sidebar>      
                 <SidebarLinks
@@ -91,8 +107,10 @@ const MainLayout = () => {
               <SidebarLinks icon={faMoon} text="Dark Mode" isButton> 
                 <Switch isChecked={darkMode} onChange={() => {setDarkMode ((current) => !current)}}/>
               </SidebarLinks> 
-              <SidebarLinks icon={faArrowRightFromBracket} text="Log Out" isButton/>
+              <SidebarLinks icon={faArrowRightFromBracket} onClick={() => {setShowLogout(true)}} text="Log Out" isButton/>                
           </Sidebar>
+            
+          
           
           {/* Main Content */}
 
@@ -102,7 +120,22 @@ const MainLayout = () => {
           </main>
          
       </div>
-    
+      
+      {showLogout && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-600 bg-opacity-30">
+          <div className="p-6 bg-white rounded-lg shadow-lg dark:bg-woodsmoke-900 w-96">
+            <h1 className="mb-4 text-xl font-semibold text-center text-black dark:text-white">
+              Are you sure you want to Log Out?
+            </h1>
+            <div className="flex justify-center space-x-4">
+              <button onClick={() => setLogout(true)} className="px-4 py-2 text-white rounded bg-zuccini-600 hover:bg-zuccini-700">Yes</button>
+              <button onClick={loginCancel} className="px-4 py-2 text-white bg-red-600 rounded hover:bg-red-700 ">No</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </>
   )
 }
 

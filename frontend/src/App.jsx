@@ -13,6 +13,11 @@ import Profile from './pages/Profile';
 
 
 function App() {
+  // If the user is not logged in it will redirect to login page
+    const ProtectedRoute = ({children}) => {
+      const isAuthenticated = localStorage.getItem('token')
+      return isAuthenticated ? children : <Navigate to="/Login" />
+    }
   
   return (
     <Router>
@@ -21,8 +26,15 @@ function App() {
         <Route path="/" element={<Navigate to="/Login" />}/>
         <Route path="/Login" element={<Login />}/>
 
+        
+        
+        {/* These are the routes that needs authentication */}
         {/* MainLayout wraps other pages */}
-        <Route path="/" element={<MainLayout />} >
+        <Route path="/" element={
+          <ProtectedRoute>
+            <MainLayout />
+          </ProtectedRoute>
+          }>
           <Route path="/Dashboard" element={<Dashboard />} />
           <Route path="/Institutes" element={<Institutes />} />
           <Route path="/Programs" element={<Programs />} />
@@ -30,6 +42,7 @@ function App() {
           <Route path="/Users" element={<Users />} />
           <Route path="/Tasks" element={<Tasks />} />
           <Route path="/Documents" element={<Documents />} />
+
         {/* Profile page */}
          <Route path='/Profile' element={<Profile />}/>
         </Route>

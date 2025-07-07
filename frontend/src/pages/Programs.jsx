@@ -2,39 +2,46 @@
 import ProgramCard from "../components/ProgramCard";
 import CreateCard from "../components/CreateCard";
 import CreateForm from "../components/CreateForm";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 
   const Programs = () => {
+    
+    useEffect(() => {
+      fetch('http://localhost:5000/api/programs')
+        .then(res => res.json())
+        .then(data => setPrograms(data));
+    }, []);
 
     {/*use state function*/}
-    const [programs, setPrograms] = useState([
-      {
-        code: "BSIT",
-        name: "Bachelor of Science in Information Technology",
-        color: "#FFA500",
-        programDean: "John Doe",
-      },
-      {
-        code: "BSCrim",
-        name: "Bachelor of Science in Criminology",
-        color: "#FF0000",
-        programDean: "John Joe",
-      },
-      {
-        code: "BSN",
-        name: "Bachelor of Science in Nursing",
-        color: "#FFFF00",
-        programDean: "John Boe",
-      },
-      {
-        code: "CBA",
-        name: "Bachelor of Science in Education",
-        color: "#008000",
-        programDean: "John Coe",
-      },
-      
-    ])
+    const [programs, setPrograms] = useState(
+    //   [
+    //   {
+    //     code: "BSIT",
+    //     name: "Bachelor of Science in Information Technology",
+    //     color: "#FFA500",
+    //     programDean: "John Doe",
+    //   },
+    //   {
+    //     code: "BSCrim",
+    //     name: "Bachelor of Science in Criminology",
+    //     color: "#FF0000",
+    //     programDean: "John Joe",
+    //   },
+    //   {
+    //     code: "BSN",
+    //     name: "Bachelor of Science in Nursing",
+    //     color: "#FFFF00",
+    //     programDean: "John Boe",
+    //   },
+    //   {
+    //     code: "CBA",
+    //     name: "Bachelor of Science in Education",
+    //     color: "#008000",
+    //     programDean: "John Coe",
+    //   },
+    // ]
+  )
 
 
     
@@ -122,7 +129,7 @@ import { useState } from "react";
               
             {/*Program Cards Row */}
             {programs.map(program=> (
-              <ProgramCard program={program} key={program.code}/>
+              <ProgramCard program={program} key={program.programID}/>
             ))}
 
             {/*Form*/}
