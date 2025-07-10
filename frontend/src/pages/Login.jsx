@@ -31,7 +31,7 @@ const Login = () => {
         }
 
         try {
-            const response = await axios.post('/api/login', {employeeID, password}, {withCredentials: true});
+            const response = await axios.post('http://localhost:5000/api/login', {employeeID, password}, {withCredentials: true});
             if (response.data.success) {
                 setError(null);
                 navigate('/Dashboard');
@@ -112,6 +112,8 @@ const Login = () => {
             </div>
         </div>
        
+       
+
     </>
     )
 }

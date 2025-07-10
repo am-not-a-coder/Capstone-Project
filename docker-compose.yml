@@ -1,15 +1,17 @@
-
 services:
   frontend:
     build: ./frontend
     ports: 
-      - "3000:3000"
+      - "5173:5173"
     environment:
       - REACT_APP_API_URL=http://localhost:5000/api
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app  
+    develop:
+      watch:
+      - path: ./frontend
+        target: /app
+        action: sync 
     stdin_open: true #for the live reload in react to work
     tty: true
   backend:
@@ -20,21 +22,9 @@ services:
     env_file: 
       - ./backend/.env
 
-    depends_on:
-      - database
-    volumes:
-      - ./backend:/app
+    develop:
+      watch:
+      - path: ./backend
+        target: /app
+        action: sync
   
-  database:
-    image: postgres:latest
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: Admin_123
-      POSTGRES_DB: UDMS
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-  
-volumes:
-  postgres_data:
