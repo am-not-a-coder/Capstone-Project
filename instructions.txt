@@ -1,0 +1,10 @@
+Instructions on how to make the files work on docker
+
+1. Make sure you have the files from the repository
+2. Make sure you have the .env file in the ./backend directory
+3. run these commands in the terminal
+
+docker-compose build         # Build frontend, backend, and DB
+docker-compose up -d        # Start all services in the background
+docker-compose watch        # Enable hot reload for frontend/backend
+

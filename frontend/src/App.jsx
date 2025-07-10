@@ -15,7 +15,7 @@ import Profile from './pages/Profile';
 function App() {
   // If the user is not logged in it will redirect to login page
     const ProtectedRoute = ({children}) => {
-      const isAuthenticated = localStorage.getItem('token')
+      const isAuthenticated = localStorage.getItem('token') // chcecks if the jwt auth token from the backend is present
       return isAuthenticated ? children : <Navigate to="/Login" />
     }
   

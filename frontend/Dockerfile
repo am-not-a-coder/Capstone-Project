@@ -1,6 +1,6 @@
 
 #Initializes the base image
-FROM node:18-alpine
+FROM node:18
 
 #Declares the working directory
 WORKDIR /app
@@ -17,7 +17,7 @@ COPY . .
 #Declares the default port 
 ENV PORT=3000
 
-#Exposes port 3000 on the container
+#Exposes port 5173 on the container
 EXPOSE  3000
 
 #Tells Docker to run 'npm run dev' when the container launches.

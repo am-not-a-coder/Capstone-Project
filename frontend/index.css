@@ -1,3 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@theme{
+  /* Woodsmoke Custom Color */
+  --color-woodsmoke-50: #f7f7f8;
+  --color-woodsmoke-100: #ededf1;
+  --color-woodsmoke-200: #d7d8e0;
+  --color-woodsmoke-300: #b5b6c4;
+  --color-woodsmoke-400: #8c8ea4;
+  --color-woodsmoke-500: #6e7189;
+  --color-woodsmoke-600: #595a70;
+  --color-woodsmoke-700: #48495c;
+  --color-woodsmoke-800: #3e3e4e;
+  --color-woodsmoke-900: #373843;
+  --color-woodsmoke-950: #0e0e11;
+
+  /* Zuccini Custom Color */
+  --color-zuccini-50: #eefff5;
+  --color-zuccini-100: #d8ffeb;
+  --color-zuccini-200: #b4fed8;
+  --color-zuccini-300: #79fcba;
+  --color-zuccini-400: #38f094;
+  --color-zuccini-500: #0ed975;
+  --color-zuccini-600: #05b45d;
+  --color-zuccini-700: #088d4c;
+  --color-zuccini-800: #0c6f3f;
+  --color-zuccini-900: #0c5b36;
+  --color-zuccini-950: #004526;
+
+}
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
