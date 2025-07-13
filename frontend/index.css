@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+
 @theme{
   /* Woodsmoke Custom Color */
   --color-woodsmoke-50: #f7f7f8;

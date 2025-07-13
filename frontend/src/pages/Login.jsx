@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import axios  from 'axios';
 import Carousel from '../components/Carousel';
@@ -42,6 +42,7 @@ const Login = () => {
             }
         } catch (err) {
             alert('Server error. Please try again.');
+            
         }
     }
 

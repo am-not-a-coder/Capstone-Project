@@ -15,9 +15,6 @@ class User(db.Model):
     profilePic = db.Column(db.Text)
     isAdmin = db.Column(db.Boolean, default=False)
     isOnline = db.Column(db.Boolean, default=False)
-
-   
-
 class Area(db.Model):
     __tablename__ = 'area'
 

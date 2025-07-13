@@ -45,7 +45,7 @@ import LoginFigure3 from '../assets/login-figure-3.svg';
       //carousel wrapper
      <div className="w-[80%] h-[85%] mt-12 bg-transparent p-2 rounded-4xl"> 
          {/* slides container */}
-        <div className=" px-2 h-full w-full text-center border-1 border-neutral-600 shadow-2xl rounded-3xl backdrop-blur-xl">
+        <div className=" px-2 h-full w-full text-center border-3 border-neutral-900  backdrop-blur-md shadow-2xl/60 rounded-3xl ">
          <Slider {...settings}>
                {slides.map((slide, index) =>{
                   return(

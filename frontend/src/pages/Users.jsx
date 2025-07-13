@@ -2,23 +2,38 @@
 import{
     faCircleUser
 } from '@fortawesome/free-solid-svg-icons';
+import axios from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+
 
 const Users = () => {
-    const [visible, makeVisible] = useState("list");  // state to control which section is visible
-    const [employeeId, setEmployeeId] = useState("");  // state for employee ID input
-    const [name, setName] = useState("");  // state for name input
-    const [department, setDepartment] = useState("");  // state for department input
+
+    // user info
+    const [employeeID, setEmployeeID] = useState("");  // state for employee ID input
+    const [fName, setFName] = useState("");  // state for first name input
+    const [lName, setLName] = useState("");  // state for last name input
+    const [suffix, setSuffix] = useState(""); // state for suffix input
+    const [program, setProgram] = useState("");  // state for program input
+    const [area, setArea] = useState("");  // state for area input
     const [password, setPassword] = useState("");  // state for password input
     const [email, setEmail] = useState("");  // state for email input
+    const [contactNum, setContactNum] = useState("");  // state for contact number input
     const [profilePic, setProfilePic] = useState(null); // state for profile picture
+
+    const [programOption, setProgramOption] = useState([]);    
+    const [areaOption, setAreaOption] = useState([]);    
+    const [visible, makeVisible] = useState("list");  // state to control which section is visible
     const [submittedUsers, setSubmittedUsers] = useState([]); 
     const [showDetails, setShowDetails] = useState(false); // state for showing user details
     const [removeUser, setRemoveUser] = useState(false); // state for removing user
     const [selectedUser, setSelectedUser] = useState([]); // state for selected user
     const [removeConfirmation, setRemoveConfirmation] = useState(false); // state for showing remove button
     const [searchQuery, setSearchQuery] = useState(""); // state for search query
+
+    const token = localStorage.getItem('token'); // gets the access token
+
 
     if (removeUser) {
         setSubmittedUsers(submittedUsers.filter(user => user !== selectedUser)); // remove selected user from submitted users
@@ -32,18 +47,125 @@ const Users = () => {
         setSelectedUser(user); // set selected user
         setShowDetails(true); // show user details
     }
-
-    const handleSubmit = (e) => {
+    const handleCreateUser = async (e) => {
         e.preventDefault(); // prevent default form submission
-        const newUser = { employeeId, name, department, password, email, profilePic }; // create new user object
-        setSubmittedUsers(prev => [...prev, newUser]);  // add new user to submitted users
-        setEmployeeId(""); // reset employee ID input
-        setName(""); // reset name input
-        setDepartment(""); // reset department input
-        setPassword(""); // reset password input
-        setEmail(""); // reset email input
-        setProfilePic(null); // reset profile picture
+
+        if (!token){
+            alert("No token found!");
+            return;
+        }
+
+        //sends user data through a FormData
+        const formData = new FormData();
+            formData.append("employeeID", employeeID);
+            formData.append("password", password);
+            formData.append("fName", fName);
+            formData.append("lName", lName);
+            formData.append("suffix", suffix);
+            formData.append("email", email);
+            formData.append("contactNum", contactNum);
+            if (profilePic) formData.append("profilePic", profilePic); //gets the actual file
+            formData.append("programName", program)
+
+        try{
+            //Post request
+        const res = await axios.post('http://localhost:5000/api/user', formData,
+            {headers: 
+                {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'multipart/form-data' // supports the file 
+                }}, {withCredentials: true});
+            
+            alert(res.data.message);
+            console.log(res.data.user_list);
+            setSubmittedUsers(user => [...user,
+                {
+                    employeeID,
+                    name: `${fName} ${lName} ${suffix}`,
+                    email,
+                    contactNum,
+                    profilePic: URL.createObjectURL(profilePic),
+                    program
+                }]);
+            
+            //resets the form inputs 
+            setEmployeeID("")
+            setFName("")
+            setLName("")
+            setSuffix("")
+            setPassword("")
+            setEmail("")
+            setContactNum("")
+            setProgram("")
+            setProfilePic(null)
+            
+        
+        } catch(err){
+            alert("Server error. Please try again");
+            console.log(err.res?.data || err.message)
+        }
     }
+
+    // Get user info from the backend
+    useEffect(() => {
+        const fetchUsers = async () => {
+            try{
+                
+                if(!token){
+                    alert("Token not found!");
+                    return;
+                }
+                const res = await axios.get('http://localhost:5000/api/users',
+                    {headers: {'Authorization': `Bearer ${token}`}
+                });
+                //checking the users before setting
+                (Array.isArray(res.data.users)) ? setSubmittedUsers(res.data.users) : setSubmittedUsers([]); 
+            } catch (err){
+                console.error("Error occurred during user fetching", err);
+            }
+        };
+         fetchUsers();
+    }, [])
+    //Get program info from the backend
+    useEffect(() => {
+    const fetchProgram = async () =>{
+
+        const res = await axios.get('http://localhost:5000/api/program', 
+            {headers: {'Authorization': `Bearer ${token}`}}, {withCredentials: true}
+        )
+
+        try{
+            (Array.isArray(res.data.programs) ? setProgramOption(res.data.programs) : setProgramOption([]) )
+        } catch(err){
+            console.error("Error occurred during program fetching", err)
+        }
+    }
+    fetchProgram();
+    }, [])
+
+    useEffect(() => {
+        
+    const fetchArea = async () => {
+        
+       const res = await axios.get('http://localhost:5000/api/area', 
+        {headers: {'Authorization': `Bearer ${token}`}},
+        {withCredentials: true}
+       )
+
+       try{
+        Array.isArray(res.data.area) ? setArea(res.data.area) : setArea([]);
+        console.log(res.data.area);
+    } catch (err) {
+        console.error("Error occurred during area fetching", err)
+    }
+
+    }
+
+    fetchArea();
+    }, [])
+
+
+   
 
     function exitShowDetails() {
         setRemoveConfirmation(false); 
@@ -79,17 +201,25 @@ const Users = () => {
             
             {/* section for adding users */}
             <section  className={`${visible == "add" ? "block" : "hidden"} overflow-y-auto box-border h-[75%] mt-4 p-5 text-neutral-800 border border-neutral-400 rounded-3xl shadow-xl dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-800`}>
-                <form onSubmit={handleSubmit} action="" method='POST' className='flex flex-row flex-wrap w-full gap-8 p-5 '>
+                <form onSubmit={handleCreateUser} action="" method='POST' className='flex flex-row flex-wrap w-full gap-8 p-5 '>
                     {/* detais form */}
                     <div className='flex flex-col w-1/4 gap-6 '>
                         <div className='relative'>
-                            <input type="text" value={employeeId} required onChange={(e) => setEmployeeId(e.target.value)} name='employeeId' className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
+                            <input type="text" value={employeeID} required onChange={(e) => setEmployeeID(e.target.value)} name='employeeID' className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
                             <label  className="absolute transition-all duration-200 left-1 top-0 peer-focus:top-[-1.5rem] peer-valid:top-[-1.5rem] peer-focus:text-sm peer-valid:text-sm text-neutral-500 text-lg " style={{paddingInline: "0.25rem"}}>Employee ID</label>
                         </div>
 
                         <div className='relative'>
-                            <input type="text" value={name} required onChange={(e) => setName(e.target.value)} name='name' className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
-                            <label  className="absolute transition-all duration-200 left-1 top-0 peer-focus:top-[-1.5rem] peer-valid:top-[-1.5rem] peer-focus:text-sm peer-valid:text-sm text-neutral-500 text-lg " style={{paddingInline: "0.25rem"}}>Name</label>
+                            <input type="text" value={fName} required onChange={(e) => setFName(e.target.value)} name='fName' className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
+                            <label  className="absolute transition-all duration-200 left-1 top-0 peer-focus:top-[-1.5rem] peer-valid:top-[-1.5rem] peer-focus:text-sm peer-valid:text-sm text-neutral-500 text-lg " style={{paddingInline: "0.25rem"}}>First Name</label>
+                        </div>
+                        <div className='relative'>
+                            <input type="text" value={lName} required onChange={(e) => setLName(e.target.value)} name='lName' className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
+                            <label  className="absolute transition-all duration-200 left-1 top-0 peer-focus:top-[-1.5rem] peer-valid:top-[-1.5rem] peer-focus:text-sm peer-valid:text-sm text-neutral-500 text-lg " style={{paddingInline: "0.25rem"}}>Last Name</label>
+                        </div>
+                        <div className='relative'>
+                            <input type="text" value={suffix} onChange={(e) => setSuffix(e.target.value)} name='suffix' className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
+                            <label  className="absolute transition-all duration-200 left-1 top-0 peer-focus:top-[-1.5rem] peer-valid:top-[-1.5rem] peer-focus:text-sm peer-valid:text-sm text-neutral-500 text-lg " style={{paddingInline: "0.25rem"}}>Suffix</label>
                         </div>
 
                         <div className='relative'>
@@ -101,14 +231,31 @@ const Users = () => {
                             <input type="email" required placeholder='' name='email' value={email} onChange={(e) => setEmail(e.target.value)}  className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
                             <label  className="absolute transition-all duration-200 left-1 top-0 peer-focus:top-[-1.5rem] peer-focus:text-sm text-neutral-500 text-lg peer-not-placeholder-shown:top-[-1.5rem] peer-not-placeholder-shown:text-sm" style={{paddingInline: "0.25rem"}}>Email</label>
                         </div>
+                        <div className='relative'>
+                            <input type="number" required placeholder='' name='contactNum' value={contactNum} onChange={(e) => setContactNum(e.target.value)}  className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
+                            <label  className="absolute transition-all duration-200 left-1 top-0 peer-focus:top-[-1.5rem] peer-focus:text-sm text-neutral-500 text-lg peer-not-placeholder-shown:top-[-1.5rem] peer-not-placeholder-shown:text-sm" style={{paddingInline: "0.25rem"}}>Contact Number</label>
+                        </div>
+
+                    
+                        <div className='relative'>
+                            <select name="program" id="program"  value={program} onChange={(e) => setProgram(e.target.value)} className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-500 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'>
+                                <option value="">Select Program</option>
+                                {programOption.map((program, index) => {
+                                return (
+                                    <option key={index} value={program.programName}>{program.programName}</option>
+                                )}
+                            )};                    
+                            </select>
+                        </div>
 
                         <div className='relative'>
-                            <select name="department" id="department"  value={department} onChange={(e) => setDepartment(e.target.value)} className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-500 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'>
-                                <option value="" disabled hidden>Select Program</option>
-                                <option value="BSIT">Information Technology</option>
-                                <option value="Criminology">Criminology</option>
-                                <option value="Accounting">Accounting</option>
-                                <option value="Nursing">Nursing</option>
+                            <select name="area" id="area"  value={area} onChange={(e) => setArea(e.target.value)} className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-500 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'>
+                                <option value="">Select Area</option>
+                                {areaOption.map((area, index) => {
+                                return (
+                                    <option key={index} value={area.areaName}>{area.areaName}</option>
+                                )}
+                            )};                    
                             </select>
                         </div>
 
@@ -121,15 +268,14 @@ const Users = () => {
                             <div className="w-[70%] h-[70%] place-self-center object-cover rounded-full relative" >
                                 <img src={profilePic} alt="Profile" className='w-full h-full rounded-full' />
                                 <button onClick={()=> setProfilePic(null)} className='absolute top-0 right-0 text-sm bg-gray-300 rounded-full cursor-pointer w-1/10 h-1/10'>X</button>
-                            </div>
+                            </div>  
                             : <FontAwesomeIcon icon={faCircleUser} className="place-self-center text-[14rem] text-gray-800 m-2" /> 
                         }
                         <label htmlFor="fileInput" className="px-4 py-1 text-sm text-gray-800 bg-gray-300 border border-gray-400 rounded cursor-pointer place-self-center ">Choose File</label>
                         <input type="file" id='fileInput' name='profilePic' hidden onChange={(e)=> {
                             const file = e.target.files[0];
                             if (file) {
-                                const imageUrl = URL.createObjectURL(file);
-                                setProfilePic(imageUrl); // set profile picture state to the image URL
+                                setProfilePic(file); // set profile picture state to the image URL
                             }
                         }}/>
                         
@@ -147,15 +293,15 @@ const Users = () => {
                     
                     (submittedUsers.map((user, index) => (
                         
-                        <div key={index}  onClick={()=> detailsAndSelectedUser(user)} className=" cursor-pointer flex flex-row w-[23%] bg-neutral-300 p-1 rounded-lg min-w-[200px] dark:shadow-md dark:shadow-zuccini-800 dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
+                        <div key={index}  onClick={()=> detailsAndSelectedUser(user)} className=" cursor-pointer flex flex-row w-[25%] bg-neutral-300 p-1 rounded-lg min-w-[200px] dark:shadow-md dark:shadow-zuccini-800 dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
                             {user.profilePic ? 
-                                <img src={user.profilePic} alt="" className='place-self-center m-2 w-[21%] h-[80%] object-cover rounded-full'/> : <FontAwesomeIcon icon={faCircleUser} className="m-2 text-5xl text-gray-800 place-self-center" />
+                                <img src={user.profilePic} alt="user profile pic" className='place-self-center m-2 w-[21%] h-[80%] object-cover rounded-full mr-2'/> : <FontAwesomeIcon icon={faCircleUser} className="ml-2 mr-3 text-5xl text-gray-800 place-self-center dark:text-white" />
                             }
                             
                             <div className='flex flex-col items-center justify-center w-full '>
                                 
-                                <p  className="p-2 text-lg text-neutral-800 dark:text-white" style={{fontSize: user.name.length >= 13 ? '0.8rem' : '1rem'}}>{user.name}</p>
-                                <p className="text-sm dark:text-white">{user.department}</p>
+                                <p  className="p-2 text-lg text-neutral-800 dark:text-white" style={{fontSize: user.name.length >= 13 ? '0.8rem' : '1.3rem'}}>{user.name}</p>
+                                <p className="text-sm dark:text-white text-center" style={{fontSize: user.programName.length >= 13 ? '0.8rem' : '1rem'}}>{user.programName}</p>
                             </div>
                         </div>
                     )))}
@@ -172,21 +318,21 @@ const Users = () => {
                             {selectedUser.profilePic ? 
                                 <img src={selectedUser.profilePic} alt="" className='place-self-center w-[31%] h-[25%] object-cover rounded-full'/> : <FontAwesomeIcon icon={faCircleUser} className="text-gray-800 text-9xl"/>
                             }
-                            <form action="" onSubmit={handleSubmit} method='POST' className='flex flex-col w-full gap-4 gap'>
+                            <form action="" onSubmit={handleCreateUser} method='POST' className='flex flex-col w-full gap-4 gap'>
                                 <p className='ml-10'>Employee ID: <span>
-                                    <input type="text" value={selectedUser.employeeId} name='employeeId' className='p-1 ml-2 font-semibold border border-gray-400 rounded' />
+                                    <input type="text" value={selectedUser.employeeID} readOnly name='employeeID' className='p-1 ml-2 font-semibold border border-gray-400 rounded' />
                                 </span></p>
                                 <p className='ml-10'>Name: <span>
-                                    <input type="text" value={selectedUser.name} name='name' className='p-1 font-semibold border border-gray-400 rounded ml-14'/>
+                                    <input type="text" value={selectedUser.name} readOnly name='name' className='p-1 font-semibold border border-gray-400 rounded ml-14'/>
                                 </span></p>
-                                <p className='ml-10'>Password: <span>
-                                    <input type="text" value={selectedUser.password} className='p-1 ml-8 font-semibold border border-gray-400 rounded' />
+                                <p className='ml-10'>Area Assigned: <span>
+                                    <input type="text" value={selectedUser.password} readOnly className='p-1 ml-8 font-semibold border border-gray-400 rounded' />
                                 </span></p>
-                                <p className='ml-10'>Department: <span>
-                                    <input type="text" value={selectedUser.department} className='p-1 ml-3 font-semibold border border-gray-400 rounded' />
+                                <p className='ml-10'>Program: <span>
+                                    <input type="text" value={selectedUser.programName} readOnly className='p-1 ml-3 font-semibold border border-gray-400 rounded' />
 
                                     {/* <select  className='p-1 ml-3 font-semibold border border-gray-400 rounded w-6/10 ' >
-                                        <option value={selectedUser.department} selected></option>
+                                        <option value={selectedUser.program} selected></option>
                                         <option value="BSIT">Information Technology</option>
                                         <option value="Criminology">Criminology</option>
                                         <option value="Accounting">Accounting</option>
@@ -194,7 +340,7 @@ const Users = () => {
                                     </select> */}
                                 </span></p>
                                 <p className='ml-10'>Email: <span>
-                                    <input type="email" value={selectedUser.email} className='p-1 font-semibold border border-gray-400 rounded ml-15' />
+                                    <input type="email" value={selectedUser.email} readOnly className='p-1 font-semibold border border-gray-400 rounded ml-15' />
                                 </span></p>
                             </form><br />
 
@@ -228,12 +374,12 @@ const Users = () => {
                             // using users index in array as key
                             <div key={index}  onClick={()=> detailsAndSelectedUser(user)} className=" cursor-pointer flex flex-row w-[23%] bg-neutral-300 p-1 rounded-lg min-w-[200px] dark:shadow-md dark:shadow-zuccini-800 dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
                                 {user.profilePic ? 
-                                    <img src={user.profilePic} alt="" className='place-self-center m-2 w-[21%] h-[80%] object-cover rounded-full'/> : <FontAwesomeIcon icon={faCircleUser} className="m-2 text-5xl text-gray-800 place-self-center" />
+                                    <img src={user.profilePic} alt="" className='place-self-center m-2 w-[21%] h-[80%] object-cover rounded-full'/> : <FontAwesomeIcon icon={faCircleUser} className="m-2 text-5xl text-gray-800 place-self-center dark:text-white" />
                                 }
                                 <div className='flex flex-col items-center justify-center w-full '> 
                                     {/* make name smaller when it is too long */}
                                     <p  className="p-2 text-lg text-neutral-800 dark:text-white" style={{fontSize: user.name.length >= 13 ? '0.8rem' : '1rem'}}>{user.name}</p>
-                                    <p className="text-sm dark:text-white">{user.department}</p>
+                                    <p className="text-sm dark:text-white" style={{fontSize: user.programName.length >= 13 ? '0.8rem' : '1rem'}}>{user.programName}</p>
                                 </div>
                             </div>
                         ))
