@@ -10,6 +10,8 @@ from app.models import User, Program, Area, Subarea, Institute, Document
 
 
 def register_routes(app):
+                                        #AUTHENTICATION(LOGIN/LOGOUT) PAGE ROUTES 
+
 
     # CHECKS IF THE BACKEND IS WORKING
     @app.route('/api/checkdb', methods=['GET'])
@@ -76,7 +78,9 @@ def register_routes(app):
         session.clear()
         return jsonify({"message":"You have logged out the system"})
     
-        
+
+                                        #USER PAGE ROUTES
+
     #CREATE USER
     @app.route('/api/user', methods=["POST"])
     @jwt_required()
@@ -90,15 +94,21 @@ def register_routes(app):
         suffix = data.get("suffix").strip()
         email = data.get("email").strip()
         contactNum = data.get("contactNum")
+        programID = data.get("programID")
+        areaID = data.get("areaID")
 
         # Get the profile picture file
         file = request.files.get("profilePic")
 
         if file:
+
             filename = secure_filename(file.filename)
+            
+            # Make sure the folder exists
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(file_path)
-
             profilePic = f"/uploads/{filename}"
         else:
             profilePic = None
@@ -117,17 +127,39 @@ def register_routes(app):
                 suffix = suffix,
                 email = email,
                 contactNum = contactNum,
-                profilePic = f"/uploads/(filename)",
+                profilePic = profilePic,
+                programID = programID,
+                areaID = areaID
         )
             db.session.add(new_user)
             db.session.commit()
             return jsonify({'success': True, "message": "User created successfully"}), 201  
+        
 
-    #View the uploaded file
-    @app.route('/api/<filename>')
-    def uploaded_file(filename):
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-    
+
+    #Delete the user 
+    @app.route('/api/user/<string:employeeID>', methods=["DELETE"])
+    def delete_user(employeeID):
+        user = User.query.filter_by(employeeID=employeeID).first()
+
+        if not user:
+            return jsonify({"success": False, "message": "User does not exists"}), 404
+        
+        db.session.delete(user)
+        db.session.commit()
+
+        return jsonify({"success": True, "message":"User has been deleted"}), 200
+
+
+
+
+
+
+
+
+                                        #DATA FETCHING ROUTES
+                                        
+                                                            
     #Get the users 
     @app.route('/api/users', methods=["GET"])
     @jwt_required()
@@ -190,12 +222,12 @@ def register_routes(app):
     def get_area():
         areas = (Area.query
                  .join(Program, Area.programID == Program.programID)
-                 .join(Subarea, Area.subareaID == Subarea.subareaID)
+                #  .join(Subarea, Area.subareaID == Subarea.subareaID)
                  .add_columns(
                     Area.areaID,
                     Program.programName,
                     Area.areaName,
-                    Subarea.subareaName 
+                    # Subarea.subareaName 
                 )
                  ).all()
 
@@ -206,9 +238,10 @@ def register_routes(app):
                 'areaID' : area.areaID,
                 'programName': area.programName,
                 'areaName': area.areaName,
-                'subareaName': area.subareaName
+                # 'subareaName': area.subareaName
             }
             area_list.append(area_data)
+            
 
         return jsonify({"area": area_list}), 200
 

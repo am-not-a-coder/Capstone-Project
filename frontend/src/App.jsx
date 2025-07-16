@@ -15,10 +15,12 @@ import Profile from './pages/Profile';
 
 function App() {
 
+  //Checks if the token is not expired and directs the user to login if it is
   axios.interceptors.response.use(
     response => response,
     error => {
       if (error.response?.status === 401){
+        console.log("Your token is expired!")
         localStorage.removeItem('token');
         window.location.href = '/login'
       }

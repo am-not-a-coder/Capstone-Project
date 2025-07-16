@@ -30,7 +30,7 @@ def create_app():
     from app.routes import register_routes
     register_routes(app)
 
-    upload_folder = os.path.join(os.getcwd(), '../uploads')
+    upload_folder = os.path.join(os.getcwd(), 'uploads')
     app.config['UPLOAD_FOLDER'] = upload_folder
 
     

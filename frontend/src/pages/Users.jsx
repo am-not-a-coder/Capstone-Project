@@ -1,6 +1,8 @@
 // import no profile icon from fontawesome
 import{
-    faCircleUser
+    faCircleUser,
+    faEye,
+    faEyeSlash
 } from '@fortawesome/free-solid-svg-icons';
 import axios from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -15,8 +17,8 @@ const Users = () => {
     const [fName, setFName] = useState("");  // state for first name input
     const [lName, setLName] = useState("");  // state for last name input
     const [suffix, setSuffix] = useState(""); // state for suffix input
-    const [program, setProgram] = useState("");  // state for program input
-    const [area, setArea] = useState("");  // state for area input
+    const [programID, setProgramID] = useState("");  // state for program ID input
+    const [areaID, setAreaID] = useState("");  // state for area ID input
     const [password, setPassword] = useState("");  // state for password input
     const [email, setEmail] = useState("");  // state for email input
     const [contactNum, setContactNum] = useState("");  // state for contact number input
@@ -31,6 +33,8 @@ const Users = () => {
     const [selectedUser, setSelectedUser] = useState([]); // state for selected user
     const [removeConfirmation, setRemoveConfirmation] = useState(false); // state for showing remove button
     const [searchQuery, setSearchQuery] = useState(""); // state for search query
+
+    const[hidePassword, setHidePassword] = useState(); //state for hiding the password
 
     const token = localStorage.getItem('token'); // gets the access token
 
@@ -64,8 +68,9 @@ const Users = () => {
             formData.append("suffix", suffix);
             formData.append("email", email);
             formData.append("contactNum", contactNum);
-            if (profilePic) formData.append("profilePic", profilePic); //gets the actual file
-            formData.append("programName", program)
+             if(profilePic?.file) formData.append("profilePic", profilePic.file); // 
+            formData.append("programID", programID);
+            formData.append("areaID", areaID)
 
         try{
             //Post request
@@ -77,15 +82,28 @@ const Users = () => {
                 }}, {withCredentials: true});
             
             alert(res.data.message);
-            console.log(res.data.user_list);
+
+        
+            const selectedProgram = programOption.find(program => program.programID == programID);
+            const selectedProgramName = selectedProgram ? selectedProgram.programName: "";
+
+            const selectedArea = areaOption.find(area => area.areaID == areaID);
+            const selectedAreaName  = selectedArea ? selectedArea.areaName : "";
+
+
+            //updates the users list
             setSubmittedUsers(user => [...user,
                 {
                     employeeID,
                     name: `${fName} ${lName} ${suffix}`,
                     email,
                     contactNum,
-                    profilePic: URL.createObjectURL(profilePic),
-                    program
+                    profilePic,
+                    programID,
+                    areaID,
+                    programName: selectedProgramName,
+                    areaName: selectedAreaName
+                    
                 }]);
             
             //resets the form inputs 
@@ -96,7 +114,8 @@ const Users = () => {
             setPassword("")
             setEmail("")
             setContactNum("")
-            setProgram("")
+            setProgramID("")
+            setAreaID("")
             setProfilePic(null)
             
         
@@ -105,27 +124,29 @@ const Users = () => {
             console.log(err.res?.data || err.message)
         }
     }
-
+                                        //FETCHING DATA FROM BACKEND  
     // Get user info from the backend
     useEffect(() => {
-        const fetchUsers = async () => {
-            try{
-                
-                if(!token){
-                    alert("Token not found!");
-                    return;
-                }
-                const res = await axios.get('http://localhost:5000/api/users',
-                    {headers: {'Authorization': `Bearer ${token}`}
-                });
-                //checking the users before setting
-                (Array.isArray(res.data.users)) ? setSubmittedUsers(res.data.users) : setSubmittedUsers([]); 
-            } catch (err){
-                console.error("Error occurred during user fetching", err);
+    const fetchUsers = async () => {
+        try{                
+            if(!token){
+                alert("Token not found!");
+                return;
             }
-        };
-         fetchUsers();
+            const res = await axios.get('http://localhost:5000/api/users',
+                {headers: {'Authorization': `Bearer ${token}`}
+            });
+            //checking the users before setting
+            (Array.isArray(res.data.users)) ? setSubmittedUsers(res.data.users) : setSubmittedUsers([]); 
+        } catch (err){
+            console.error("Error occurred during user fetching", err);
+        }
+    };
+
+    fetchUsers();
+
     }, [])
+
     //Get program info from the backend
     useEffect(() => {
     const fetchProgram = async () =>{
@@ -140,43 +161,69 @@ const Users = () => {
             console.error("Error occurred during program fetching", err)
         }
     }
+
     fetchProgram();
+
     }, [])
 
+    //Fetch the Area in the backend
     useEffect(() => {
         
     const fetchArea = async () => {
         
        const res = await axios.get('http://localhost:5000/api/area', 
-        {headers: {'Authorization': `Bearer ${token}`}},
-        {withCredentials: true}
+            {headers: {'Authorization': `Bearer ${token}`}},
+            {withCredentials: true}
        )
 
        try{
-        Array.isArray(res.data.area) ? setArea(res.data.area) : setArea([]);
-        console.log(res.data.area);
-    } catch (err) {
-        console.error("Error occurred during area fetching", err)
-    }
+            Array.isArray(res.data.area) ? setAreaOption(res.data.area) : setAreaOption([]);
+        } catch (err) {
+            console.error("Error occurred during area fetching", err)
+        }
 
     }
-
     fetchArea();
     }, [])
 
 
-   
+    
+    function removeAndClose() {
+        setRemoveUser(true); // set remove user to true
+        setRemoveConfirmation(false); // hide remove confirmation
+        exitShowDetails(); // exit show details
+    }
+
+    const handleDeleteUser = async () => { //Deletes the user
+        const id = selectedUser?.employeeID;
+
+        if(!id){
+            alert("No selected user for deletion")
+            return;
+        }
+
+        try{
+
+            const res = await axios.delete(`http://localhost:5000/api/user/${id}`,
+                {headers: {'Authorization' : `Bearer ${token}`}},
+                {withCredentials: true});
+            
+            removeAndClose() 
+            
+            alert(res.data.message)
+
+        } catch(err){
+            console.error(err.response?.data || err.message)
+            alert("Failed to delete user")
+        }
+
+    }
 
     function exitShowDetails() {
         setRemoveConfirmation(false); 
         setShowDetails(false); 
     }
 
-    function removeAndClose() {
-        setRemoveUser(true); // set remove user to true
-        setRemoveConfirmation(false); // hide remove confirmation
-        exitShowDetails(); // exit show details
-    }
 
     const handleQuery = (e) => {
         makeVisible("searchList"); // switch to list view
@@ -223,8 +270,12 @@ const Users = () => {
                         </div>
 
                         <div className='relative'>
-                            <input type="password" value={password} required onChange={(e) => setPassword(e.target.value)} name='password' className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
+                            <input type={!hidePassword ? "password" : "text"} value={password} required onChange={(e) => setPassword(e.target.value)} name='password' className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
                             <label  className="absolute transition-all duration-200 left-1 top-0 peer-focus:top-[-1.5rem] peer-valid:top-[-1.5rem] peer-focus:text-sm peer-valid:text-sm text-neutral-500 text-lg" style={{paddingInline: "0.25rem"}}>Password</label>
+                             <FontAwesomeIcon icon={!hidePassword ? faEye : faEyeSlash} 
+                                onClick={() => {setHidePassword((current) => !current)}}
+                                className='absolute cursor-pointer top-2.5 right-3 text-neutral-600'
+                            />
                         </div>
 
                         <div className='relative'>
@@ -232,28 +283,29 @@ const Users = () => {
                             <label  className="absolute transition-all duration-200 left-1 top-0 peer-focus:top-[-1.5rem] peer-focus:text-sm text-neutral-500 text-lg peer-not-placeholder-shown:top-[-1.5rem] peer-not-placeholder-shown:text-sm" style={{paddingInline: "0.25rem"}}>Email</label>
                         </div>
                         <div className='relative'>
-                            <input type="number" required placeholder='' name='contactNum' value={contactNum} onChange={(e) => setContactNum(e.target.value)}  className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
+                            <input type="tel" required placeholder='' name='contactNum' value={contactNum} onChange={(e) => setContactNum(e.target.value)}  className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
                             <label  className="absolute transition-all duration-200 left-1 top-0 peer-focus:top-[-1.5rem] peer-focus:text-sm text-neutral-500 text-lg peer-not-placeholder-shown:top-[-1.5rem] peer-not-placeholder-shown:text-sm" style={{paddingInline: "0.25rem"}}>Contact Number</label>
                         </div>
 
                     
                         <div className='relative'>
-                            <select name="program" id="program"  value={program} onChange={(e) => setProgram(e.target.value)} className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-500 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'>
+                            <select name="programID" id="programID"  value={programID}  required onChange={(e) => setProgramID(e.target.value)} className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-500 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'>
                                 <option value="">Select Program</option>
-                                {programOption.map((program, index) => {
+                                {programOption.map((program) => {
                                 return (
-                                    <option key={index} value={program.programName}>{program.programName}</option>
+                                    //shows the Program name but passes the Program ID in the backend
+                                    <option key={program.programID} value={program.programID}>{program.programName}</option>
                                 )}
                             )};                    
                             </select>
                         </div>
 
                         <div className='relative'>
-                            <select name="area" id="area"  value={area} onChange={(e) => setArea(e.target.value)} className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-500 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'>
+                            <select name="areaID" id="areaID"  value={areaID} required onChange={(e) => setAreaID(e.target.value)} className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-500 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'>
                                 <option value="">Select Area</option>
-                                {areaOption.map((area, index) => {
+                                {areaOption.map((area) => {
                                 return (
-                                    <option key={index} value={area.areaName}>{area.areaName}</option>
+                                    <option key={area.areaID} value={area.areaID}>{area.areaName}</option>
                                 )}
                             )};                    
                             </select>
@@ -266,7 +318,7 @@ const Users = () => {
                     <div className='flex flex-col items-start w-1/3 gap-4'>
                         {profilePic ? 
                             <div className="w-[70%] h-[70%] place-self-center object-cover rounded-full relative" >
-                                <img src={profilePic} alt="Profile" className='w-full h-full rounded-full' />
+                                <img src={profilePic.preview} alt="Profile" className='w-full h-full rounded-full' />
                                 <button onClick={()=> setProfilePic(null)} className='absolute top-0 right-0 text-sm bg-gray-300 rounded-full cursor-pointer w-1/10 h-1/10'>X</button>
                             </div>  
                             : <FontAwesomeIcon icon={faCircleUser} className="place-self-center text-[14rem] text-gray-800 m-2" /> 
@@ -275,7 +327,10 @@ const Users = () => {
                         <input type="file" id='fileInput' name='profilePic' hidden onChange={(e)=> {
                             const file = e.target.files[0];
                             if (file) {
-                                setProfilePic(file); // set profile picture state to the image URL
+                                setProfilePic({
+                                    preview: URL.createObjectURL(file), //creates a url for the preview
+                                    file: file // sends the file backend
+                                })
                             }
                         }}/>
                         
@@ -293,15 +348,15 @@ const Users = () => {
                     
                     (submittedUsers.map((user, index) => (
                         
-                        <div key={index}  onClick={()=> detailsAndSelectedUser(user)} className=" cursor-pointer flex flex-row w-[25%] bg-neutral-300 p-1 rounded-lg min-w-[200px] dark:shadow-md dark:shadow-zuccini-800 dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
+                        <div key={index}  onClick={()=> detailsAndSelectedUser(user)} className=" cursor-pointer flex flex-row max-w-[31%] bg-neutral-300 p-1 rounded-lg min-w-[200px] dark:shadow-md dark:shadow-zuccini-800 dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
                             {user.profilePic ? 
-                                <img src={user.profilePic} alt="user profile pic" className='place-self-center m-2 w-[21%] h-[80%] object-cover rounded-full mr-2'/> : <FontAwesomeIcon icon={faCircleUser} className="ml-2 mr-3 text-5xl text-gray-800 place-self-center dark:text-white" />
+                                <img src={`http://localhost:5000/${user.profilePic}`} alt="Profile" className='place-self-center m-2 w-[21%] h-[80%] object-cover rounded-full mr-2'/> : <FontAwesomeIcon icon={faCircleUser} className="ml-2 mr-3 text-5xl text-gray-800 place-self-center dark:text-white" />
                             }
                             
-                            <div className='flex flex-col items-center justify-center w-full '>
+                            <div className='flex flex-col items-center justify-center w-full'>
                                 
-                                <p  className="p-2 text-lg text-neutral-800 dark:text-white" style={{fontSize: user.name.length >= 13 ? '0.8rem' : '1.3rem'}}>{user.name}</p>
-                                <p className="text-sm dark:text-white text-center" style={{fontSize: user.programName.length >= 13 ? '0.8rem' : '1rem'}}>{user.programName}</p>
+                                <p  className="p-2 text-lg font-semibold text-neutral-800 dark:text-white" style={{fontSize: user.name.length >= 13 ? '1rem' : '1.3rem'}}>{user.name}</p>
+                                <p className="text-sm text-center dark:text-white" style={{fontSize: user.programName.length >= 13 ? '0.8rem' : '1rem'}}>{user.programName}</p>
                             </div>
                         </div>
                     )))}
@@ -326,7 +381,7 @@ const Users = () => {
                                     <input type="text" value={selectedUser.name} readOnly name='name' className='p-1 font-semibold border border-gray-400 rounded ml-14'/>
                                 </span></p>
                                 <p className='ml-10'>Area Assigned: <span>
-                                    <input type="text" value={selectedUser.password} readOnly className='p-1 ml-8 font-semibold border border-gray-400 rounded' />
+                                    <input type="text" value={selectedUser.areaName} readOnly className='p-1 ml-8 font-semibold border border-gray-400 rounded' />
                                 </span></p>
                                 <p className='ml-10'>Program: <span>
                                     <input type="text" value={selectedUser.programName} readOnly className='p-1 ml-3 font-semibold border border-gray-400 rounded' />
@@ -354,7 +409,7 @@ const Users = () => {
                                 <div className="absolute rounded-2xl g-5 w-[80%] h-1/5 place-self-center top-105 bg-gray-300 flex justify-center items-center flex-col">
                                         <p className="text-neutral-700">Are you sure you want to remove this user?</p><br />
                                         <div className='flex items-center justify-center w-full gap-4'>
-                                        <button className='w-1/5 p-2 bg-gray-400 border border-gray-500 text-neutral-800 rounded-xl' onClick={()=> removeAndClose()}>Yes</button>
+                                        <button className='w-1/5 p-2 bg-gray-400 border border-gray-500 text-neutral-800 rounded-xl' onClick={handleDeleteUser}>Yes</button>
                                         <button className='w-1/5 p-2 bg-gray-400 border border-gray-500 text-neutral-800 rounded-xl' onClick={()=> setRemoveConfirmation(false)}>No</button>
                                         </div>
                                 </div>

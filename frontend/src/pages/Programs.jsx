@@ -8,9 +8,26 @@ import { useState, useEffect } from "react";
   const Programs = () => {
     
     useEffect(() => {
-      fetch('http://localhost:5000/api/programs')
-        .then(res => res.json())
-        .then(data => setPrograms(data));
+      const fetchProgram = async () =>{
+        const token = localStorage.getItem('token');
+
+        if(!token){
+          alert("Token not found!");
+                return;
+            }
+      
+      try{
+         const response = await axios.get('http://localhost:5000/api/program', 
+          {headers: {'Authorization' : `Bearer ${token}`}},
+          {withCredentials: true});
+
+          
+
+      } catch (err){
+
+      }
+      }
+
     }, []);
 
     {/*use state function*/}
