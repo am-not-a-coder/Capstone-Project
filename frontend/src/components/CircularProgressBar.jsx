@@ -1,9 +1,12 @@
-const CircularProgressBar = ({percentage, circleWidth}) =>{
+import axios from 'axios';
+
+const CircularProgressBar = ({circleWidth, progress}) =>{
     const strokeWidth = 7;
     const radius = (circleWidth - strokeWidth) / 2;
     const dashArray = radius * Math.PI * 2;
-    const dashOffset = dashArray - (dashArray * percentage) / 100;
+    const dashOffset = dashArray - (dashArray * progress) / 100;
 
+    
     return(
         <>
             <svg 
@@ -39,7 +42,7 @@ const CircularProgressBar = ({percentage, circleWidth}) =>{
             dy='0.3em' 
             textAnchor="middle"
             className="font-semibold"
-            >{percentage}%</text>
+            >{progress}%</text>
 
 
             </svg>

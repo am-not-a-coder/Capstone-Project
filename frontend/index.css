@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme{
   /* Woodsmoke Custom Color */

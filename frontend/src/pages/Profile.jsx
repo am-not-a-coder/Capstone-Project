@@ -158,7 +158,7 @@ const [form, setForm] = useState({
     
    
     return(
-    <div className='w-full p-5 border-2 border-neutral-800 rounded-2xl dark:border-none dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-900'>
+    <div className='w-full p-5 border-2 border-neutral-800 rounded-2xl bg-neutral-100 dark:border-none dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-900'>
         {/* View Profile */}
         <h1 className='text-2xl text-neutral-800 dark:text-white'>View Profile</h1>
         <div className="grid grid-cols-3 gap-3 px-3 my-5 border shadow-xl text-neutral-800 rounded-2xl dark:bg-woodsmoke-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm">

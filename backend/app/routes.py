@@ -5,8 +5,9 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
 from flask_jwt_extended.exceptions import JWTExtendedException
+from datetime import datetime
 import os
-from app.models import User, Program, Area, Subarea, Institute, Document
+from app.models import User, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement
 
 
 def register_routes(app):
@@ -39,13 +40,7 @@ def register_routes(app):
             
             if check_password_hash(user.password, password): #checks if the user input hashed password matches the hashed pass in the db 
                 # After login, store the user info in the session
-                session["employeeID"] = user.employeeID
-                session["name"] = str(user.fName) + str(user.lName) + str(user.suffix)
-                session["email"] = user.email
-                session["contactNum"] = user.contactNum
-                session["profilePic"] = user.profilePic
-                session["isAdmin"] = user.isAdmin
-                session["isOnline"] = user.isOnline
+                
                 user.isOnline = True
                 db.session.commit()      
                 try:
@@ -152,11 +147,6 @@ def register_routes(app):
 
 
 
-
-
-
-
-
                                         #DATA FETCHING ROUTES
                                         
                                                             
@@ -171,6 +161,7 @@ def register_routes(app):
                       User.employeeID,
                       Program.programName,
                       Area.areaName,
+                      Area.areaNum,
                       User.fName,
                       User.lName,
                       User.suffix,
@@ -189,6 +180,7 @@ def register_routes(app):
                 'employeeID': user.employeeID,
                 'programName': user.programName,
                 'areaName': user.areaName,
+                'areaNum': user.areaNum,
                 'name': f"{user.fName} {user.lName} {user.suffix or ''}",
                 'email': user.email,
                 'contactNum': user.contactNum,
@@ -199,16 +191,22 @@ def register_routes(app):
             user_list.append(user_data)
         return jsonify({"users" : user_list}), 200
     
+
+    
     #Get the program
     @app.route('/api/program', methods=["GET"])
     def get_program():
         programs = Program.query.all()
-
+                    
         program_list = []
 
         for program in programs:
+
+            dean = program.dean
+
             program_data = {
                 'programID': program.programID,
+                'programDean': f"{program.lName} {program.fName} {program.suffix or ''}" if dean else "N/A",
                 'programCode': program.programCode,
                 'programName': program.programName,
                 'programColor': program.programColor,
@@ -216,35 +214,132 @@ def register_routes(app):
             program_list.append(program_data)
         return jsonify({"programs": program_list}), 200
 
-                    
     #Get the area
     @app.route('/api/area', methods=["GET"])
     def get_area():
         areas = (Area.query
                  .join(Program, Area.programID == Program.programID)
-                #  .join(Subarea, Area.subareaID == Subarea.subareaID)
+                 .join(Subarea, Area.subareaID == Subarea.subareaID)
                  .add_columns(
                     Area.areaID,
-                    Program.programName,
+                    Program.programCode,
                     Area.areaName,
-                    # Subarea.subareaName 
+                    Area.areaNum,
+                    Area.progress,
+                    Subarea.subareaName
                 )
-                 ).all()
+            ).all()
 
         area_list = []
 
         for area in areas:
             area_data = {
                 'areaID' : area.areaID,
-                'programName': area.programName,
+                'programCode': area.programCode,
                 'areaName': area.areaName,
-                # 'subareaName': area.subareaName
+                'progress': area.progress,
+                'subareaName': area.subareaName,
+                'areaNum': area.areaNum
             }
             area_list.append(area_data)
-            
+        
 
         return jsonify({"area": area_list}), 200
 
+
+
+    #Create deadline
+    @app.route('/api/deadline', methods=["POST"])
+    def create_deadline():        
+        data = request.form
+        #gets the data input from the frontend forms
+        programID = data.get("program")
+        areaID = data.get("area")
+        content = data.get("content")
+        due_date = data.get("due_date") 
+
+        
+        #creates a new deadline 
+        new_deadline = Deadline(
+            programID = programID,
+            areaID = areaID,
+            content = content,
+            due_date = due_date
+        )
+
+        db.session.add(new_deadline)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Deadline created successfully!'}), 200
+    
+
+    @app.route('/api/deadlines', methods=["GET"]) 
+    def get_deadline():
+
+        deadlines = (Deadline.query
+                     .join(Program, Deadline.programID == Program.programID)
+                     .join(Area, Deadline.areaID == Area.areaID)
+                     .add_columns(
+                         Deadline.deadlineID,
+                         Program.programName,
+                         Area.areaName,
+                         Area.areaNum,
+                         Deadline.due_date,
+                         Deadline.content
+                     )).all()
+     
+        deadline_list = []
+
+        for dl in deadlines: 
+            deadline_data = {                            
+                'deadlineID': dl.deadlineID,
+                'programName': dl.programName,                               
+                'areaName': dl.areaNum + ": " + dl.areaName, 
+                'due_date': dl.due_date.strftime('%m-%d-%Y'),
+                'content': dl.content
+            }
+            deadline_list.append(deadline_data)
+
+        return jsonify({'deadline': deadline_list})
+    
+    #get the events for the calendar
+    @app.route('/api/events', methods=["GET"])
+    def get_events():
+    
+        events = (Deadline.query
+                     .join(Program, Deadline.programID == Program.programID)
+                     .join(Area, Deadline.areaID == Area.areaID)
+                     .add_columns(
+                         Deadline.deadlineID,
+                         Program.programName,
+                         Program.programColor,
+                         Area.areaName,
+                         Area.areaNum,
+                         Deadline.due_date,
+                     )).all()
+        
+        event_list = []
+
+        for e in events:
+            event = {
+                'id': e.deadlineID,
+                'title': f"{e.areaNum}: {e.areaName}",
+                'start': e.due_date.strftime('%Y-%m-%d'),
+                'color': e.programColor
+            }
+     
+            event_list.append(event)
+        
+        return jsonify(event_list)
+        
+
+
+
+
+
+
+
+        
                     
         
 

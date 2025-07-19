@@ -88,7 +88,7 @@ const Users = () => {
             const selectedProgramName = selectedProgram ? selectedProgram.programName: "";
 
             const selectedArea = areaOption.find(area => area.areaID == areaID);
-            const selectedAreaName  = selectedArea ? selectedArea.areaName : "";
+            const selectedAreaName  = selectedArea ? selectedArea.areaNum : "";
 
 
             //updates the users list
@@ -102,7 +102,7 @@ const Users = () => {
                     programID,
                     areaID,
                     programName: selectedProgramName,
-                    areaName: selectedAreaName
+                    areaNum: selectedAreaName
                     
                 }]);
             
@@ -178,6 +178,7 @@ const Users = () => {
 
        try{
             Array.isArray(res.data.area) ? setAreaOption(res.data.area) : setAreaOption([]);
+            console.log(res.data.area)
         } catch (err) {
             console.error("Error occurred during area fetching", err)
         }
@@ -305,7 +306,7 @@ const Users = () => {
                                 <option value="">Select Area</option>
                                 {areaOption.map((area) => {
                                 return (
-                                    <option key={area.areaID} value={area.areaID}>{area.areaName}</option>
+                                    <option key={area.areaID} value={area.areaID}>{area.areaNum}</option>
                                 )}
                             )};                    
                             </select>
@@ -317,7 +318,7 @@ const Users = () => {
                     {/* upload profile */}
                     <div className='flex flex-col items-start w-1/3 gap-4'>
                         {profilePic ? 
-                            <div className="w-[70%] h-[70%] place-self-center object-cover rounded-full relative" >
+                            <div className="w-[70%] h-[70%] place-self-center object-cover rounded-full relative">
                                 <img src={profilePic.preview} alt="Profile" className='w-full h-full rounded-full' />
                                 <button onClick={()=> setProfilePic(null)} className='absolute top-0 right-0 text-sm bg-gray-300 rounded-full cursor-pointer w-1/10 h-1/10'>X</button>
                             </div>  
@@ -381,7 +382,7 @@ const Users = () => {
                                     <input type="text" value={selectedUser.name} readOnly name='name' className='p-1 font-semibold border border-gray-400 rounded ml-14'/>
                                 </span></p>
                                 <p className='ml-10'>Area Assigned: <span>
-                                    <input type="text" value={selectedUser.areaName} readOnly className='p-1 ml-8 font-semibold border border-gray-400 rounded' />
+                                    <input type="text" value={selectedUser.areaNum + ": " + selectedUser.areaName} readOnly className='p-1 ml-8 font-semibold border border-gray-400 rounded' />
                                 </span></p>
                                 <p className='ml-10'>Program: <span>
                                     <input type="text" value={selectedUser.programName} readOnly className='p-1 ml-3 font-semibold border border-gray-400 rounded' />
