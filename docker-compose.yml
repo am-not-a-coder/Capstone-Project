@@ -27,4 +27,7 @@ services:
       - path: ./backend
         target: /app
         action: sync
+
+    volumes:
+      - ./uploads:/app/uploads
   

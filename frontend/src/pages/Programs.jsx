@@ -3,47 +3,38 @@ import ProgramCard from "../components/ProgramCard";
 import CreateCard from "../components/CreateCard";
 import CreateForm from "../components/CreateForm";
 import { useState, useEffect } from "react";
+import axios from 'axios';
 
 
   const Programs = () => {
-    
+    const token = localStorage.getItem('token');
+
     useEffect(() => {
-      fetch('http://localhost:5000/api/programs')
-        .then(res => res.json())
-        .then(data => setPrograms(data));
+      const fetchProgram = async () =>{
+
+        if(!token){
+          alert("Token not found!");
+                return;
+            }
+      
+      try{
+         const response = await axios.get('http://localhost:5000/api/program', 
+          {headers: {'Authorization' : `Bearer ${token}`}},
+          {withCredentials: true});
+
+          Array.isArray(response.data.programs) ? setPrograms(response.data.programs) : setPrograms([]);
+          console.log(response.data.programs)
+
+      } catch (err){
+        console.error("Error occurred when fetching programs", err)
+
+      }
+    }
+      fetchProgram()
     }, []);
 
     {/*use state function*/}
-    const [programs, setPrograms] = useState(
-    //   [
-    //   {
-    //     code: "BSIT",
-    //     name: "Bachelor of Science in Information Technology",
-    //     color: "#FFA500",
-    //     programDean: "John Doe",
-    //   },
-    //   {
-    //     code: "BSCrim",
-    //     name: "Bachelor of Science in Criminology",
-    //     color: "#FF0000",
-    //     programDean: "John Joe",
-    //   },
-    //   {
-    //     code: "BSN",
-    //     name: "Bachelor of Science in Nursing",
-    //     color: "#FFFF00",
-    //     programDean: "John Boe",
-    //   },
-    //   {
-    //     code: "CBA",
-    //     name: "Bachelor of Science in Education",
-    //     color: "#008000",
-    //     programDean: "John Coe",
-    //   },
-    // ]
-  )
-
-
+    const [programs, setPrograms] = useState([]);
     
     const [showForm, setShowForm] = useState(false);
     const [activeModify, setActiveModify] = useState(null);
@@ -115,7 +106,7 @@ import { useState, useEffect } from "react";
     };
 
     return (
-      <main className="flex-1 h-full col-span-4 col-start-2 row-span-4 row-start-2 p-4 overflow-y-auto">
+      <>
         <div className="p-6 border rounded-xl border-neutral-800 dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
           <div className="flex flex-wrap mb-8 gap-15">
 
@@ -150,7 +141,7 @@ import { useState, useEffect } from "react";
             />}
           </div>
         </div>
-      </main>
+      </>
     );
   };
 

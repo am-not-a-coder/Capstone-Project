@@ -44,19 +44,19 @@ const Documents = () => {
   };
 
   return (
-    <main className="flex-1 h-full col-span-4 col-start-2 row-span-4 row-start-2 p-2 overflow-y-auto font-sans text-gray-800">
+    <>
       {/* Outer container for the document panel */}
-      <div className="border border-neutral-800 rounded-[20px] min-w-[950px] min-h-[450px] shadow-md p-6 dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
+      <div className="border border-neutral-800 rounded-[20px] min-w-[950px] min-h-[450px] shadow-md p-6 bg-neutral-200 dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
         
         {/* Search Bar Section */}
         <div className="flex max-w-[500px] items-center mx-auto mb-4">
-          <label className="mr-2 text-lg font-semibold dark:text-white">Search</label>
+          <label className="mr-2 text-lg font-semibold text-neutral-800 dark:text-white">Search</label>
           
           {/* Input field for typing search query */}
           <input
             type="text"
             placeholder="Search Document"
-            className="flex-grow px-3 py-2 text-base transition duration-300 bg-gray-200 border border-r-0 rounded-l-md focus:outline-none focus:ring focus:ring-zuccini-600 placeholder-neutral-500 dark:text-white dark:border-none dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:bg-woodsmoke-950"
+            className="flex-grow px-3 py-2 text-base transition duration-300 bg-gray-200 border border-r-0 text-neutral-800 rounded-l-md focus:outline-none focus:ring focus:ring-zuccini-600 placeholder-neutral-500 dark:text-white dark:border-none dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:bg-woodsmoke-950"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -78,7 +78,7 @@ const Documents = () => {
           
           {/* Header + removable tag chip (inline using flex) */}
           <div className="flex flex-wrap items-center gap-3 mb-3">
-            <p className="text-sm font-medium dark:text-white">Filter by:</p>
+            <p className="text-sm font-medium text-neutral-800 dark:text-white">Filter by:</p>
 
             {/* Example selected filter with remove "✕" */}
             <div className="inline-block px-4 py-1 text-sm text-gray-700 border rounded-full cursor-pointer border-neutral-400 dark:text-white">
@@ -94,7 +94,7 @@ const Documents = () => {
             {tags.map((tag) => (
               <div
                 key={tag}
-                className="px-4 py-1 text-sm border rounded-full cursor-pointer border-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-600 dark:text-white" 
+                className="px-4 py-1 text-sm border rounded-full cursor-pointer text-neutral-800 border-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-600 dark:text-white" 
               >
                 {tag}
               </div>
@@ -111,14 +111,14 @@ const Documents = () => {
             filteredFiles.map((file, index) => (
               <div
                 key={index}
-                className="border border-neutral-800 shadow-md rounded-[20px] px-4 py-5 flex justify-between items-center cursor-pointer hover:shadow-lg dark:hover:shadow-md dark:hover:shadow-zuccini-800 transition dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800"
+                className="border text-neutral-800 border-neutral-800 shadow-md rounded-[20px] px-4 py-5 flex justify-between items-center cursor-pointer hover:shadow-lg dark:hover:shadow-md dark:hover:shadow-zuccini-800 transition dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800"
               >
                 <div className="flex items-center space-x-3">
                   {/* Icon for PDF */}
                   <FontAwesomeIcon icon={faFilePdf} className="text-xl text-red-600 cursor-pointer dark:text-red-500" />
 
                   {/* Filename */}
-                  <span className="text-sm font-medium cursor-pointer hover:underline dark:text-white">
+                  <span className="text-sm font-medium cursor-pointer text-neutral-800 hover:underline dark:text-white">
                     {file}
                   </span>
                 </div>
@@ -135,7 +135,7 @@ const Documents = () => {
           )}
         </div>
       </div>
-    </main>
+    </>
   );
 };
 

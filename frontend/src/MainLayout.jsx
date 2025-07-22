@@ -38,10 +38,11 @@ const MainLayout = () => {
     localStorage.setItem('darkMode', darkMode)
   }, [darkMode])
 
+  //Log out logic
   const [showLogout, setShowLogout] = useState(false);
   const [logout, setLogout] = useState()
   const navigate = useNavigate()
- 
+ //shows the logout confirmation
   const loginCancel = () =>{
     setLogout(false)
     setShowLogout(false)
@@ -49,7 +50,7 @@ const MainLayout = () => {
 
   useEffect(() => {
     if (logout){
-      localStorage.removeItem('token')
+      localStorage.removeItem('token') // removes the token from the local storage
       navigate('/login')
     } 
   }, [logout])

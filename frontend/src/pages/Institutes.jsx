@@ -99,8 +99,8 @@ const Institutes = () => {
         };
         
     return(
-        <main  className="flex-1 h-full col-span-4 col-start-2 row-span-4 row-start-2 p-4 overflow-y-auto">
-            <div className="p-6 border border-neutral-800 rounded-xl dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:bg-[#19181A]">
+        <>
+            <div className="p-6 border border-neutral-800 rounded-xl bg-neutral-200 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:bg-[#19181A]">
                 <div className="flex flex-wrap gap-16 mb-8">
                   <CreateCard setShowForm={setShowForm}/>
                 {institutes.map(institute => (
@@ -125,7 +125,7 @@ const Institutes = () => {
                   handleModify={handleModify}
                 />}
             </div>
-        </main>
+        </>
 
     )
 };

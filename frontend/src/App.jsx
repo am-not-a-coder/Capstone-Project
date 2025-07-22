@@ -1,4 +1,5 @@
 import {BrowserRouter as Router, Routes, Route, Navigate} from 'react-router-dom';
+import axios from 'axios';
 // Importing Pages
 import Login from './pages/Login';
 import MainLayout from './MainLayout';
@@ -13,9 +14,25 @@ import Profile from './pages/Profile';
 
 
 function App() {
+
+  //Checks if the token is not expired and directs the user to login if it is
+  axios.interceptors.response.use(
+    response => response,
+    error => {
+      if (error.response?.status === 401){
+        console.log("Your token is expired!")
+        localStorage.removeItem('token');
+        window.location.href = '/login'
+      }
+      return Promise.reject(error);
+    }
+  )
+
+
+
   // If the user is not logged in it will redirect to login page
     const ProtectedRoute = ({children}) => {
-      const isAuthenticated = localStorage.getItem('token') // chcecks if the jwt auth token from the backend is present
+      const isAuthenticated = localStorage.getItem('token') // checks if the jwt auth token from the backend is present
       return isAuthenticated ? children : <Navigate to="/Login" />
     }
   
@@ -48,7 +65,6 @@ function App() {
         </Route>
 
 
-       
       </Routes>
     </Router>
   )

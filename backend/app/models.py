@@ -15,24 +15,26 @@ class User(db.Model):
     profilePic = db.Column(db.Text)
     isAdmin = db.Column(db.Boolean, default=False)
     isOnline = db.Column(db.Boolean, default=False)
-
-   
-
 class Area(db.Model):
     __tablename__ = 'area'
 
     areaID = db.Column(db.Integer, primary_key=True, nullable=False)
     programID = db.Column(db.Integer, nullable=False)
     areaName = db.Column(db.String(100))
+    areaNum = db.Column(db.String(10))
+    progress = db.Column(db.Integer)
     subareaID = db.Column(db.Integer)
 
 class Program(db.Model):
     __tablename__ = 'program'
 
     programID = db.Column(db.Integer, primary_key=True, nullable=False)
+    employeeID = db.Column(db.Integer, db.ForeignKey('user.employeeID'))
     programCode = db.Column(db.String(20))
     programName = db.Column(db.String(100))
     programColor = db.Column(db.String(30))
+    
+    dean = db.relationship("User", backref="programs")
 
 class Subarea(db.Model):
     __tablename__ = 'subarea'
@@ -69,7 +71,7 @@ class Deadline(db.Model):
     deadlineID = db.Column(db.Integer, primary_key=True, nullable=False)
     programID = db.Column(db.Integer, nullable=False)
     areaID = db.Column(db.Integer, nullable=False)
-    detail = db.Column(db.Text, nullable=False)
+    content = db.Column(db.Text, nullable=False)
     due_date = db.Column(db.Date, nullable=False)
 
 class AuditLog(db.Model):

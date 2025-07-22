@@ -8,23 +8,21 @@ import{
     faGears,
     faHourglassHalf
 } from '@fortawesome/free-solid-svg-icons';
+import {useNavigate} from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 
-// use this for getting protected user info
-// axios.get('/api/protected', {
-//     headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-//     });
-
 const Dashboard = () => {
+
+    
     return (
         <>
             {/* Dashboard links */}
             <section className="grid grid-cols-4 gap-3">   
-            <DashboardLinks icon={faUsers} text="Users" />            
-            <DashboardLinks icon={faGraduationCap} text="Programs" />            
-            <DashboardLinks icon={faSchool} text="Institutes" />            
-            <DashboardLinks icon={faCircleCheck} text="Approved" />            
+                <DashboardLinks icon={faUsers} text="Users" />            
+                <DashboardLinks icon={faGraduationCap} text="Programs" />            
+                <DashboardLinks icon={faSchool} text="Institutes" />            
+                <DashboardLinks icon={faCircleCheck} text="Approved" />            
             </section>
 
             {/* Announcements */}
@@ -42,7 +40,6 @@ const Dashboard = () => {
                 <div className="p-4 transition-all duration-500 rounded-lg bg-neutral-300 dark:bg-woodsmoke-950">
                     <p className="p-5 font-light text-center text-gray-700 transition-all duration-500 dark:text-white">No new announcements</p>
                 </div>
-
             </section>
 
             <section className='grid grid-cols-2 gap-4 mt-4'>
@@ -78,14 +75,18 @@ const Dashboard = () => {
 }
 
 export const DashboardLinks = ({icon, text}) =>{
+    const navigate = useNavigate();
+
     return (
-     <div className='flex flex-row items-center text-neutral-800 border-1 border-neutral-900 rounded-3xl h-20 p-4 m-1 relative shadow-xl cursor-pointer transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-[#19181A]'>
-        <div className='flex items-center justify-center p-2 w-12 h-12 bg-[#5ADF9C] rounded-full mr-3'>
-            <FontAwesomeIcon icon={icon} className="text-2xl text-center text-neutral-800" />
+    
+        <div className='flex flex-row items-center text-neutral-800 border-1 border-neutral-900 rounded-3xl h-20 p-4 m-1 relative shadow-xl cursor-pointer transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-[#19181A]'>
+            <div className='flex items-center justify-center p-2 w-12 h-12 bg-[#5ADF9C] rounded-full mr-3'>
+                <FontAwesomeIcon icon={icon}  className="text-2xl text-center text-neutral-800" />
+            </div>
+            <h1 className="text-xl font-semibold transition-all duration-500 text-shadow-md dark:text-white">{text}</h1>
+            <span className="absolute text-lg transition-all duration-500 right-6 dark:text-white">0</span>
         </div>
-        <h1 className="text-xl font-semibold transition-all duration-500 text-shadow-md dark:text-white">{text}</h1>
-        <span className="absolute text-lg transition-all duration-500 right-6 dark:text-white">0</span>
-    </div>
+    
     )
 }
 
