@@ -6,6 +6,7 @@ import './App.css'
 import Sidebar, { SidebarLinks } from './components/Sidebar';
 import Switch from './components/Switch';
 import Header from './components/Header';
+import logOut from './assets/log_out.svg';
 //Importing  Icons
 import{
   faLayerGroup, 
@@ -123,14 +124,18 @@ const MainLayout = () => {
       </div>
       
       {showLogout && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-600 bg-opacity-30">
-          <div className="p-6 bg-white rounded-lg shadow-lg dark:bg-woodsmoke-900 w-96">
-            <h1 className="mb-4 text-xl font-semibold text-center text-black dark:text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center transition-all duration-500 bg-neutral-900/50">
+          <div className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-xl border-2 border-neutral-700 transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:border-none dark:bg-[#19181A] min-h-[55%] min-w-[50%]">
+            <h1 className='mb-5 text-4xl font-semibold text-zuccini-500'>Logout</h1>
+            <img src={logOut} alt="Log out illustration" 
+              className='h-40 mb-2'
+            />
+            <h1 className="mb-10 text-2xl font-semibold text-center text-black text-shadow-sm dark:text-white">
               Are you sure you want to Log Out?
             </h1>
-            <div className="flex justify-center space-x-4">
-              <button onClick={() => setLogout(true)} className="px-4 py-2 text-white rounded bg-zuccini-600 hover:bg-zuccini-700">Yes</button>
-              <button onClick={loginCancel} className="px-4 py-2 text-white bg-red-600 rounded hover:bg-red-700 ">No</button>
+            <div className="flex justify-center space-x-[50px]">
+              <button onClick={() => setLogout(true)} className="shadow-xl px-4 py-2 transition-all duration-300 text-white cursor-pointer w-[150px] rounded-2xl bg-zuccini-600 hover:bg-zuccini-700">Log out</button>
+              <button onClick={loginCancel} className="shadow-xl transition-all duration-300 px-4 py-3 w-[150px] text-white cursor-pointer rounded-2xl bg-zuccini-600 hover:bg-zuccini-700">Cancel</button>
             </div>
           </div>
         </div>

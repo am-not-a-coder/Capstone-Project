@@ -1,5 +1,5 @@
 from flask import jsonify, request, session, send_from_directory, current_app
-from app.models import User
+from app.models import Employee
 from app import db
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
@@ -7,7 +7,7 @@ from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_requir
 from flask_jwt_extended.exceptions import JWTExtendedException
 from datetime import datetime
 import os
-from app.models import User, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement
+from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement
 
 
 def register_routes(app):
@@ -33,10 +33,10 @@ def register_routes(app):
             empID = data.get("employeeID")
             password = data.get("password")
             #Fetches the user from the db using the employeeID
-            user = User.query.filter_by(employeeID=empID).first()
+            user = Employee.query.filter_by(employeeID=empID).first()
             #If the user is not found in the db
             if user is None:
-                return jsonify({'success': False, 'message': 'User not found'})
+                return jsonify({'success': False, 'message': 'Employee not found'})
             
             if check_password_hash(user.password, password): #checks if the user input hashed password matches the hashed pass in the db 
                 # After login, store the user info in the session
@@ -110,11 +110,11 @@ def register_routes(app):
 
 
         # Checks if the user already exists
-        user = User.query.filter_by(employeeID=empID).first()
+        user = Employee.query.filter_by(employeeID=empID).first()
         if user:
-            return jsonify({'success': False, "message": "User already exists"}), 400
+            return jsonify({'success': False, "message": "Employee already exists"}), 400
         else:
-            new_user = User(
+            new_user = Employee(
                 employeeID = empID,
                 password = generate_password_hash(password),
                 fName = first_name,
@@ -128,22 +128,22 @@ def register_routes(app):
         )
             db.session.add(new_user)
             db.session.commit()
-            return jsonify({'success': True, "message": "User created successfully"}), 201  
+            return jsonify({'success': True, "message": "Employee created successfully"}), 201  
         
 
 
     #Delete the user 
     @app.route('/api/user/<string:employeeID>', methods=["DELETE"])
     def delete_user(employeeID):
-        user = User.query.filter_by(employeeID=employeeID).first()
+        user = Employee.query.filter_by(employeeID=employeeID).first()
 
         if not user:
-            return jsonify({"success": False, "message": "User does not exists"}), 404
+            return jsonify({"success": False, "message": "Employee does not exists"}), 404
         
         db.session.delete(user)
         db.session.commit()
 
-        return jsonify({"success": True, "message":"User has been deleted"}), 200
+        return jsonify({"success": True, "message":"Employee has been deleted"}), 200
 
 
 
@@ -154,22 +154,22 @@ def register_routes(app):
     @app.route('/api/users', methods=["GET"])
     @jwt_required()
     def get_users():
-        users  = (User.query
-                  .join(Program, User.programID == Program.programID)
-                  .join(Area, User.areaID == Area.areaID)
+        users  = (Employee.query
+                  .join(Program, Employee.programID == Program.programID)
+                  .join(Area, Employee.areaID == Area.areaID)
                   .add_columns(
-                      User.employeeID,
+                      Employee.employeeID,
                       Program.programName,
                       Area.areaName,
                       Area.areaNum,
-                      User.fName,
-                      User.lName,
-                      User.suffix,
-                      User.email,
-                      User.contactNum,
-                      User.profilePic,
-                      User.isAdmin,
-                      User.isOnline,
+                      Employee.fName,
+                      Employee.lName,
+                      Employee.suffix,
+                      Employee.email,
+                      Employee.contactNum,
+                      Employee.profilePic,
+                      Employee.isAdmin,
+                      Employee.isOnline,
                   ).all()
                   
                 )
@@ -282,6 +282,8 @@ def register_routes(app):
                      .add_columns(
                          Deadline.deadlineID,
                          Program.programName,
+                         Program.programCode,
+                         Program.programColor,
                          Area.areaName,
                          Area.areaNum,
                          Deadline.due_date,
@@ -293,7 +295,9 @@ def register_routes(app):
         for dl in deadlines: 
             deadline_data = {                            
                 'deadlineID': dl.deadlineID,
-                'programName': dl.programName,                               
+                'programName': dl.programName,
+                'programColor': dl.programColor,
+                'programCode': dl.programCode,                               
                 'areaName': dl.areaNum + ": " + dl.areaName, 
                 'due_date': dl.due_date.strftime('%m-%d-%Y'),
                 'content': dl.content
@@ -316,6 +320,7 @@ def register_routes(app):
                          Area.areaName,
                          Area.areaNum,
                          Deadline.due_date,
+                         Deadline.content
                      )).all()
         
         event_list = []
@@ -325,6 +330,7 @@ def register_routes(app):
                 'id': e.deadlineID,
                 'title': f"{e.areaNum}: {e.areaName}",
                 'start': e.due_date.strftime('%Y-%m-%d'),
+                'content': e.content,
                 'color': e.programColor
             }
      
