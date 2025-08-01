@@ -1,18 +1,26 @@
 //for imports
 import CircularProgressBar from '../components/CircularProgressBar'
 import {useState, useEffect} from 'react';
+import {
+    faAngleRight
+} from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import axios from 'axios';
-import FullCalendar from '@fullcalendar/react'
-import dayGridPlugin from '@fullcalendar/daygrid'
+import FullCalendar from '@fullcalendar/react';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import EventModal from '../components/modals/EventModal';
+import StatusModal from '../components/modals/StatusModal';
+import DeadlineModal from '../components/modals/DeadlineModal';
 // the progress bar is currently static  
 
 const Tasks = () => {
 
-    const [deadLines, setDeadLines] = useState([]);
+    const [deadLines, setDeadLines] = useState([]); // used to list the deadlines 
     const [event, setEvent] = useState([]); //used for the calendar
     
+    //states for the input values
     const [dueDate, setDueDate] = useState("");
-    const [program, setProgram] = useState("")
+    const [program, setProgram] = useState("");
     const [content, setContent] = useState("");
 
     const [programOption, setProgramOption] = useState([]); // for the form option
@@ -20,6 +28,19 @@ const Tasks = () => {
     const [selectedArea, setSelectedArea] = useState(""); // area use state
     const [areaOption, setAreaOption] = useState([]); // for the form option
     const [areaProgressList, setAreaProgressList] = useState([]); // displays the area in tasks
+
+    const [showEventModal, setShowEventModal] = useState(false); // shows the event modal
+    const [selectedEvent, setSelectedEvent] = useState(null); // selected event in the calendar
+    
+    const [showStatusModal, setShowStatusModal] = useState(false); // shows the status modal
+    const [statusMessage, setStatusMessage] = useState(null); // status message
+    const [statusType, setStatusType] = useState("success"); // status type (success/error)
+
+    const [showDeadline, setShowDeadline] = useState(false);
+    const [selectedDeadline, setSelectedDeadline] = useState(null);
+
+
+
     const token = localStorage.getItem('token'); //gets the token
 
 
@@ -31,11 +52,6 @@ const Tasks = () => {
         }
 
         const fetchProgram = async () => {
-
-            if(!token){
-            console.error("No token found!");
-            return;
-        }
             
             try{
 
@@ -76,6 +92,7 @@ const Tasks = () => {
         fetchArea();
     }, []);
 
+    // FETCH DEADLINES
     useEffect(() => {
         
         if(!token){
@@ -101,6 +118,7 @@ const Tasks = () => {
 
     }, [])
 
+    // FETCH EVENTS (FOR CALENDAR)
     useEffect(() => {
         
         if(!token){
@@ -126,11 +144,6 @@ const Tasks = () => {
 
     }, [])
 
-
-
-
-
-
     // Creates the deadline
     const handleCreateDeadline = async (e) => {
         e.preventDefault()
@@ -146,7 +159,9 @@ const Tasks = () => {
             const res = await axios.post('http://localhost:5000/api/deadline', formData, 
                 {headers: {'Authorization': `Bearer ${token}`}}, {withCredentials: true}) 
 
-                alert(res.data.message)
+                setStatusMessage(res.data.message);
+                setShowStatusModal(true);
+                setStatusType("success");
 
                 setSelectedArea("");
                 setProgram("");
@@ -167,17 +182,62 @@ const Tasks = () => {
             
 
 
-
         }catch(err){
-            alert("Server error. Please try again");
+            setStatusMessage("Server error. Please try again");
+            setShowStatusModal(true);
+            setStatusType("error")
             console.log(err.res?.data || err.message)
         }
 
     } 
+    
+    const handleEventClick = (clickInfo) => {
+
+        setSelectedEvent({
+            title: clickInfo.event.title,
+            date: clickInfo.event.startStr,
+            color: clickInfo.event.extendedProps.color,
+            content: clickInfo.event.extendedProps.content,
+            
+        })
+        setShowEventModal(true);
+    }
+
+    const handleCloseModal = () =>{
+        setSelectedEvent(null);
+        setShowEventModal(false);
+    }
+
+
+    const handleViewDeadline = (selectedDeadline) => {
+
+        setSelectedDeadline({
+            id: selectedDeadline.deadlineID,
+            programName: selectedDeadline.programName,
+            programCode: selectedDeadline.programCode,
+            color: selectedDeadline.programColor,
+            areaName: selectedDeadline.areaName,
+            date: selectedDeadline.due_date,
+            content: selectedDeadline.content
+            
+        })
+        setShowDeadline(true);
+
+    }
+
+    const handleCloseDeadline = () =>{
+        setSelectedDeadline(null);
+        setShowDeadline(false);
+    }
 
     return(
         
     <>    
+    {/* shows status when creating deadline */}
+    {showStatusModal && (
+        <StatusModal message={statusMessage} type={statusType} onClick={()=>setShowStatusModal(false)} />
+    )}
+
     {/* Container */}
     <div className="relative w-full bg-neutral-100 p-5 border-2 border-neutral-700 text-neutral-800 rounded-2xl dark:border-none dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-900">
 
@@ -294,23 +354,37 @@ const Tasks = () => {
     {/* Deadlines */}
         <div className="flex items-center flex-col row-start-2 p-3 border rounded-md relative dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-900">                    
             <div className='grid w-full grid-cols-3 font-medium text-center dark:text-white '>
+                <h2>Program</h2>
                 <h2>Task</h2>
                 <h2>Deadline</h2>
             </div>
             {/* Deadline container */}
             <div className='flex flex-col items-center mt-2 min-h-[500px] min-w-full p-1 bg-neutral-300 rounded-md border relative dark:bg-woodsmoke-950 ' >
                 {deadLines && deadLines.length > 0 ? deadLines.map((deadline) => (
-                    <Deadline key={deadline.deadlineID} data={deadline} areaTitle={deadline.areaName} date={deadline.due_date} />
+                    <Deadline key={deadline.deadlineID} data={deadline} program={deadline.programCode} areaTitle={deadline.areaName} date={deadline.due_date} onClick={() => handleViewDeadline(deadline)}/>
                 )) : (
                         <p className="m-auto text-lg text-center text-gray-500 font-extralight">No deadlines ahead.</p>
                 )
                 }            
             </div>
+
+            {showDeadline && selectedDeadline && (
+                <DeadlineModal 
+                    programName={selectedDeadline.programName} 
+                    programCode={selectedDeadline.programCode} 
+                    area={selectedDeadline.areaName} 
+                    date={selectedDeadline.date} 
+                    color={selectedDeadline.color} 
+                    content={selectedDeadline.content || 'No description'} 
+                    id={selectedDeadline.id}
+                    onClick={handleCloseDeadline} />
+            )}
+            
         </div>
 
     
     {/* Calendar */}
-        <div className="row-start-2 col-start-2 bg-transparent border rounded-md p-5 transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:text-white dark:bg-[#19181A] dark:border-none">
+        <div className="relative row-start-2 col-start-2 bg-transparent border rounded-md p-5 transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:text-white dark:bg-[#19181A] dark:border-none">
             <FullCalendar 
             plugins={[dayGridPlugin]}
             initialView='dayGridMonth'
@@ -320,13 +394,15 @@ const Tasks = () => {
                 end: 'today prev next'
             }}
             events={event}        
-            eventClick={(info) => {
-                alert(`Program: ${info.event.title}\nDate: ${info.event.startStr}`);
-                }}
+            eventClick={handleEventClick}
             height={'500px'}                    
             expandRows={true}
-            
             />
+
+            {/* EventModal */}
+            {showEventModal && selectedEvent && (
+              <EventModal title={selectedEvent.title} date={selectedEvent.date} content={selectedEvent.content || 'N/A'} onClick={handleCloseModal} />
+            )}
 
         </div>
 
@@ -351,6 +427,7 @@ export const Area = ({program, areaTitle, desc, progress}) =>{
             <div className='text-right h-[50%] p-3 bg-neutral-200 border-t-1 transition-all duration-500  dark:bg-[#19181A] dark:text-white dark:border-t-neutral-600'>
                 <h1 className='mb-4 text-2xl font-semibold text-wrap'>{areaTitle}</h1>
                 <h2 className='text-lg truncate'>{desc}</h2>
+                
             </div>
         </div> 
         
@@ -359,16 +436,23 @@ export const Area = ({program, areaTitle, desc, progress}) =>{
 
 // Generates due_date
 
-export const Deadline = ({areaTitle, date}) =>{
-
-    return(
-        <div className='grid grid-cols-3 justify-center mt-2 border p-2 rounded-lg bg-neutral-200 transition-all duration-500 dark:bg-[#19181A]'>
-            <h2 className='text-sm font-light transition-all duration-500 place-self-center text-neutral-600 text-wrap dark:text-white'>{areaTitle}</h2>
-            <h2 className='text-sm transition-all duration-500 place-self-center text-neutral-600 dark:text-white'>{date}</h2>
-            <button className='px-10 py-3 m-auto font-semibold transition-all duration-300 border-2 cursor-pointer text-neutral-100 bg-zuccini-600 border-zuccini-700 hover:bg-zuccini-700 active:bg-zuccini-600 rounded-xl'>View</button>
+export const Deadline = ({program, areaTitle, date, onClick}) => {
+    return (
+        <div 
+            className='relative grid grid-cols-3 justify-center mt-2 border p-2  rounded-lg bg-neutral-200 transition-all duration-500 dark:bg-[#19181A] hover:bg-neutral-300 dark:hover:bg-[#232228] cursor-pointer'
+            onClick={onClick}
+        >
+            <div className='flex items-center px-2'>
+            <FontAwesomeIcon icon={faAngleRight} className="mr-3 dark:text-white"/>
+            <h2 className='mb-1 text-2xl font-semibold tracking-widest text-center transition-all duration-500 text-neutral-600 text-wrap dark:text-white'>{program}</h2>
+            </div>
+            <h2 className='font-light transition-all duration-500 text-md place-self-center text-neutral-600 text-wrap dark:text-white'>{areaTitle}</h2>
+            <h2 className='transition-all duration-500 text-md place-self-center text-neutral-600 dark:text-white'>{date}</h2>
+            
+            
 
         </div>
-    )
+    );
 }
 
 export default Tasks;

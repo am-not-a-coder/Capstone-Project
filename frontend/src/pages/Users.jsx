@@ -7,6 +7,7 @@ import{
 import axios from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect } from 'react';
+import StatusModal from '../components/modals/StatusModal';
 
 
 
@@ -35,6 +36,10 @@ const Users = () => {
     const [searchQuery, setSearchQuery] = useState(""); // state for search query
 
     const[hidePassword, setHidePassword] = useState(); //state for hiding the password
+
+    const [showStatusModal, setShowStatusModal] = useState(false); // shows the status modal
+    const [statusMessage, setStatusMessage] = useState(null); // status message
+    const [statusType, setStatusType] = useState("success"); // status type (success/error)
 
     const token = localStorage.getItem('token'); // gets the access token
 
@@ -81,7 +86,9 @@ const Users = () => {
                     'Content-Type': 'multipart/form-data' // supports the file 
                 }}, {withCredentials: true});
             
-            alert(res.data.message);
+            setStatusMessage(res.data.message);
+            setShowStatusModal(true);
+            setStatusType("success");
 
         
             const selectedProgram = programOption.find(program => program.programID == programID);
@@ -120,7 +127,9 @@ const Users = () => {
             
         
         } catch(err){
-            alert("Server error. Please try again");
+            setStatusMessage("Server error. Please try again");
+            setShowStatusModal(true);
+            setStatusType("error");
             console.log(err.res?.data || err.message)
         }
     }
@@ -240,6 +249,11 @@ const Users = () => {
 
     return (
         <>
+        {/* shows status when creating deadline */}
+        {showStatusModal && (
+            <StatusModal message={statusMessage} type={statusType} onClick={()=>setShowStatusModal(false)} />
+        )}
+
             {/* navigation bar */}
             <section className="flex items-center h-[7%] gap-7 text-xl text-neutral-800 dark:text-white">
                 <button className={`${visible == "list" ? 'border-b-2 font-semibold' : 'border-0 font-normal'} w-1/10 h-full`} onClick={() => makeVisible("list")}>List</button>
