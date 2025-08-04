@@ -14,6 +14,7 @@ import avatar3 from '../assets/avatar3.png';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 
+
 const Header = ({title}) => {
     const [showProfile , setShowProfile] = useState(false);
     const [showNotification, setShowNotification] = useState(false);
@@ -193,9 +194,12 @@ const Header = ({title}) => {
             {showNotification && (
                  <div ref={notifRef}  className='fixed top-25 right-8 flex flex-col w-[300px] min-w-[35%] p-3 border-2 border-neutral-500 bg-neutral-200 text-neutral-900 transition-all duration-500 dark:border-zuccini-950 dark:text-white dark:inset-shadow-xs dark:inset-shadow-zuccini-800 dark:bg-[#19181A] rounded-2xl z-20'>
                         {/* Notification tab */}
-                        <h1 className='mb-1 ml-2 text-2xl font-medium'>
-                            Notifications
-                        </h1>
+                        <div className='flex items-center justify-between'>
+                            <h1 className='mb-1 ml-2 text-2xl font-medium'>
+                                Notifications
+                            </h1>
+                            <Link to='/Notification'>See All</Link>
+                        </div>
                        <div className='flex flex-col min-h-[300px] p-3 bg-neutral-300 w-full rounded-xl inset-shadow-sm inset-shadow-neutral-400 transition-all duration-500 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
                             {notifications && notifications.length > 0 ? (
                             notifications.map((notification, index) => (
