@@ -8,47 +8,64 @@ from '@fortawesome/free-solid-svg-icons';
 import udmsLogo from '../assets/udms-logo.png';
 import { createContext, useState, useContext } from 'react';
 import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
 
-const SidebarContext = createContext();
-const Sidebar = ({children}) => {
-const [expanded, setExpanded] = useState(true);
+export const SidebarContext = createContext();
+    const Sidebar = ({children}) => {
+	const [expanded, setExpanded] = useState(false);
 
+    // Detect screen size if viewport is large enough for sidebar to expand at start
+    const isLargeScreen = window.matchMedia('(min-width: 1024px)').matches; // Check if the screen is large enough for sidebar expansion
+
+    // Expanded is true if isLargeScreen is true
+    useEffect(() => {
+        setExpanded(isLargeScreen);
+    }, [isLargeScreen]);
 
     // Sidebar component with state for expanded/collapsed
-    return(
-        <aside className={`row-span-5 h-screen mt-3 ml-3 transition-all duration-500 ${ expanded ? 'w-70' : 'w-12'} z-1`}>
-            <nav className="relative flex flex-col bg-woodsmoke-200 border-1 border-black rounded-lg shadow-neutral-500 shadow-lg transition-all duration-500 dark:bg-[#19181A] dark:shadow-none dark:border-none">
-
-            {/* Title and Logo */}
-            <div className="flex items-center justify-between pt-3 pb-2 pl-2 pr-10 transition-all duration-500">
-                <img src={udmsLogo} alt="UDMS Logo" className={`m-2 h-10 rounded-full w-10 transition-all duration-500 ${expanded ? 'opacity-100 w-10' : 'opacity-0 w-0'}`}/>
-                <h4 className={`overflow-hidden transition-all m-1 line-clamp-2 font-semibold text-neutral-950 ${expanded ? 'w-42 opacity-100 ml-2' : 'w-0 opacity-0 ml-0'} dark:text-white transition-all duration-500`}>University Document Management System</h4>
-                <button onClick={() => setExpanded(current => !current)} className="absolute p-2 px-4 transition-all duration-500 rounded-lg -right-3 bg-zuccini-900">
-                    { expanded ? <FontAwesomeIcon icon={faAngleRight} /> : <FontAwesomeIcon icon={faAngleLeft} /> }
-                </button>
-            </div>
+   return(
+    
+        <>
             
+            <aside className={`absolute lg:relative row-span-5 h-screen mt-0 lg:mt-3 ml-0 lg:ml-3 transition-all duration-500 ${ expanded ? 'w-70' : 'hidden lg:block w-12'} z-40`}>
+                
+                <nav className={`${expanded ? '' : 'hidden lg:block'} relative flex flex-col bg-woodsmoke-200 border-1 border-black rounded-lg shadow-neutral-500 shadow-lg transition-all duration-500 dark:bg-[#19181A] dark:shadow-none dark:border-none`}>
 
-            {/* Search bar*/}
-            <div className="relative px-1 py-2 ml-1 overflow-hidden">
-                <FontAwesomeIcon icon={faSearch} className={`absolute text-zuccini-800 ml-3.5 mt-3.5 ${expanded ? '' : 'cursor-pointer'}`} />
-                <input
-                    type="text" 
-                    placeholder="Search..." 
-                    className={`min-w-65 p-2 pl-10 text-black placeholder-neutral-200 rounded-xl bg-woodsmoke-300 border border-gray-900 transition-colors duration-500 focus:outline-none focus:ring-2 focus:ring-zuccini-900 ${expanded ? '' : 'cursor-pointer'} dark:border-neutral-800 dark:bg-[#242424]`}
-                />
-            </div>
+                {/* Title and Logo */}
+                <div className="flex items-center justify-between pt-3 pb-2 pl-2 pr-10 transition-all duration-500">
+                    <img src={udmsLogo} alt="UDMS Logo" className={`m-2 h-10 rounded-full w-10 transition-all duration-500 ${expanded ? 'opacity-100 w-10' : 'opacity-0 w-0'}`}/>
+                    <h4 className={`overflow-hidden transition-all m-1 line-clamp-2 font-semibold text-neutral-950 ${expanded ? 'w-42 opacity-100 ml-2' : 'w-0 opacity-0 ml-0'} dark:text-white transition-all duration-500`}>University Document Management System</h4>
+                    
+                </div>
+                
 
-            {/* Nav Links */}
-            <SidebarContext.Provider value={{expanded}}>
-            <ul className={`flex flex-col flex-1 ml-1 mt-1 ${expanded ? 'items-end' : ''}`}>{children}</ul> 
-            </SidebarContext.Provider>
-            {/* SidebarLinks is are generated below */}
+                {/* Search bar*/}
+                <div className="relative px-1 py-2 ml-1 overflow-hidden">
+                    <FontAwesomeIcon icon={faSearch} className={`absolute text-zuccini-800 ml-3.5 mt-3.5 ${expanded ? '' : 'cursor-pointer'}`} />
+                    <input
+                        type="text" 
+                        placeholder="Search..." 
+                        className={`min-w-65 p-2 pl-10 text-black placeholder-neutral-200 rounded-xl bg-woodsmoke-300 border border-gray-900 transition-colors duration-500 focus:outline-none focus:ring-2 focus:ring-zuccini-900 ${expanded ? '' : 'cursor-pointer'} dark:border-neutral-800 dark:bg-[#242424]`}
+                    />
+                </div>
 
-            </nav>
-        </aside>
-    );
+                {/* Nav Links */}
+                <SidebarContext.Provider value={{expanded}}>
+                <ul className={`flex flex-col flex-1 ml-1 mt-1 ${expanded ? 'items-end' : ''}`}>{children}</ul> 
+                </SidebarContext.Provider>
+                {/* SidebarLinks is are generated below */}
 
+                </nav>
+
+                
+            </aside>
+
+            <button onClick={() => setExpanded(current => !current)} className={`${expanded ? 'left-65 lg:left-67' : 'left-2 lg:left-4'} z-50 top-4 absolute p-2 px-4 transition-none lg:transition-all duration-500 rounded-lg bg-zuccini-900`}>
+                { expanded ? <FontAwesomeIcon icon={faAngleLeft} /> : <FontAwesomeIcon icon={faAngleRight} /> }
+            </button>
+        </>
+   );
+    
 };
 
 export const SidebarLinks = ({children, icon, text, active, alert, onClick, isButton}) => {
