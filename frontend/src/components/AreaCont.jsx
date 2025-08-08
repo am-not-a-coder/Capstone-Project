@@ -1,21 +1,28 @@
 import {
- faPlus,
- faChevronDown
+ faChevronDown,
+ faChevronUp,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
-export default function AreaCont(props) {
+//Area container div
 
+export default function AreaCont(props) {
+    // props: title, onClick, isExpanded, onIconClick
     return(
-        <button className='flex flex-row justify-between border min-w-full p-3 rounded-2xl cursor-pointer text-neutral-800 mb-2 shadow-md'>
-             
-            <h1 className='text-md font-semibold'>{props.title}</h1>
-            
+        <button 
+            onClick={props.onClick}
+            className='flex flex-row justify-between min-w-full p-3 mb-2 border shadow-md cursor-pointer rounded-2xl text-neutral-800'>
+            <h1 className='font-semibold text-md'>{props.title}</h1>
             <div className='mr-3'>
-                <FontAwesomeIcon icon={faPlus} className='mx-5' onClick={props.onclick}/>
-                <FontAwesomeIcon icon={faChevronDown} onClick={props.onclick}/>
+                <FontAwesomeIcon 
+                    icon={props.isExpanded ? faChevronUp : faChevronDown} 
+                    onClick={e => {
+                        e.stopPropagation();
+                        if (props.onIconClick) props.onIconClick(e);
+                    }}
+                    className='cursor-pointer'
+                />
             </div>
-           
         </button>
     )
 }

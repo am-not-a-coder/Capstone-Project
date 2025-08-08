@@ -32,10 +32,10 @@ function App() {
 
 
   // If the user is not logged in it will redirect to login page
-    // const ProtectedRoute = ({children}) => {
-    //   const isAuthenticated = localStorage.getItem('token') // checks if the jwt auth token from the backend is present
-    //   return isAuthenticated ? children : <Navigate to="/Login" />
-    // }
+    const ProtectedRoute = ({children}) => {
+      const isAuthenticated = localStorage.getItem('token') // checks if the jwt auth token from the backend is present
+      return isAuthenticated ? children : <Navigate to="/Login" />
+    }
   
   return (
     <Router>
@@ -49,9 +49,9 @@ function App() {
         {/* These are the routes that needs authentication */}
         {/* MainLayout wraps other pages */}
         <Route path="/" element={
-          // <ProtectedRoute>
+          <ProtectedRoute>
             <MainLayout />
-          // </ProtectedRoute>
+          </ProtectedRoute>
           }>
           <Route path="/Dashboard" element={<Dashboard />} />
           <Route path="/Institutes" element={<Institutes />} />

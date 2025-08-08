@@ -7,7 +7,7 @@ from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_requir
 from flask_jwt_extended.exceptions import JWTExtendedException
 from datetime import datetime
 import os
-from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement
+from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria
 
 
 def register_routes(app):
@@ -143,7 +143,7 @@ def register_routes(app):
         db.session.delete(user)
         db.session.commit()
 
-        return jsonify({"success": True, "message":"Employee has been deleted"}), 200
+        return jsonify({"success": True, "message":"Employee has been deleted successfully!"}), 200
 
 
 
@@ -214,7 +214,7 @@ def register_routes(app):
             program_list.append(program_data)
         return jsonify({"programs": program_list}), 200
 
-    #Get the area
+    #Get the area for displaying in tasks
     @app.route('/api/area', methods=["GET"])
     def get_area():
         areas = (Area.query
@@ -245,7 +245,6 @@ def register_routes(app):
         
 
         return jsonify({"area": area_list}), 200
-
 
 
     #Create deadline
@@ -340,8 +339,101 @@ def register_routes(app):
         
 
 
+    # Accreditation page
+    @app.route('/api/accreditation', methods=["GET"])
+    def get_areas():
+        data = (
+            db.session.query(
+                Area.areaID,
+                Program.programCode,
+                Area.areaName,
+                Area.areaNum,
+                Area.progress,
+                Subarea.subareaID,
+                Subarea.subareaName,
+                Criteria.criteriaContent,
+                Criteria.criteriaType,
+                Document.docID,
+                Document.docName,
+                Document.docPath
+            )
+            .join(Program, Area.programID == Program.programID)
+            .join(Subarea, Area.subareaID == Subarea.subareaID)
+            .join(Criteria, Subarea.criteriaID == Criteria.criteriaID)
+            .join(Document, Criteria.docID == Document.docID)       
+            .order_by(Area.areaID)
+            .all() 
+        )
+
+        result = {}
+        for row in data:
+            area_id = row.areaID
+            subarea_id = row.subareaID
+
+            if area_id not in result:
+                result[area_id] = {                    
+                'areaID': row.areaID,
+                'programCode': row.programCode,
+                'areaName': row.areaNum + ": " + row.areaName, 
+                'subareas': []                  
+            }
+                
+
+            if subarea_id not in result[area_id]['subareas']:
+                result[area_id][subarea_id]["subareas"] = {
+                    'subareaID': row.subareaID,
+                    'subareaName': row.subareaName,
+                    'criteria': {
+                        'inputs': [],
+                        'processes': [],
+                        'outcomes': [],
+                }, 
+            }
+                
+            criteria_data = {
+                'content': row.criteriaContent,
+                'docID': row.docID,
+                'docName': row.docName,
+                'docPath': row.docPath
+            }
+
+            match row.criteriaType:
+                case "Input":
+                    result[area_id]['subareas'][subarea_id]['criteria']['inputs'].append(criteria_data)
+                case "Processes":
+                    result[area_id]['subareas'][subarea_id]['criteria']['processes'].append(criteria_data)
+                case "Outcomes":
+                    result[area_id]['subareas'][subarea_id]['criteria']['outcomes'].append(criteria_data)
+
+        for area in result.values():
+            area['subareas'] = list(area['subareas'].values())
 
 
+        return jsonify(list(result.values())) 
+
+
+    @app.route('/api/accreditation/upload', methods=["POST"])
+    def upload_file():
+        file = request.files.get("uploadFile")
+
+        if file:
+
+            fileName = secure_filename(file.filename)
+            
+            # Make sure the folder exists
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], fileName)
+            file.save(file_path)
+            return {"file_url": f"/preview/{fileName}"}
+
+    
+    @app.route('/api/preview/<filename>')   
+    def preview_file(filename):   
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+            
+           
 
 
 

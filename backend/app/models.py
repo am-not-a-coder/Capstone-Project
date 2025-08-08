@@ -43,7 +43,15 @@ class Subarea(db.Model):
     subareaID = db.Column(db.Integer, primary_key=True, nullable=False)
     docID = db.Column(db.Integer, nullable=False)
     subareaName = db.Column(db.String(100))
-    content = db.Column(db.Text)
+    criteriaID = db.Column(db.Integer)
+
+class Criteria(db.Model):
+    __tablename__ = 'criteria'
+
+    criteriaID = db.Column(db.Integer, primary_key=True, nullable=False)
+    criteriaContent = db.Column(db.Text)
+    criteriaType = db.Column(db.String(50))
+    docID = db.Column(db.Integer)
 
 class Institute(db.Model):
     __tablename__ = 'institute'
