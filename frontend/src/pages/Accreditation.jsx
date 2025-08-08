@@ -23,13 +23,8 @@ const subArea = [
         title: "Sub-Area II: Administration"   
     }]
 
-    const [showDropArea, setShowDropArea] = useState(false);
-
 
 const Accreditation = () => {
-
-
-
 
     return(
     <>
