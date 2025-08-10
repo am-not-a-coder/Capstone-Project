@@ -187,7 +187,7 @@ const Users = () => {
 
        try{
             Array.isArray(res.data.area) ? setAreaOption(res.data.area) : setAreaOption([]);
-            console.log(res.data.area)
+            
         } catch (err) {
             console.error("Error occurred during area fetching", err)
         }
@@ -218,13 +218,18 @@ const Users = () => {
                 {headers: {'Authorization' : `Bearer ${token}`}},
                 {withCredentials: true});
             
+            setStatusMessage(res.data.message);
+            setShowStatusModal(true);
+            setStatusType("delete");
             removeAndClose() 
             
-            alert(res.data.message)
+           
 
         } catch(err){
             console.error(err.response?.data || err.message)
-            alert("Failed to delete user")
+            setStatusMessage("Failed to delete user")
+            setStatusMessage(true)
+            setStatusType("error")
         }
 
     }

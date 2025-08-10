@@ -53,7 +53,7 @@ const MainLayout = () => {
     if (logout){
       localStorage.removeItem('token') // removes the token from the local storage
       navigate('/login')
-    } 
+    }
   }, [logout])
 
   return(

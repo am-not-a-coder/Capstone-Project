@@ -22,7 +22,7 @@ import axios from 'axios';
           {withCredentials: true});
 
           Array.isArray(response.data.programs) ? setPrograms(response.data.programs) : setPrograms([]);
-          console.log(response.data.programs)
+          
 
       } catch (err){
         console.error("Error occurred when fetching programs", err)

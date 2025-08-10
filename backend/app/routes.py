@@ -7,7 +7,7 @@ from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_requir
 from flask_jwt_extended.exceptions import JWTExtendedException
 from datetime import datetime
 import os
-from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement
+from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria
 
 
 def register_routes(app):
@@ -185,7 +185,7 @@ def register_routes(app):
         db.session.delete(user)
         db.session.commit()
 
-        return jsonify({"success": True, "message":"Employee has been deleted"}), 200
+        return jsonify({"success": True, "message":"Employee has been deleted successfully!"}), 200
 
     #Check for users with invalid password hashes
     @app.route('/api/users/check-invalid-passwords', methods=["GET"])
@@ -479,7 +479,9 @@ def register_routes(app):
 
             program_data = {
                 'programID': program.programID,
+
                 'programDean': f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A",
+
                 'programCode': program.programCode,
                 'programName': program.programName,
                 'programColor': program.programColor,
@@ -488,7 +490,7 @@ def register_routes(app):
             program_list.append(program_data)
         return jsonify({"programs": program_list}), 200
 
-    #Get the area
+    #Get the area for displaying in tasks
     @app.route('/api/area', methods=["GET"])
     def get_area():
         areas = (Area.query
@@ -510,7 +512,7 @@ def register_routes(app):
             area_data = {
                 'areaID' : area.areaID,
                 'programCode': area.programCode,
-                'areaName': area.areaName,
+                'areaName': f"{area.areaNum}: {area.areaName}",
                 'progress': area.progress,
                 'subareaName': area.subareaName,
                 'areaNum': area.areaNum
@@ -519,7 +521,6 @@ def register_routes(app):
         
 
         return jsonify({"area": area_list}), 200
-
 
 
     #Create deadline
@@ -614,8 +615,206 @@ def register_routes(app):
         
 
 
+    # Accreditation page
+    @app.route('/api/accreditation', methods=["GET"])
+    def get_areas():
+        data = (
+            db.session.query(
+                Area.areaID,
+                Program.programCode,
+                Area.areaName,
+                Area.areaNum,
+                Area.progress,
+                Subarea.subareaID,
+                Subarea.subareaName,
+                Criteria.criteriaContent,
+                Criteria.criteriaType,
+                Document.docID,
+                Document.docName,
+                Document.docType,
+                Document.docPath
+            )
+            .outerjoin(Program, Area.programID == Program.programID)
+            .outerjoin(Subarea, Area.areaID == Subarea.areaID)
+            .outerjoin(Criteria, Subarea.subareaID == Criteria.subareaID)
+            .outerjoin(Document, Criteria.docID == Document.docID)       
+            .order_by(Area.areaID)
+            .all() 
+        )
+
+        result = {}
+        for row in data:
+            area_id = row.areaID
+            subarea_id = row.subareaID
+
+            if area_id not in result:
+                result[area_id] = {                    
+                'areaID': row.areaID,
+                'programCode': row.programCode,
+                'areaName': row.areaNum + ": " + row.areaName, 
+                'subareas': {}                  
+            }
+                
+
+            if subarea_id and subarea_id not in result[area_id]['subareas']:
+                result[area_id]["subareas"][subarea_id] = {
+                    'subareaID': subarea_id,
+                    'subareaName': row.subareaName,
+                    'criteria': {
+                        'inputs': [],
+                        'processes': [],
+                        'outcomes': [],
+                }, 
+            }
+            
+            if row.criteriaContent:
+                criteria_data = {
+                    'content': row.criteriaContent,
+                    'docID': row.docID,
+                    'docName': f"{row.docName}{row.docType}",
+                    'docPath': row.docPath
+                }
+
+            match row.criteriaType:
+                case "Input":
+                    result[area_id]['subareas'][subarea_id]['criteria']['inputs'].append(criteria_data)
+                case "Processes":
+                    result[area_id]['subareas'][subarea_id]['criteria']['processes'].append(criteria_data)
+                case "Outcomes":
+                    result[area_id]['subareas'][subarea_id]['criteria']['outcomes'].append(criteria_data)
+
+        for area in result.values():
+            area['subareas'] = list(area['subareas'].values())
+
+        print(result.values())
 
 
+        return jsonify(list(result.values())) 
+    
+
+    @app.route('/api/subarea', methods=["GET"])
+    def get_subarea():
+        # Query all subareas with their criteria
+        results = (
+            db.session.query(
+                Subarea.subareaID,
+                Subarea.subareaName,
+                Area.areaID,
+                Criteria.criteriaID
+            )
+            .join(Area, Subarea.areaID == Area.areaID)
+            .outerjoin(Criteria, Subarea.subareaID == Criteria.subareaID)
+            .all()
+        )
+
+        subarea_dict = {}
+
+        for sa in results:
+            if sa.subareaID not in subarea_dict:
+                subarea_dict[sa.subareaID] = {
+                    'subareaID': sa.subareaID,
+                    'subareaName': sa.subareaName,
+                    'areaID': sa.areaID,
+                    'criteria': []  # group criteria here
+                }
+            if sa.criteriaID:
+                subarea_dict[sa.subareaID]['criteria'].append({
+                    'criteriaID': sa.criteriaID
+                })
+
+        return jsonify({'subarea': list(subarea_dict.values())}), 200
+
+    @app.route('/api/accreditation/create_area', methods=["POST"])
+    def create_area():
+        data = request.form
+        programID = data.get("programID")
+        areaNum = data.get("areaNum")
+        areaName = data.get("areaName")
+
+    # create new area
+
+        new_area = Area(
+            programID = programID,
+            areaName = areaName,
+            areaNum = areaNum
+        )
+
+        db.session.add(new_area)
+        db.session.commit()
+
+        return jsonify({'message' : 'Area created successfully!'}), 200
+
+
+    @app.route('/api/accreditation/create_subarea', methods=["POST"])
+    def create_sub_area():
+        data = request.form
+        areaID = data.get("selectedAreaID")
+        subareaName = data.get("subAreaName")
+
+        area = Area.query.get(areaID)
+        # Check if the area exists
+        if not area:
+            return jsonify({'error': 'Area not found'}), 404
+
+
+        new_subArea = Subarea(subareaName = subareaName)
+        area.subareas.append(new_subArea)
+
+        db.session.add(new_subArea)
+        db.session.commit()
+
+        return jsonify({'message': 'Sub-Area created successfully!'}), 200
+
+        
+    @app.route('/api/accreditation/create_criteria', methods=["POST"])
+    def create_criteria():
+        data = request.form
+        subareaID = data.get("selectedSubAreaID")
+        criteriaContent = data.get("criteria")
+        criteriaType = data.get("criteriaType")
+
+        subarea = Subarea.query.get(subareaID)
+
+        if not subarea:
+            return jsonify({'error': 'Subarea not found'}), 404
+        
+        new_criteria = Criteria(
+            subareaID = subareaID,
+            criteriaContent = criteriaContent,
+            criteriaType = criteriaType
+        )
+
+        subarea.criteria.append(new_criteria)
+
+        db.session.add(new_criteria)
+        db.session.commit()
+
+        return jsonify({'message': 'Criteria created successfully!'}), 200
+
+
+
+    @app.route('/api/accreditation/upload', methods=["POST"])
+    def upload_file():
+        file = request.files.get("uploadedfile")
+
+        if file:
+
+            fileName = secure_filename(file.filename)
+            
+            # Make sure the folder exists
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], fileName)
+            file.save(file_path)
+            return {"file_url": f"/preview/{fileName}"}
+
+    
+    @app.route('/api/preview/<filename>')   
+    def preview_file(filename):   
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+            
+           
 
 
 
