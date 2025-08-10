@@ -11,6 +11,7 @@ import Programs from './pages/Programs';
 import Users from './pages/Users';
 import Tasks from './pages/Tasks';
 import Profile from './pages/Profile';
+import Notification from './pages/Notification';
 
 
 function App() {
@@ -62,6 +63,7 @@ function App() {
 
         {/* Profile page */}
          <Route path='/Profile' element={<Profile />}/>
+         <Route path='/Notification' element={<Notification />}/>
         </Route>
 
 
