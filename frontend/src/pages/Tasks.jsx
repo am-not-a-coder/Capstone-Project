@@ -239,7 +239,7 @@ const Tasks = () => {
     )}
 
     {/* Container */}
-    <div className="relative w-full bg-neutral-100 p-5 border-2 border-neutral-700 text-neutral-800 rounded-2xl dark:border-none dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-900">
+    <div className="relative w-full bg-neutral-200 p-5 border-2 border-neutral-700 text-neutral-800 rounded-2xl dark:border-none dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-900">
 
         {/* Area Progress */}
         <h1 className="mx-3 mb-3 text-xl font-semibold transition-all duration-500 dark:text-white">Area Progress</h1>

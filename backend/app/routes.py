@@ -206,7 +206,7 @@ def register_routes(app):
 
             program_data = {
                 'programID': program.programID,
-                'programDean': f"{program.lName} {program.fName} {program.suffix or ''}" if dean else "N/A",
+                'programDean': f"{dean.lName} {dean.fName} {dean.suffix or ''}" if dean else "N/A",
                 'programCode': program.programCode,
                 'programName': program.programName,
                 'programColor': program.programColor,
@@ -236,7 +236,7 @@ def register_routes(app):
             area_data = {
                 'areaID' : area.areaID,
                 'programCode': area.programCode,
-                'areaName': area.areaName,
+                'areaName': f"{area.areaNum}: {area.areaName}",
                 'progress': area.progress,
                 'subareaName': area.subareaName,
                 'areaNum': area.areaNum
@@ -355,12 +355,13 @@ def register_routes(app):
                 Criteria.criteriaType,
                 Document.docID,
                 Document.docName,
+                Document.docType,
                 Document.docPath
             )
-            .join(Program, Area.programID == Program.programID)
-            .join(Subarea, Area.subareaID == Subarea.subareaID)
-            .join(Criteria, Subarea.criteriaID == Criteria.criteriaID)
-            .join(Document, Criteria.docID == Document.docID)       
+            .outerjoin(Program, Area.programID == Program.programID)
+            .outerjoin(Subarea, Area.areaID == Subarea.areaID)
+            .outerjoin(Criteria, Subarea.subareaID == Criteria.subareaID)
+            .outerjoin(Document, Criteria.docID == Document.docID)       
             .order_by(Area.areaID)
             .all() 
         )
@@ -375,13 +376,13 @@ def register_routes(app):
                 'areaID': row.areaID,
                 'programCode': row.programCode,
                 'areaName': row.areaNum + ": " + row.areaName, 
-                'subareas': []                  
+                'subareas': {}                  
             }
                 
 
-            if subarea_id not in result[area_id]['subareas']:
-                result[area_id][subarea_id]["subareas"] = {
-                    'subareaID': row.subareaID,
+            if subarea_id and subarea_id not in result[area_id]['subareas']:
+                result[area_id]["subareas"][subarea_id] = {
+                    'subareaID': subarea_id,
                     'subareaName': row.subareaName,
                     'criteria': {
                         'inputs': [],
@@ -389,13 +390,14 @@ def register_routes(app):
                         'outcomes': [],
                 }, 
             }
-                
-            criteria_data = {
-                'content': row.criteriaContent,
-                'docID': row.docID,
-                'docName': row.docName,
-                'docPath': row.docPath
-            }
+            
+            if row.criteriaContent:
+                criteria_data = {
+                    'content': row.criteriaContent,
+                    'docID': row.docID,
+                    'docName': f"{row.docName}{row.docType}",
+                    'docPath': row.docPath
+                }
 
             match row.criteriaType:
                 case "Input":
@@ -408,13 +410,116 @@ def register_routes(app):
         for area in result.values():
             area['subareas'] = list(area['subareas'].values())
 
+        print(result.values())
+
 
         return jsonify(list(result.values())) 
+    
+
+    @app.route('/api/subarea', methods=["GET"])
+    def get_subarea():
+        # Query all subareas with their criteria
+        results = (
+            db.session.query(
+                Subarea.subareaID,
+                Subarea.subareaName,
+                Area.areaID,
+                Criteria.criteriaID
+            )
+            .join(Area, Subarea.areaID == Area.areaID)
+            .outerjoin(Criteria, Subarea.subareaID == Criteria.subareaID)
+            .all()
+        )
+
+        subarea_dict = {}
+
+        for sa in results:
+            if sa.subareaID not in subarea_dict:
+                subarea_dict[sa.subareaID] = {
+                    'subareaID': sa.subareaID,
+                    'subareaName': sa.subareaName,
+                    'areaID': sa.areaID,
+                    'criteria': []  # group criteria here
+                }
+            if sa.criteriaID:
+                subarea_dict[sa.subareaID]['criteria'].append({
+                    'criteriaID': sa.criteriaID
+                })
+
+        return jsonify({'subarea': list(subarea_dict.values())}), 200
+
+    @app.route('/api/accreditation/create_area', methods=["POST"])
+    def create_area():
+        data = request.form
+        programID = data.get("programID")
+        areaNum = data.get("areaNum")
+        areaName = data.get("areaName")
+
+    # create new area
+
+        new_area = Area(
+            programID = programID,
+            areaName = areaName,
+            areaNum = areaNum
+        )
+
+        db.session.add(new_area)
+        db.session.commit()
+
+        return jsonify({'message' : 'Area created successfully!'}), 200
+
+
+    @app.route('/api/accreditation/create_subarea', methods=["POST"])
+    def create_sub_area():
+        data = request.form
+        areaID = data.get("selectedAreaID")
+        subareaName = data.get("subAreaName")
+
+        area = Area.query.get(areaID)
+        # Check if the area exists
+        if not area:
+            return jsonify({'error': 'Area not found'}), 404
+
+
+        new_subArea = Subarea(subareaName = subareaName)
+        area.subareas.append(new_subArea)
+
+        db.session.add(new_subArea)
+        db.session.commit()
+
+        return jsonify({'message': 'Sub-Area created successfully!'}), 200
+
+        
+    @app.route('/api/accreditation/create_criteria', methods=["POST"])
+    def create_criteria():
+        data = request.form
+        subareaID = data.get("selectedSubAreaID")
+        criteriaContent = data.get("criteria")
+        criteriaType = data.get("criteriaType")
+
+        subarea = Subarea.query.get(subareaID)
+
+        if not subarea:
+            return jsonify({'error': 'Subarea not found'}), 404
+        
+        new_criteria = Criteria(
+            subareaID = subareaID,
+            criteriaContent = criteriaContent,
+            criteriaType = criteriaType
+        )
+
+        subarea.criteria.append(new_criteria)
+
+        db.session.add(new_criteria)
+        db.session.commit()
+
+        return jsonify({'message': 'Criteria created successfully!'}), 200
+
 
 
     @app.route('/api/accreditation/upload', methods=["POST"])
     def upload_file():
-        file = request.files.get("uploadFile")
+        file = request.files.get("uploadedfile")
 
         if file:
 
