@@ -255,17 +255,16 @@ const Users = () => {
         )}
 
             {/* navigation bar */}
-            <section className="flex items-center h-[7%] gap-7 text-xl text-neutral-800 dark:text-white">
-                <button className={`${visible == "list" ? 'border-b-2 font-semibold' : 'border-0 font-normal'} w-1/10 h-full`} onClick={() => makeVisible("list")}>List</button>
-                <button className={`${visible == "add" ? 'border-b-2 font-semibold' : 'border-0 font-normal'} w-1/10 h-full`} onClick={() => makeVisible("add")}>Add</button>
-                <input type="text" className='rounded-lg right-[2%] w-1/4 bg-neutral-200 p-1 text-base absolute border border-gray-400 dark:placeholder-neutral-600 dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none' onChange={handleQuery} value={searchQuery} placeholder='Search user' />
+            <section className="flex relative mt-20 lg:mt-0 items-center h-[7%] text-xl text-neutral-800 dark:text-white">
+                <button className={`${visible == "list" ? 'border border-gray-300 shadow-sm rounded-xl font-semibold' : 'border-0 font-normal'} w-15 lg:w-30 h-full`} onClick={() => makeVisible("list")}>List</button>
+                <button className={`${visible == "add" ? 'border border-gray-300 shadow-sm rounded-xl font-semibold' : 'border-0 font-normal'} w-15 lg:w-30 h-full`} onClick={() => makeVisible("add")}>Add</button>
+                <input type="text" className='rounded-lg right-[2%] w-46 lg:w-1/4 bg-neutral-200 p-1 text-base absolute border border-gray-400 dark:placeholder-neutral-600 dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none' onChange={handleQuery} value={searchQuery} placeholder='Search user' />
             </section>
             
             {/* section for adding users */}
-            <section  className={`${visible == "add" ? "block" : "hidden"} overflow-y-auto box-border h-[75%] mt-4 p-5 text-neutral-800 border border-neutral-400 rounded-3xl shadow-xl dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-800`}>
-                <form onSubmit={handleCreateUser} action="" method='POST' className='flex flex-row flex-wrap w-full gap-8 p-5 '>
+                <form onSubmit={handleCreateUser} action="" method='POST' className={`${visible == "add" ? "block" : "hidden"} flex mt-5 mb-5 flex-col-reverse lg:flex-row flex-wrap w-full gap-8 p-5 border border-gray-300 shadow-xl rounded-2xl`}>
                     {/* detais form */}
-                    <div className='flex flex-col w-1/4 gap-6 '>
+                    <div className='flex flex-col w-full lg:w-1/4 gap-6 '>
                         <div className='relative'>
                             <input type="text" value={employeeID} required onChange={(e) => setEmployeeID(e.target.value)} name='employeeID' className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
                             <label  className="absolute transition-all duration-200 left-1 top-0 peer-focus:top-[-1.5rem] peer-valid:top-[-1.5rem] peer-focus:text-sm peer-valid:text-sm text-neutral-500 text-lg " style={{paddingInline: "0.25rem"}}>Employee ID</label>
@@ -280,8 +279,8 @@ const Users = () => {
                             <label  className="absolute transition-all duration-200 left-1 top-0 peer-focus:top-[-1.5rem] peer-valid:top-[-1.5rem] peer-focus:text-sm peer-valid:text-sm text-neutral-500 text-lg " style={{paddingInline: "0.25rem"}}>Last Name</label>
                         </div>
                         <div className='relative'>
-                            <input type="text" value={suffix} onChange={(e) => setSuffix(e.target.value)} name='suffix' className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
-                            <label  className="absolute transition-all duration-200 left-1 top-0 peer-focus:top-[-1.5rem] peer-valid:top-[-1.5rem] peer-focus:text-sm peer-valid:text-sm text-neutral-500 text-lg " style={{paddingInline: "0.25rem"}}>Suffix</label>
+                            <input type="text" value={suffix} onChange={(e) => setSuffix(e.target.value)} name='suffix' className='peer w-full p-1 bg-gray-300 border border-gray-400 rounded-lg text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
+                            <label  className="absolute transition-all duration-200 left-1 top-0 peer-focus:top-[-1.5rem]  peer-focus:text-sm  text-neutral-500 text-lg " style={{paddingInline: "0.25rem"}}>Suffix</label>
                         </div>
 
                         <div className='relative'>
@@ -330,7 +329,7 @@ const Users = () => {
                     </div>
 
                     {/* upload profile */}
-                    <div className='flex flex-col items-start w-1/3 gap-4'>
+                    <div className='flex flex-col items-start w-full lg:w-1/3 gap-4'>
                         {profilePic ? 
                             <div className="w-[70%] h-[70%] place-self-center object-cover rounded-full relative">
                                 <img src={profilePic.preview} alt="Profile" className='w-full h-full rounded-full' />
@@ -351,14 +350,12 @@ const Users = () => {
                         
                     </div>
                 </form>
-            </section>
 
             {/* section for the list of users */}
-            <section  className={`${visible == "list" ? "block" : "hidden"} overflow-y-auto box-border h-[75%] mt-4 p-5 text-neutral-800 border border-neutral-400 rounded-3xl shadow-xl dark:bg-[#19181A] dark:border-none dark:inset-shadow-sm dark:inset-shadow-zuccini-800`}>
                 {/* adding users in the list */}
-                <div className={`${visible == "list" ? "block" : "hidden"} gap-6 flex flex-row flex-wrap`}>
+                <div className={`${visible == "list" ? "block" : "hidden"} gap-6 mt-5 flex flex-row flex-wrap`}>
                     {submittedUsers.length === 0 ? (
-                        <p className="flex justify-center items-center text-gray-500 w-[73%] rounded-2xl h-1/4 bg-gray-300 text-3xl absolute dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">No users yet.</p> 
+                        <p className="flex py-20 justify-center items-center text-gray-500 rounded-2xl h-1/4 w-full bg-gray-300 text-3xl dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">No users yet.</p> 
                     ) : 
                     
                     (submittedUsers.map((user, index) => (
@@ -376,7 +373,6 @@ const Users = () => {
                         </div>
                     )))}
                 </div>
-            </section>
 
             {/* showing details of a user */}
             <section>

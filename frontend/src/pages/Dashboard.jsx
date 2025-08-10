@@ -10,15 +10,14 @@ import{
 } from '@fortawesome/free-solid-svg-icons';
 import {useNavigate} from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-
+import { useState } from 'react';
 
 const Dashboard = () => {
 
-    
     return (
         <>
             {/* Dashboard links */}
-            <section className="grid grid-cols-4 gap-3">   
+            <section className='grid grid-rows-4 mb-5 lg:grid-cols-4 lg:grid-rows-1 gap-1 mt-20'>   
                 <DashboardLinks icon={faUsers} text="Users" />            
                 <DashboardLinks icon={faGraduationCap} text="Programs" />            
                 <DashboardLinks icon={faSchool} text="Institutes" />            
@@ -26,7 +25,7 @@ const Dashboard = () => {
             </section>
 
             {/* Announcements */}
-            <section className="relative mt-4 p-5 text-neutral-800 border-1 border-neutral-900 rounded-3xl shadow-xl transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-[#19181A] ">
+            <section className={` relative mt-4 mb-8 p-5 text-neutral-800 border-1 border-gray-300 rounded-3xl shadow-xl transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-[#19181A]`}>
                 <div className='flex flex-row'>
                     <FontAwesomeIcon icon={faBullhorn} className="p-2 dark:text-white" />
                     <h2 className="mb-4 text-xl font-semibold text-neutral-800 dark:text-white">Announcements</h2>
@@ -42,10 +41,10 @@ const Dashboard = () => {
                 </div>
             </section>
 
-            <section className='grid grid-cols-2 gap-4 mt-4'>
+            <section className='grid grid-rows-2 lg:grid-cols-2 lg:grid-rows-1 gap-4 mt-4'>
 
             {/* Pending Documents */}
-            <div className="mt-4 p-5 text-neutral-800 border-1 border-neutral-900 rounded-3xl shadow-xl transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-[#19181A]" >
+            <div className="mb-8 p-5 text-neutral-800 border-1 border-neutral-300 rounded-3xl shadow-xl transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-[#19181A]" >
                 <div className='flex flex-row'>
                     <FontAwesomeIcon icon={faHourglassHalf}  className="p-2 transition-all duration-500 dark:text-white" />
                     <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Pending Documents</h2>
@@ -56,7 +55,7 @@ const Dashboard = () => {
             </div>
             {/* Audit Logs */}
             
-            <div className="mt-4 p-5 text-neutral-800 border-1 border-neutral-900 rounded-3xl shadow-xl transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-[#19181A]">
+            <div className="mb-10 p-5 text-neutral-800 border-1 border-neutral-300 rounded-3xl shadow-xl transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-[#19181A]">
                 <div className='flex flex-row'>
                     <FontAwesomeIcon icon={faGears}  className="p-2 transition-all duration-500 dark:text-white" />
                     <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Audit Logs</h2>
@@ -79,11 +78,11 @@ export const DashboardLinks = ({icon, text}) =>{
 
     return (
     
-        <div className='flex flex-row items-center text-neutral-800 border-1 border-neutral-900 rounded-3xl h-20 p-4 m-1 relative shadow-xl cursor-pointer transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-[#19181A]'>
+        <div className='flex flex-row items-center text-neutral-800 border-1 border-neutral-300 rounded-3xl h-20 p-4 m-1 relative shadow-xl cursor-pointer transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-[#19181A]'>
             <div className='flex items-center justify-center p-2 w-12 h-12 bg-[#5ADF9C] rounded-full mr-3'>
                 <FontAwesomeIcon icon={icon}  className="text-2xl text-center text-neutral-800" />
             </div>
-            <h1 className="text-xl font-semibold transition-all duration-500 text-shadow-md dark:text-white">{text}</h1>
+            <h1 className="text-xl font-semibold transition-all duration-500 text-shadow-sm dark:text-white">{text}</h1>
             <span className="absolute text-lg transition-all duration-500 right-6 dark:text-white">0</span>
         </div>
     
