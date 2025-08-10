@@ -1,7 +1,7 @@
 from flask import jsonify, request, session, send_from_directory, current_app
 from app.models import Employee
 from app import db
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash, _hash_internal
 from werkzeug.utils import secure_filename
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
 from flask_jwt_extended.exceptions import JWTExtendedException
@@ -38,7 +38,18 @@ def register_routes(app):
             if user is None:
                 return jsonify({'success': False, 'message': 'Employee not found'})
             
-            if check_password_hash(user.password, password): #checks if the user input hashed password matches the hashed pass in the db 
+            # Check if the user has a valid password hash
+            if not user.password or len(user.password.strip()) == 0:
+                return jsonify({'success': False, 'message': 'User account has no password set. Contact administrator.'}), 400
+            
+            # Try to verify the password hash, handle invalid hash format errors
+            try:
+                is_valid_password = check_password_hash(user.password, password)
+            except ValueError as hash_error:
+                current_app.logger.error(f"Invalid password hash for user {empID}: {hash_error}")
+                return jsonify({'success': False, 'message': 'User account has invalid password format. Contact administrator.'}), 400
+                
+            if is_valid_password: #checks if the user input hashed password matches the hashed pass in the db 
                 # After login, store the user info in the session
                 
                 user.isOnline = True
@@ -84,6 +95,12 @@ def register_routes(app):
         data = request.form
         empID = data.get("employeeID")
         password = data.get("password")
+        
+        # Validate required fields
+        if not password or len(password.strip()) == 0:
+            return jsonify({'success': False, 'message': 'Password cannot be empty'}), 400
+        if not empID:
+            return jsonify({'success': False, 'message': 'Employee ID is required'}), 400
         first_name = data.get("fName").strip()
         last_name = data.get("lName").strip()
         suffix = data.get("suffix").strip()
@@ -132,6 +149,31 @@ def register_routes(app):
         
 
 
+    #Reset user password (for fixing invalid password hashes)
+    @app.route('/api/user/<string:employeeID>/reset-password', methods=["POST"])
+    @jwt_required()
+    def reset_user_password(employeeID):
+        try:
+            data = request.get_json()
+            new_password = data.get("newPassword")
+            
+            if not new_password or len(new_password.strip()) == 0:
+                return jsonify({'success': False, 'message': 'New password cannot be empty'}), 400
+            
+            user = Employee.query.filter_by(employeeID=employeeID).first()
+            if not user:
+                return jsonify({'success': False, 'message': 'Employee not found'}), 404
+            
+            # Update with properly hashed password
+            user.password = generate_password_hash(new_password)
+            db.session.commit()
+            
+            return jsonify({'success': True, 'message': f'Password reset successfully for employee {employeeID}'}), 200
+            
+        except Exception as e:
+            current_app.logger.error(f"Password reset error: {e}")
+            return jsonify({'success': False, 'message': 'Failed to reset password'}), 500
+
     #Delete the user 
     @app.route('/api/user/<string:employeeID>', methods=["DELETE"])
     def delete_user(employeeID):
@@ -144,6 +186,91 @@ def register_routes(app):
         db.session.commit()
 
         return jsonify({"success": True, "message":"Employee has been deleted"}), 200
+
+    #Check for users with invalid password hashes
+    @app.route('/api/users/check-invalid-passwords', methods=["GET"])
+    def check_invalid_passwords():
+        try:
+            users_with_invalid_passwords = []
+            all_users = Employee.query.all()
+            
+            for user in all_users:
+                if not user.password or len(user.password.strip()) == 0:
+                    users_with_invalid_passwords.append({
+                        'employeeID': user.employeeID,
+                        'name': f"{user.fName} {user.lName}",
+                        'email': user.email,
+                        'issue': 'Empty password hash'
+                    })
+                else:
+                    # Try to validate the hash format by attempting to parse it
+                    try:
+                        # This will raise ValueError if the hash format is invalid
+                        _hash_internal(user.password, 'test')
+                    except ValueError:
+                        users_with_invalid_passwords.append({
+                            'employeeID': user.employeeID,
+                            'name': f"{user.fName} {user.lName}",
+                            'email': user.email,
+                            'issue': 'Invalid hash format'
+                        })
+                    except Exception:
+                        # If we can't even test the hash, it's definitely invalid
+                        users_with_invalid_passwords.append({
+                            'employeeID': user.employeeID,
+                            'name': f"{user.fName} {user.lName}",
+                            'email': user.email,
+                            'issue': 'Corrupted hash format'
+                        })
+            
+            return jsonify({
+                'success': True, 
+                'count': len(users_with_invalid_passwords),
+                'users': users_with_invalid_passwords
+            }), 200
+            
+        except Exception as e:
+            current_app.logger.error(f"Check invalid passwords error: {e}")
+            return jsonify({'success': False, 'message': 'Failed to check passwords'}), 500
+
+    #Test specific user's password hash
+    @app.route('/api/user/<string:employeeID>/test-password', methods=["GET"])
+    def test_user_password(employeeID):
+        try:
+            user = Employee.query.filter_by(employeeID=employeeID).first()
+            if not user:
+                return jsonify({'success': False, 'message': 'Employee not found'}), 404
+            
+            result = {
+                'employeeID': user.employeeID,
+                'name': f"{user.fName} {user.lName}",
+                'email': user.email,
+                'hasPassword': bool(user.password),
+                'passwordLength': len(user.password) if user.password else 0,
+                'passwordPreview': user.password[:20] + '...' if user.password and len(user.password) > 20 else user.password
+            }
+            
+            # Test if the hash format is valid
+            if user.password:
+                try:
+                    _hash_internal(user.password, 'test')
+                    result['hashValid'] = True
+                    result['hashError'] = None
+                except ValueError as e:
+                    result['hashValid'] = False
+                    result['hashError'] = str(e)
+                except Exception as e:
+                    result['hashValid'] = False
+                    result['hashError'] = f"Unexpected error: {str(e)}"
+            else:
+                result['hashValid'] = False
+                result['hashError'] = 'No password set'
+            
+            return jsonify({'success': True, 'user': result}), 200
+            
+        except Exception as e:
+            current_app.logger.error(f"Test password error: {e}")
+            return jsonify({'success': False, 'message': 'Failed to test password'}), 500
 
 
 
@@ -192,7 +319,153 @@ def register_routes(app):
         return jsonify({"users" : user_list}), 200
     
 
-    
+    #edit program base on program id
+    @app.route('/api/program/<int:programID>', methods=['PUT'])
+    def edit_program(programID):
+        try:
+            data = request.get_json()  # Get JSON data from frontend
+            programs = Program.query.filter_by(programID=programID).first()  # Find program by ID
+            
+            if programs:
+                # Update the database fields with new values
+                programs.programCode = data.get('programCode')      # Update program code (e.g., "BSIT")
+                programs.programName = data.get('programName')      # Update program name  
+                programs.programColor = data.get('programColor')    # Update program color
+                # Handle employeeID - accept string format like "23-45-678"
+                employee_id = data.get('employeeID')
+                if employee_id and employee_id.strip():  # Check if not empty
+                    programs.employeeID = employee_id  # Store as string (matches your DB format)
+                else:
+                    programs.employeeID = None  # Set to null for empty values
+                
+                db.session.commit()  # Save changes to database
+                
+                # After saving, get the updated dean info via the foreign key relationship
+                dean = programs.dean  # This uses the relationship defined in your models.py
+                dean_name = f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A"
+                
+                return jsonify({
+                    'success': True,
+                    'message': 'Program Updated Successfully',
+                    'updated_program': {
+                        'programID': programs.programID,
+                        'programCode': programs.programCode,
+                        'programName': programs.programName,
+                        'programColor': programs.programColor,
+                        'programDean': dean_name,  # Send back the dean's full name for display
+                        'employeeID': programs.employeeID  # Include the ID for future edits
+                    }
+                })
+            else:
+                return jsonify({'error': 'Program not found'}), 404
+                
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': 'Database error occurred'}), 500
+
+    #Create new program
+    @app.route('/api/program', methods=['POST'])
+    def create_program():
+        try:
+            data = request.get_json()  # Get JSON data from frontend
+            
+            # Handle employeeID - accept string format like "23-45-678"
+            employee_id = data.get('employeeID')
+            if employee_id and employee_id.strip():  # Check if not empty
+                final_employee_id = employee_id  # Store as string
+            else:
+                final_employee_id = None  # Set to null for empty values
+            
+            # Create new program object
+            new_program = Program(
+                programCode=data.get('programCode'),
+                programName=data.get('programName'),
+                programColor=data.get('programColor'),
+                employeeID=final_employee_id
+            )
+            
+            db.session.add(new_program)  # Add to database
+            db.session.commit()  # Save changes
+            
+            # Get the dean info for response (same as edit route)
+            dean = new_program.dean
+            dean_name = f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A"
+            
+            return jsonify({
+                'success': True,
+                'message': 'Program Created Successfully',
+                'programID': new_program.programID,
+                'programCode': new_program.programCode,
+                'programName': new_program.programName,
+                'programColor': new_program.programColor,
+                'programDean': dean_name,
+                'employeeID': new_program.employeeID
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Create program error: {str(e)}")
+            return jsonify({'error': 'Failed to create program'}), 500
+
+    #Delete program by ID
+    @app.route('/api/program/<int:programID>', methods=['DELETE'])
+    def delete_program(programID):
+        try:
+            programs = Program.query.filter_by(programID=programID).first()
+            
+            if not programs:
+                return jsonify({'error': 'Program not found'}), 404
+            
+            # Check dependencies before deletion
+            dependencies = []
+            
+            # Check employees
+            employees = Employee.query.filter_by(programID=programID).count()
+            if employees > 0:
+                dependencies.append(f"{employees} employee(s)")
+            
+            # Check areas
+            areas = Area.query.filter_by(programID=programID).count()
+            if areas > 0:
+                dependencies.append(f"{areas} area(s)")
+            
+            # Check institutes  
+            institutes = Institute.query.filter_by(programID=programID).count()
+            if institutes > 0:
+                dependencies.append(f"{institutes} institute(s)")
+                
+            # Check deadlines
+            deadlines = Deadline.query.filter_by(programID=programID).count()  
+            if deadlines > 0:
+                dependencies.append(f"{deadlines} deadline(s)")
+            
+            # If dependencies exist, prevent deletion
+            if dependencies:
+                dependency_text = ", ".join(dependencies)
+                return jsonify({
+                    'error': 'Cannot delete program',
+                    'reason': f'This program is referenced by: {dependency_text}',
+                    'suggestion': 'Please reassign or remove dependent records first',
+                    'canDelete': False,
+                    'dependencies': dependencies
+                }), 400
+            
+            # Safe to delete - no dependencies found
+            db.session.delete(programs)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Program deleted successfully',
+                'deletedID': programID
+            })
+                
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Delete program error: {str(e)}")
+            return jsonify({'error': 'Database error occurred'}), 500
+        
+
     #Get the program
     @app.route('/api/program', methods=["GET"])
     def get_program():
@@ -206,10 +479,11 @@ def register_routes(app):
 
             program_data = {
                 'programID': program.programID,
-                'programDean': f"{program.lName} {program.fName} {program.suffix or ''}" if dean else "N/A",
+                'programDean': f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A",
                 'programCode': program.programCode,
                 'programName': program.programName,
                 'programColor': program.programColor,
+                'employeeID': program.employeeID  # Include the foreign key ID
             } 
             program_list.append(program_data)
         return jsonify({"programs": program_list}), 200
