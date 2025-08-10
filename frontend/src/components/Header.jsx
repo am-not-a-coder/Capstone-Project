@@ -12,6 +12,7 @@ import avatar1 from '../assets/avatar1.png';
 import avatar2 from '../assets/avatar2.png';
 import avatar3 from '../assets/avatar3.png';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { useNavigate } from 'react-router-dom';
 
 
 
@@ -76,17 +77,29 @@ const Header = ({title}) => {
     //static notif data
     const notifications = [
         {
+            profilePic: avatar1,
             title: "Programs",
-            content: "BSIT department has completed the Area I",
+            content: "BSIT department has completed the Area I.",
             date: "06/20/2025",
-            alert: true
+            alert: true,
+            link: "/Programs"
         },
         {
+            profilePic: avatar2,
             title: "New Announcement",
-            content: "Admin has uploaded a new announcement",
+            content: "Admin has uploaded a new announcement.",
             date: "06/20/2025",
-            alert: false
+            alert: false,
+            link: "/Dashboard"
         },
+        {
+            profilePic: avatar3,
+            title: "Documents",
+            content: "New document has been uploaded to the system.",
+            date: "06/29/2025",
+            alert: true,
+            link: "/Documents"
+        }
     ]
     //static message data
     const messages = [
@@ -116,17 +129,16 @@ const Header = ({title}) => {
 
 
     return(
-        <header className="relative flex items-center col-span-5 col-start-2 p-4 mb-3 text-white">
+        <header className="w-full z-10 fixed lg:relative flex items-center col-span-5 col-start-2 p-4 -mt-5 mb-3 pl-10">
              <HeaderTitle title={title}/>
              {/* Profile, messages, notifications */}
-        <div className='relative w-full'>
-            <div 
+        <div className='w-full'><div 
             ref={iconContainerRef}
-            className="fixed top-4 right-10 flex justify-center items-center w-45 h-16 p-1 shadow-[5px_5px_10px_rgba(0,0,0,0.5)] bg-neutral-200 rounded-3xl dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-[#19181A] z-20">
+            className="bg-gray-300 lg:rounded-3xl fixed top-0 lg:top-4 lg:right-10 right-0 flex justify-end items-center lg:w-45 w-full lg:h-16 h-19 p-2 shadow-lg border border-gray-300 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 ">
                 {/* Message button */}
                 <FontAwesomeIcon 
                     icon={faComment} 
-                    className="bg-neutral-300 text-zuccini-800 text-xl p-2 rounded-lg cursor-pointer dark:text-zuccini-700 dark:bg-[#242424] transition-all duration-500 "
+                    className="bg-neutral-300 text-zuccini-800 text-lg lg:text-xl p-2 rounded-lg cursor-pointer dark:text-zuccini-700 dark:bg-[#242424] transition-all duration-500"
                     onClick={() => {
                         setShowMessages((current) => !current);
                         setShowNotification(false);
@@ -146,7 +158,7 @@ const Header = ({title}) => {
                 {/* Profile button */}
                 <FontAwesomeIcon 
                     icon={faCircleUser}
-                    className="ml-8 text-4xl transition-all duration-500 cursor-pointer text-zuccini-800 dark:text-zuccini-700" 
+                    className="ml-2 lg:ml-8 text-4xl transition-all duration-500 cursor-pointer text-zuccini-800 dark:text-zuccini-700" 
                     onClick={ () => {
                         setShowProfile ((current) => !current);
                         setShowNotification(false);
@@ -198,12 +210,14 @@ const Header = ({title}) => {
                             <h1 className='mb-1 ml-2 text-2xl font-medium'>
                                 Notifications
                             </h1>
-                            <Link to='/Notification'>See All</Link>
+                            <Link className='ml-2 px-2 text-lg font-medium text-blue-500 hover:bg-neutral-300 dark:hover:bg-neutral-800'
+                            to='/Notification'>See All
+                            </Link>
                         </div>
                        <div className='flex flex-col min-h-[300px] p-3 bg-neutral-300 w-full rounded-xl inset-shadow-sm inset-shadow-neutral-400 transition-all duration-500 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
                             {notifications && notifications.length > 0 ? (
                             notifications.map((notification, index) => (
-                                <Notifications key={index} notifTitle={notification.title} content={notification.content} date={notification.date} alert={notification.alert}/>
+                                <Notifications key={index} picture={notification.profilePic} notifTitle={notification.title} content={notification.content} date={notification.date} alert={notification.alert} link={notification.link}/>
                             )) 
                         ) : ( <h1 className='text-xl text-center text-neutral-600'>No new notifications</h1> 
                         )}
@@ -238,19 +252,33 @@ const Header = ({title}) => {
 
 export const HeaderTitle = ({title}) => {
     return(
-     <h1 className="ml-2 text-5xl font-semibold text-neutral-900 text-shadow-lg dark:text-white">{title}</h1>   
+     <h1 className="z-[60] fixed lg:relative top-5 ml-2 text-2xl lg:text-5xl font-semibold text-neutral-900 text-shadow-lg dark:text-white">{title}</h1>   
     )
 
 }
 
 //generates the notification div
 
-export const Notifications = ({notifTitle, content, date, alert}) => {
+export const Notifications = ({notifTitle, content, date, alert, picture, link}) => {
+    const navigate = useNavigate();
+
+    const handleClick = () => {
+        if(link) {
+            navigate(link); // Navigate to the specified link
+        }
+    };
+
     return(
         
-    <div className='relative flex items-center w-full min-h-[50px] p-3 border mb-2 rounded-xl bg-neutral-200 shadow-md transition-transform duration-200 cursor-pointer hover:shadow-lg hover:scale-101 dark:border-none dark:bg-[#19181A] dark:inset-shadow-zuccini-900 dark:inset-shadow-sm '>
+    <div 
+    onClick={handleClick}
+    className='relative flex items-center w-full min-h-[50px] p-3 border mb-2 rounded-xl bg-neutral-200 shadow-md transition-transform duration-200 cursor-pointer hover:shadow-lg hover:scale-101 dark:border-none dark:bg-[#19181A] dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
         {/* Hole */}
-        <div className="w-5 h-5 mr-5 transition-all duration-500 rounded-full bg-neutral-300 inset-shadow-sm inset-shadow-neutral-400 dark:bg-woodsmoke-950 dark:inset-shadow-xs dark:inset-shadow-zuccini-600"></div>
+        <img 
+        src={picture} 
+        alt="profile picture" 
+        className='w-10 h-10 mr-3 rounded-full'
+        />
         <div>
             <h1 className='flex items-center font-bold text-md'>
                 {notifTitle}

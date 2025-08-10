@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -55,8 +53,6 @@ body {
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
-
-  
 }
 
 
@@ -94,3 +90,4 @@ body {
   }
 }
 
+======

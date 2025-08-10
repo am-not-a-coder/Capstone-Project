@@ -9,6 +9,6 @@
     @apply box-border;
 }
 
-html{
-    @apply overflow-hidden;
+html {
+  overflow: hidden;
 }

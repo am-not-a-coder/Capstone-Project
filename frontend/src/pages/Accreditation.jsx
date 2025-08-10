@@ -12,6 +12,7 @@ import CreateModal from '../components/modals/CreateModal';
 
 const Accreditation = () => {
 
+
     const [expandedAreaIndex, setExpandedAreaIndex] = useState(null);
     const [area, setArea] = useState([]);
 
