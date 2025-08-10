@@ -5,6 +5,7 @@ export default function CreateForm({
   title = "Program", // "Program" or "Institute"
   fields = [], // Array of field configurations
   data = [], // Array of existing data (programs or institutes)
+  employees = [], // Array of employees for dropdown
   
   // Event handlers
   onSubmit,
@@ -24,28 +25,28 @@ export default function CreateForm({
   // Default field configuration for Programs
   const defaultFields = [
     {
-      name: "code",
+      name: "programCode",
       label: `${title} Code`,
       placeholder: `e.g. ${title === "Program" ? "BSIT" : "CCS"}`,
       type: "text",
       required: true
     },
     {
-      name: "name", 
+      name: "programName", 
       label: `${title} Name`,
       placeholder: `Full ${title.toLowerCase()} name`,
       type: "text",
       required: true
     },
     {
-      name: title === "Program" ? "programDean" : "instituteHead",
+      name: title === "Program" ? "employeeID" : "instituteHead",
       label: title === "Program" ? "Program Dean" : "Institute Head",
-      placeholder: title === "Program" ? "Program Dean" : "Institute Head",
-      type: "text",
-      required: true
+      placeholder: title === "Program" ? "Select Program Dean" : "Institute Head",
+      type: title === "Program" ? "select" : "text",
+      required: false
     },
     {
-      name: title === "Program" ? "color" : "img",
+      name: title === "Program" ? "programColor" : "img",
       label: title === "Program" ? `${title} Color` : `${title} Logo`,
       placeholder: title === "Program" ? `${title} Color` : `Select ${title.toLowerCase()} logo`,
       type: title === "Program" ? "color" : "file",
@@ -84,7 +85,7 @@ export default function CreateForm({
   return (
     <div className="fixed inset-0 bg-opacity-50 flex items-center justify-center z-50 text-black">
       <div className="bg-white p-8 rounded-lg shadow-lg min-w-[400px] flex flex-col items-center">
-        <div className="flex gap-4 mb-4 w-full justify-center">
+        <div className="flex gap-4 mb-4  w-full justify-center">
           <button onClick={() => handleModify("add")}
             className={`px-4 py-2 rounded font-semibold transition text-white ${activeModify === "add" ? "bg-green-700" : "bg-green-500 hover:bg-green-600"}`}>
             Add {title}
@@ -105,7 +106,27 @@ export default function CreateForm({
             <h2 className="text-lg font-bold mb-2">Add New {title}</h2>
             {formFields.map((field) => (
               <div key={field.name}>
-                {field.type === "file" ? (
+                {field.type === "select" ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {field.label}
+                    </label>
+                    <select
+                      name={field.name}
+                      className="border rounded p-2 w-full"
+                      value={form[field.name] || ""}
+                      onChange={handleChange}
+                      required={field.required}
+                    >
+                      <option value="">{field.placeholder}</option>
+                      {employees.map((employee) => (
+                        <option key={employee.employeeID} value={employee.employeeID}>
+                          {employee.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : field.type === "file" ? (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       {field.label}
@@ -153,14 +174,34 @@ export default function CreateForm({
             <select className="border rounded p-2" value={editIndex ?? ""} onChange={onEditSelect} required>
               <option value="" disabled>Select a {title.toLowerCase()} to edit</option>
               {data.map((item, idx) => (
-                <option value={idx} key={item.code}>{item.code} - {item.name}</option>
+                <option value={idx} key={item.programCode}>{item.programCode} - {item.programName}</option>
               ))}
             </select>
             {editIndex !== null && (
               <>
                 {formFields.map((field) => (
                   <div key={field.name}>
-                    {field.type === "file" ? (
+                    {field.type === "select" ? (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {field.label}
+                        </label>
+                        <select
+                          name={field.name}
+                          className="border rounded p-2 w-full"
+                          value={form[field.name] || ""}
+                          onChange={handleChange}
+                          required={field.required}
+                        >
+                          <option value="">{field.placeholder}</option>
+                          {employees.map((employee) => (
+                            <option key={employee.employeeID} value={employee.employeeID}>
+                              {employee.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : field.type === "file" ? (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           {field.label}
@@ -210,7 +251,7 @@ export default function CreateForm({
             <select className="border rounded p-2" value={editIndex ?? ""} onChange={onDeleteSelect} required>
               <option value="" disabled>Select a {title.toLowerCase()} to delete</option>
               {data.map((item, idx) => (
-                <option value={idx} key={item.code}>{item.code} - {item.name}</option>
+                <option value={idx} key={item.programCode}>{item.programCode} - {item.programName}</option>
               ))}
             </select>
             <div className="flex gap-2 justify-end">

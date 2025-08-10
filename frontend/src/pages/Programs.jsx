@@ -16,7 +16,6 @@ import axios from 'axios';
           alert("Token not found!");
                 return;
             }
-      
       try{
          const response = await axios.get('http://localhost:5000/api/program', 
           {headers: {'Authorization' : `Bearer ${token}`}},
@@ -33,18 +32,38 @@ import axios from 'axios';
       fetchProgram()
     }, []);
 
+    useEffect(() => {
+      const fetchEmployees = async () => {
+        if (!token) {
+          return;
+        }
+        try {
+          const response = await axios.get('http://localhost:5000/api/users', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          Array.isArray(response.data.users) ? setEmployees(response.data.users) : setEmployees([]);
+        } catch (err) {
+          console.error("Error fetching employees", err);
+        }
+      };
+      fetchEmployees();
+    }, [token]);
+
     {/*use state function*/}
     const [programs, setPrograms] = useState([]);
+    const [employees, setEmployees] = useState([]);
     
     const [showForm, setShowForm] = useState(false);
     const [activeModify, setActiveModify] = useState(null);
     const [editIndex, setEditIndex] = useState(null);
 
+
+
     function handleModify(mode) {
       setActiveModify((prev) => (prev === mode ? null : mode));
       if (mode !== "edit") {
         setEditIndex(null);
-        setForm({ code: "", name: "", color: "", programDean: "" });
+        setForm({ programCode: "", programName: "", programColor: "", employeeID: null });
       }
     }
 
@@ -52,53 +71,92 @@ import axios from 'axios';
       const idx = e.target.value;
       setEditIndex(idx);
       const prog = programs[idx];
-      setForm({ ...prog });
+      setForm({
+        programCode: prog.programCode,
+        programName: prog.programName,
+        programColor: prog.programColor,
+        employeeID: prog.employeeID || null  // Use employeeID from program object
+      });
     }
 
     function handleDeleteSelect(e) {
       setEditIndex(e.target.value);
     }
 
-    function handleDelete(e) {
+    const handleDelete = async (e) => {
       e.preventDefault();
       if (editIndex !== null) {
-        setPrograms(programs.filter((_, idx) => idx != editIndex));
-        setShowForm(false);
-        setEditIndex(null);
-        setActiveModify(null);
+        try {
+          const programToDelete = programs[editIndex];
+          
+          // Call DELETE API
+          await axios.delete(`http://localhost:5000/api/program/${programToDelete.programID}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          
+          // Remove from local state only if API call succeeds
+          setPrograms(programs.filter((_, idx) => idx != editIndex));
+          setShowForm(false);
+          setEditIndex(null);
+          setActiveModify(null);
+          
+        } catch (error) {
+          console.error('Error deleting program:', error);
+          
+          // Show detailed error message if available
+          if (error.response && error.response.data) {
+            const errorData = error.response.data;
+            if (errorData.reason && errorData.suggestion) {
+              alert(`${errorData.error}\n\n${errorData.reason}\n\n${errorData.suggestion}`);
+            } else {
+              alert(errorData.error || 'Failed to delete program. Please try again.');
+            }
+          } else {
+            alert('Failed to delete program. Please try again.');
+          }
+        }
       }
     }
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
       e.preventDefault();
-      if (activeModify === "edit" && editIndex !== null) {
-        // Edit mode
-        const updated = [...programs];
-        updated[editIndex] = { ...form };
-        setPrograms(updated);
-      } else {
-        // Add mode
-        setPrograms([
-          ...programs,
-          {
-            code: form.code,
-            name: form.name,
-            color: form.color,
-            programDean: form.programDean,
-          },
-        ]);
+      try {
+        if (activeModify === "edit" && editIndex !== null) {
+          // Edit mode
+          const response = await axios.put(`
+            http://localhost:5000/api/program/${programs[editIndex].programID}`, form,
+            { headers: {'Authorization': `Bearer ${token}`}}
+          )
+          //update localstate with response
+          const updated = [...programs];
+          updated[editIndex] = response.data.updated_program
+          setPrograms(updated)
+
+        } else {
+          // Add mode
+          const response = await axios.post('http://localhost:5000/api/program', form,
+            { headers: {'Authorization': `Bearer ${token}`} }
+          );
+          //add data to localstate
+          setPrograms([...programs, response.data])
+        }
+        //Success: Reset form
+        setShowForm(false);
+        setForm({ programCode: "", programName: "", programColor: "", employeeID: null });
+        setEditIndex(null);
+        setActiveModify(null);
+      } catch(error){
+        console.error('Error saving program', error);
+        alert('Failed to save program. Please try again.')
       }
-      setShowForm(false);
-      setForm({ code: "", name: "", color: "", programDean: "" });
-      setEditIndex(null);
-      setActiveModify(null);
+
     };
 
     const [form, setForm] = useState({
-      code: "",
-      name: "",
-      color: "",
-      programDean: "",
+      programCode: "",
+      programName: "",
+      programColor: "",
+      employeeID: null,
     });
 
     const handleChange = (e) => {
@@ -109,12 +167,6 @@ import axios from 'axios';
       <>
         <div className="p-6 border rounded-xl border-neutral-800 dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
           <div className="flex flex-wrap mb-8 gap-15">
-
-            {/* Create Card */} 
-            <button className="flex items-center justify-center w-full text-4xl text-white bg-gray-500 rounded-lg cursor-pointer min-h-48 sm:w-1/2 md:w-1/3 lg:w-1/5 " onClick={() => setShowForm(true)}>
-              +
-            </button>
-
             {/* Create Card */}
             <CreateCard setShowForm={setShowForm}/>
               
@@ -128,6 +180,7 @@ import axios from 'axios';
             <CreateForm 
               title="Program"
               data={programs}
+              employees={employees}
               onSubmit={handleSubmit}
               onClose={() => setShowForm(false)}
               onEditSelect={handleEditSelect}
