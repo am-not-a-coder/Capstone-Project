@@ -676,7 +676,7 @@ def register_routes(app):
                 }
 
             match row.criteriaType:
-                case "Input":
+                case "Input/s":
                     result[area_id]['subareas'][subarea_id]['criteria']['inputs'].append(criteria_data)
                 case "Processes":
                     result[area_id]['subareas'][subarea_id]['criteria']['processes'].append(criteria_data)

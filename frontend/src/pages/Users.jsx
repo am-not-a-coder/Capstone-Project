@@ -2,69 +2,72 @@
 import{
     faCircleUser,
     faEye,
-    faEyeSlash
+    faEyeSlash,
+    faPlus,
+    faSearch,
+    faTimes,
+    faEdit,
+    faTrash,
+    faUser,
+    faEnvelope,
+    faPhone,
+    faBuilding,
+    faMapMarkerAlt
 } from '@fortawesome/free-solid-svg-icons';
 import axios from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect } from 'react';
 import StatusModal from '../components/modals/StatusModal';
 
-
-
 const Users = () => {
-
     // user info
-    const [employeeID, setEmployeeID] = useState("");  // state for employee ID input
-    const [fName, setFName] = useState("");  // state for first name input
-    const [lName, setLName] = useState("");  // state for last name input
-    const [suffix, setSuffix] = useState(""); // state for suffix input
-    const [programID, setProgramID] = useState("");  // state for program ID input
-    const [areaID, setAreaID] = useState("");  // state for area ID input
-    const [password, setPassword] = useState("");  // state for password input
-    const [email, setEmail] = useState("");  // state for email input
-    const [contactNum, setContactNum] = useState("");  // state for contact number input
-    const [profilePic, setProfilePic] = useState(null); // state for profile picture
+    const [employeeID, setEmployeeID] = useState("");  
+    const [fName, setFName] = useState("");  
+    const [lName, setLName] = useState("");  
+    const [suffix, setSuffix] = useState(""); 
+    const [programID, setProgramID] = useState("");  
+    const [areaID, setAreaID] = useState("");  
+    const [password, setPassword] = useState("");  
+    const [email, setEmail] = useState("");  
+    const [contactNum, setContactNum] = useState("");  
+    const [profilePic, setProfilePic] = useState(null); 
 
     const [programOption, setProgramOption] = useState([]);    
     const [areaOption, setAreaOption] = useState([]);    
-    const [visible, makeVisible] = useState("list");  // state to control which section is visible
+    const [visible, makeVisible] = useState("list");  
     const [submittedUsers, setSubmittedUsers] = useState([]); 
-    const [showDetails, setShowDetails] = useState(false); // state for showing user details
-    const [removeUser, setRemoveUser] = useState(false); // state for removing user
-    const [selectedUser, setSelectedUser] = useState([]); // state for selected user
-    const [removeConfirmation, setRemoveConfirmation] = useState(false); // state for showing remove button
-    const [searchQuery, setSearchQuery] = useState(""); // state for search query
+    const [showDetails, setShowDetails] = useState(false); 
+    const [removeUser, setRemoveUser] = useState(false); 
+    const [selectedUser, setSelectedUser] = useState([]); 
+    const [removeConfirmation, setRemoveConfirmation] = useState(false); 
+    const [searchQuery, setSearchQuery] = useState(""); 
+    const[hidePassword, setHidePassword] = useState(); 
+    const [showStatusModal, setShowStatusModal] = useState(false); 
+    const [statusMessage, setStatusMessage] = useState(null); 
+    const [statusType, setStatusType] = useState("success"); 
 
-    const[hidePassword, setHidePassword] = useState(); //state for hiding the password
-
-    const [showStatusModal, setShowStatusModal] = useState(false); // shows the status modal
-    const [statusMessage, setStatusMessage] = useState(null); // status message
-    const [statusType, setStatusType] = useState("success"); // status type (success/error)
-
-    const token = localStorage.getItem('token'); // gets the access token
-
+    const token = localStorage.getItem('token'); 
 
     if (removeUser) {
-        setSubmittedUsers(submittedUsers.filter(user => user !== selectedUser)); // remove selected user from submitted users
+        setSubmittedUsers(submittedUsers.filter(user => user !== selectedUser)); 
         setSelectedUser(null);
         setRemoveUser(false);
         setShowDetails(false);
     }
 
-    // function to show user details and set selected user
     const detailsAndSelectedUser = (user) => {
-        setSelectedUser(user); // set selected user
-        setShowDetails(true); // show user details
+        setSelectedUser(user); 
+        setShowDetails(true); 
     }
+
     const handleCreateUser = async (e) => {
-        e.preventDefault(); // prevent default form submission
+        e.preventDefault(); 
 
         if (!token){
             alert("No token found!");
             return;
         }
 
-        //sends user data through a FormData
         const formData = new FormData();
             formData.append("employeeID", employeeID);
             formData.append("password", password);
@@ -73,32 +76,28 @@ const Users = () => {
             formData.append("suffix", suffix);
             formData.append("email", email);
             formData.append("contactNum", contactNum);
-             if(profilePic?.file) formData.append("profilePic", profilePic.file); // 
+             if(profilePic?.file) formData.append("profilePic", profilePic.file); 
             formData.append("programID", programID);
             formData.append("areaID", areaID)
 
         try{
-            //Post request
         const res = await axios.post('http://localhost:5000/api/user', formData,
             {headers: 
                 {
                     'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'multipart/form-data' // supports the file 
+                    'Content-Type': 'multipart/form-data' 
                 }}, {withCredentials: true});
             
             setStatusMessage(res.data.message);
             setShowStatusModal(true);
             setStatusType("success");
 
-        
             const selectedProgram = programOption.find(program => program.programID == programID);
             const selectedProgramName = selectedProgram ? selectedProgram.programName: "";
 
             const selectedArea = areaOption.find(area => area.areaID == areaID);
             const selectedAreaName  = selectedArea ? selectedArea.areaNum : "";
 
-
-            //updates the users list
             setSubmittedUsers(user => [...user,
                 {
                     employeeID,
@@ -113,7 +112,6 @@ const Users = () => {
                     
                 }]);
             
-            //resets the form inputs 
             setEmployeeID("")
             setFName("")
             setLName("")
@@ -125,7 +123,6 @@ const Users = () => {
             setAreaID("")
             setProfilePic(null)
             
-        
         } catch(err){
             setStatusMessage("Server error. Please try again");
             setShowStatusModal(true);
@@ -133,8 +130,7 @@ const Users = () => {
             console.log(err.res?.data || err.message)
         }
     }
-                                        //FETCHING DATA FROM BACKEND  
-    // Get user info from the backend
+
     useEffect(() => {
     const fetchUsers = async () => {
         try{                
@@ -145,7 +141,6 @@ const Users = () => {
             const res = await axios.get('http://localhost:5000/api/users',
                 {headers: {'Authorization': `Bearer ${token}`}
             });
-            //checking the users before setting
             (Array.isArray(res.data.users)) ? setSubmittedUsers(res.data.users) : setSubmittedUsers([]); 
         } catch (err){
             console.error("Error occurred during user fetching", err);
@@ -156,7 +151,6 @@ const Users = () => {
 
     }, [])
 
-    //Get program info from the backend
     useEffect(() => {
     const fetchProgram = async () =>{
 
@@ -175,11 +169,8 @@ const Users = () => {
 
     }, [])
 
-    //Fetch the Area in the backend
     useEffect(() => {
-        
     const fetchArea = async () => {
-        
        const res = await axios.get('http://localhost:5000/api/area', 
             {headers: {'Authorization': `Bearer ${token}`}},
             {withCredentials: true}
@@ -187,24 +178,20 @@ const Users = () => {
 
        try{
             Array.isArray(res.data.area) ? setAreaOption(res.data.area) : setAreaOption([]);
-            
         } catch (err) {
             console.error("Error occurred during area fetching", err)
         }
-
     }
     fetchArea();
     }, [])
 
-
-    
     function removeAndClose() {
-        setRemoveUser(true); // set remove user to true
-        setRemoveConfirmation(false); // hide remove confirmation
-        exitShowDetails(); // exit show details
+        setRemoveUser(true); 
+        setRemoveConfirmation(false); 
+        exitShowDetails(); 
     }
 
-    const handleDeleteUser = async () => { //Deletes the user
+    const handleDeleteUser = async () => { 
         const id = selectedUser?.employeeID;
 
         if(!id){
@@ -213,7 +200,6 @@ const Users = () => {
         }
 
         try{
-
             const res = await axios.delete(`http://localhost:5000/api/user/${id}`,
                 {headers: {'Authorization' : `Bearer ${token}`}},
                 {withCredentials: true});
@@ -222,8 +208,6 @@ const Users = () => {
             setShowStatusModal(true);
             setStatusType("delete");
             removeAndClose() 
-            
-           
 
         } catch(err){
             console.error(err.response?.data || err.message)
@@ -231,7 +215,6 @@ const Users = () => {
             setStatusMessage(true)
             setStatusType("error")
         }
-
     }
 
     function exitShowDetails() {
@@ -239,13 +222,11 @@ const Users = () => {
         setShowDetails(false); 
     }
 
-
     const handleQuery = (e) => {
-        makeVisible("searchList"); // switch to list view
-        setSearchQuery(e.target.value); // update search query state
+        makeVisible("searchList"); 
+        setSearchQuery(e.target.value); 
     };
 
-    // Filter users based on search query (case-insensitive, matches name or email)
     const filteredUsers = submittedUsers.filter(
         user =>
             user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -253,214 +234,316 @@ const Users = () => {
     );
 
     return (
-        <>
-        {/* shows status when creating deadline */}
-        {showStatusModal && (
-            <StatusModal message={statusMessage} type={statusType} onClick={()=>setShowStatusModal(false)} />
-        )}
+        <div className="min-h-screen p-6 border border-neutral-800 rounded-xl bg-neutral-200 dark:bg-gray-900">
+            {showStatusModal && (
+                <StatusModal message={statusMessage} type={statusType} onClick={()=>setShowStatusModal(false)} />
+            )}
 
-            {/* navigation bar */}
-            <section className="flex relative mt-20 lg:mt-0 items-center h-[7%] text-xl text-neutral-800 dark:text-white">
-                <button className={`${visible == "list" ? 'border border-gray-300 shadow-sm rounded-xl font-semibold' : 'border-0 font-normal'} w-15 lg:w-30 h-full`} onClick={() => makeVisible("list")}>List</button>
-                <button className={`${visible == "add" ? 'border border-gray-300 shadow-sm rounded-xl font-semibold' : 'border-0 font-normal'} w-15 lg:w-30 h-full`} onClick={() => makeVisible("add")}>Add</button>
-                <input type="text" className='rounded-lg right-[2%] w-46 lg:w-1/4 bg-neutral-200 p-1 text-base absolute border border-gray-400 dark:placeholder-neutral-600 dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none' onChange={handleQuery} value={searchQuery} placeholder='Search user' />
-            </section>
-            
-            {/* section for adding users */}
-                <form onSubmit={handleCreateUser} action="" method='POST' className={`${visible == "add" ? "block" : "hidden"} flex mt-5 mb-5 flex-col-reverse lg:flex-row flex-wrap w-full gap-8 p-5 border border-gray-300 shadow-xl rounded-2xl`}>
-                    {/* detais form */}
-                    <div className='flex flex-col w-full lg:w-1/4 gap-6 '>
-                        <div className='relative'>
-                            <input type="text" value={employeeID} required onChange={(e) => setEmployeeID(e.target.value)} name='employeeID' className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
-                            <label  className="absolute transition-all duration-200 left-1 top-0 peer-focus:top-[-1.5rem] peer-valid:top-[-1.5rem] peer-focus:text-sm peer-valid:text-sm text-neutral-500 text-lg " style={{paddingInline: "0.25rem"}}>Employee ID</label>
-                        </div>
+           
+            {/* Navigation and Search */}
+            <div className="flex flex-col items-center justify-between gap-4 mb-8 lg:flex-row">
+                <div className="flex p-1 border border-gray-200 shadow-lg bg-neutral-100/90 dark:bg-gray-800 rounded-xl dark:border-gray-700"   >
+                    <button 
+                        className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
+                            visible === "list" 
+                                ? 'bg-green-500 text-white shadow-md transform scale-105' 
+                                : 'text-gray-600 dark:text-gray-300 hover:bg-neutral-200 dark:hover:bg-gray-700'
+                        }`} 
+                        onClick={() => makeVisible("list")}
+                    >
+                        <FontAwesomeIcon icon={faUser} className="mr-2" />
+                        Users List
+                    </button>
+                    <button 
+                        className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
+                            visible === "add" 
+                                ? 'bg-green-500 text-white shadow-md transform scale-105' 
+                                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`} 
+                        onClick={() => makeVisible("add")}
+                    >
+                        <FontAwesomeIcon icon={faPlus} className="mr-2" />
+                        Add User
+                    </button>
+                </div>
 
-                        <div className='relative'>
-                            <input type="text" value={fName} required onChange={(e) => setFName(e.target.value)} name='fName' className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
-                            <label  className="absolute transition-all duration-200 left-1 top-0 peer-focus:top-[-1.5rem] peer-valid:top-[-1.5rem] peer-focus:text-sm peer-valid:text-sm text-neutral-500 text-lg " style={{paddingInline: "0.25rem"}}>First Name</label>
-                        </div>
-                        <div className='relative'>
-                            <input type="text" value={lName} required onChange={(e) => setLName(e.target.value)} name='lName' className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
-                            <label  className="absolute transition-all duration-200 left-1 top-0 peer-focus:top-[-1.5rem] peer-valid:top-[-1.5rem] peer-focus:text-sm peer-valid:text-sm text-neutral-500 text-lg " style={{paddingInline: "0.25rem"}}>Last Name</label>
-                        </div>
-                        <div className='relative'>
-                            <input type="text" value={suffix} onChange={(e) => setSuffix(e.target.value)} name='suffix' className='peer w-full p-1 bg-gray-300 border border-gray-400 rounded-lg text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
-                            <label  className="absolute transition-all duration-200 left-1 top-0 peer-focus:top-[-1.5rem]  peer-focus:text-sm  text-neutral-500 text-lg " style={{paddingInline: "0.25rem"}}>Suffix</label>
-                        </div>
+                <div className="relative">
+                    <FontAwesomeIcon 
+                        icon={faSearch} 
+                        className="absolute text-gray-400 transform -translate-y-1/2 left-4 top-1/2"
+                    />
+                    <input 
+                        type="text" 
+                        className='py-3 pl-12 pr-4 text-gray-800 placeholder-gray-400 transition-all duration-300 bg-white border border-gray-300 shadow-lg outline-none w-80 dark:bg-gray-800 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white dark:placeholder-gray-500' 
+                        onChange={handleQuery} 
+                        value={searchQuery} 
+                        placeholder='Search users...'
+                    />
+                </div>
+            </div>
 
-                        <div className='relative'>
-                            <input type={!hidePassword ? "password" : "text"} value={password} required onChange={(e) => setPassword(e.target.value)} name='password' className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
-                            <label  className="absolute transition-all duration-200 left-1 top-0 peer-focus:top-[-1.5rem] peer-valid:top-[-1.5rem] peer-focus:text-sm peer-valid:text-sm text-neutral-500 text-lg" style={{paddingInline: "0.25rem"}}>Password</label>
-                             <FontAwesomeIcon icon={!hidePassword ? faEye : faEyeSlash} 
-                                onClick={() => {setHidePassword((current) => !current)}}
-                                className='absolute cursor-pointer top-2.5 right-3 text-neutral-600'
+            {/* Add User Form */}
+            <div className={`${visible === "add" ? "block" : "hidden"} mb-8`}>
+                <div className="p-8 bg-white border border-gray-200 shadow-xl dark:bg-gray-800 rounded-2xl dark:border-gray-700">
+                    <h2 className="mb-6 text-2xl font-bold text-gray-800 dark:text-white">Create New User</h2>
+                    
+                    <form onSubmit={handleCreateUser} className="flex flex-col gap-8 lg:flex-row">
+                        {/* Profile Picture Section */}
+                        <div className="flex flex-col items-center lg:w-1/3">
+                            <div className="mb-6">
+                                {profilePic ? 
+                                    <div className="relative w-48 h-48 group">
+                                        <img 
+                                            src={profilePic.preview} 
+                                            alt="Profile" 
+                                            className='object-cover w-full h-full border-4 border-gray-200 rounded-full shadow-xl dark:border-gray-600' 
+                                        />
+                                        <button 
+                                            type="button"
+                                            onClick={() => setProfilePic(null)} 
+                                            className='absolute flex items-center justify-center w-10 h-10 text-white transition-all duration-300 bg-red-500 rounded-full shadow-lg -top-2 -right-2 hover:bg-red-600 group-hover:scale-110'
+                                        >
+                                            <FontAwesomeIcon icon={faTimes} />
+                                        </button>
+                                    </div>  
+                                    : <div className="flex items-center justify-center w-48 h-48 rounded-full shadow-xl bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600">
+                                        <FontAwesomeIcon icon={faCircleUser} className="text-gray-400 text-8xl dark:text-gray-500" />
+                                    </div>
+                                }
+                            </div>
+                            <label 
+                                htmlFor="fileInput" 
+                                className="px-6 py-3 font-semibold text-white transition-all duration-300 transform shadow-lg cursor-pointer bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl hover:shadow-xl hover:scale-105"
+                            >
+                                <FontAwesomeIcon icon={faPlus} className="mr-2" />
+                                Choose Photo
+                            </label>
+                            <input 
+                                type="file" 
+                                id='fileInput' 
+                                name='profilePic' 
+                                hidden 
+                                accept="image/*"
+                                onChange={(e) => {
+                                    const file = e.target.files[0];
+                                    if (file) {
+                                        setProfilePic({
+                                            preview: URL.createObjectURL(file),
+                                            file: file
+                                        })
+                                    }
+                                }}
                             />
                         </div>
 
-                        <div className='relative'>
-                            <input type="email" required placeholder='' name='email' value={email} onChange={(e) => setEmail(e.target.value)}  className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
-                            <label  className="absolute transition-all duration-200 left-1 top-0 peer-focus:top-[-1.5rem] peer-focus:text-sm text-neutral-500 text-lg peer-not-placeholder-shown:top-[-1.5rem] peer-not-placeholder-shown:text-sm" style={{paddingInline: "0.25rem"}}>Email</label>
-                        </div>
-                        <div className='relative'>
-                            <input type="tel" required placeholder='' name='contactNum' value={contactNum} onChange={(e) => setContactNum(e.target.value)}  className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-800 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'/>
-                            <label  className="absolute transition-all duration-200 left-1 top-0 peer-focus:top-[-1.5rem] peer-focus:text-sm text-neutral-500 text-lg peer-not-placeholder-shown:top-[-1.5rem] peer-not-placeholder-shown:text-sm" style={{paddingInline: "0.25rem"}}>Contact Number</label>
-                        </div>
+                        {/* Form Fields */}
+                        <div className='grid grid-cols-1 gap-6 lg:w-2/3 md:grid-cols-2'>
+                            <div className='relative'>
+                                <input 
+                                    type="text" 
+                                    value={employeeID} 
+                                    required 
+                                    onChange={(e) => setEmployeeID(e.target.value)} 
+                                    name='employeeID' 
+                                    className='w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl peer focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white'
+                                    placeholder=" "
+                                />
+                                <label className="absolute text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-gray-50 dark:bg-gray-700 px-2 peer-focus:px-2 peer-focus:text-blue-600 dark:peer-focus:text-blue-400 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3">
+                                    Employee ID
+                                </label>
+                            </div>
 
-                    
-                        <div className='relative'>
-                            <select name="programID" id="programID"  value={programID}  required onChange={(e) => setProgramID(e.target.value)} className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-500 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'>
-                                <option value="">Select Program</option>
-                                {programOption.map((program) => {
-                                return (
-                                    //shows the Program name but passes the Program ID in the backend
-                                    <option key={program.programID} value={program.programID}>{program.programName}</option>
-                                )}
-                            )};                    
-                            </select>
-                        </div>
+                            <div className='relative'>
+                                <input 
+                                    type="text" 
+                                    value={fName} 
+                                    required 
+                                    onChange={(e) => setFName(e.target.value)} 
+                                    name='fName' 
+                                    className='w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl peer focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white'
+                                    placeholder=" "
+                                />
+                                <label className="absolute text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-gray-50 dark:bg-gray-700 px-2 peer-focus:px-2 peer-focus:text-blue-600 dark:peer-focus:text-blue-400 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3">
+                                    First Name
+                                </label>
+                            </div>
 
-                        <div className='relative'>
-                            <select name="areaID" id="areaID"  value={areaID} required onChange={(e) => setAreaID(e.target.value)} className='w-full p-1 bg-gray-300 border border-gray-400 rounded-lg peer text-neutral-500 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none'>
-                                <option value="">Select Area</option>
-                                {areaOption.map((area) => {
-                                return (
-                                    <option key={area.areaID} value={area.areaID}>{area.areaNum}</option>
-                                )}
-                            )};                    
-                            </select>
-                        </div>
+                            <div className='relative'>
+                                <input 
+                                    type="text" 
+                                    value={lName} 
+                                    required 
+                                    onChange={(e) => setLName(e.target.value)} 
+                                    name='lName' 
+                                    className='w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl peer focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white'
+                                    placeholder=" "
+                                />
+                                <label className="absolute text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-gray-50 dark:bg-gray-700 px-2 peer-focus:px-2 peer-focus:text-blue-600 dark:peer-focus:text-blue-400 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3">
+                                    Last Name
+                                </label>
+                            </div>
 
-                        <input type="submit" className='w-1/3 p-1 bg-gray-300 border border-gray-400 rounded-lg cursor-pointer active:bg-gray-400 active:text-neutral-100 place-self-center'/>
-                    </div>
+                            <div className='relative'>
+                                <input 
+                                    type="text" 
+                                    value={suffix} 
+                                    onChange={(e) => setSuffix(e.target.value)} 
+                                    name='suffix' 
+                                    className='w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl peer focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white'
+                                    placeholder=" "
+                                />
+                                <label className="absolute text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-gray-50 dark:bg-gray-700 px-2 peer-focus:px-2 peer-focus:text-blue-600 dark:peer-focus:text-blue-400 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3">
+                                    Suffix (Optional)
+                                </label>
+                            </div>
 
-                    {/* upload profile */}
-                    <div className='flex flex-col items-start w-full lg:w-1/3 gap-4'>
-                        {profilePic ? 
-                            <div className="w-[70%] h-[70%] place-self-center object-cover rounded-full relative">
-                                <img src={profilePic.preview} alt="Profile" className='w-full h-full rounded-full' />
-                                <button onClick={()=> setProfilePic(null)} className='absolute top-0 right-0 text-sm bg-gray-300 rounded-full cursor-pointer w-1/10 h-1/10'>X</button>
-                            </div>  
-                            : <FontAwesomeIcon icon={faCircleUser} className="place-self-center text-[14rem] text-gray-800 m-2" /> 
-                        }
-                        <label htmlFor="fileInput" className="px-4 py-1 text-sm text-gray-800 bg-gray-300 border border-gray-400 rounded cursor-pointer place-self-center ">Choose File</label>
-                        <input type="file" id='fileInput' name='profilePic' hidden onChange={(e)=> {
-                            const file = e.target.files[0];
-                            if (file) {
-                                setProfilePic({
-                                    preview: URL.createObjectURL(file), //creates a url for the preview
-                                    file: file // sends the file backend
-                                })
-                            }
-                        }}/>
-                        
-                    </div>
-                </form>
+                            <div className='relative'>
+                                <input 
+                                    type={!hidePassword ? "password" : "text"} 
+                                    value={password} 
+                                    required 
+                                    onChange={(e) => setPassword(e.target.value)} 
+                                    name='password' 
+                                    className='w-full px-4 py-3 pr-12 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl peer focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white'
+                                    placeholder=" "
+                                />
+                                <label className="absolute text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-gray-50 dark:bg-gray-700 px-2 peer-focus:px-2 peer-focus:text-blue-600 dark:peer-focus:text-blue-400 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3">
+                                    Password
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => setHidePassword(!hidePassword)}
+                                    className='absolute text-gray-400 transition-colors duration-300 transform -translate-y-1/2 right-4 top-1/2 hover:text-gray-600 dark:hover:text-gray-300'
+                                >
+                                    <FontAwesomeIcon icon={!hidePassword ? faEye : faEyeSlash} />
+                                </button>
+                            </div>
 
-            {/* section for the list of users */}
-                {/* adding users in the list */}
-                <div className={`${visible == "list" ? "block" : "hidden"} gap-6 mt-5 flex flex-row flex-wrap`}>
-                    {submittedUsers.length === 0 ? (
-                        <p className="flex py-20 justify-center items-center text-gray-500 rounded-2xl h-1/4 w-full bg-gray-300 text-3xl dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">No users yet.</p> 
-                    ) : 
-                    
-                    (submittedUsers.map((user, index) => (
-                        
-                        <div key={index}  onClick={()=> detailsAndSelectedUser(user)} className=" cursor-pointer flex flex-row max-w-[31%] bg-neutral-300 p-1 rounded-lg min-w-[200px] dark:shadow-md dark:shadow-zuccini-800 dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
-                            {user.profilePic ? 
-                                <img src={`http://localhost:5000/${user.profilePic}`} alt="Profile" className='place-self-center m-2 w-[21%] h-[80%] object-cover rounded-full mr-2'/> : <FontAwesomeIcon icon={faCircleUser} className="ml-2 mr-3 text-5xl text-gray-800 place-self-center dark:text-white" />
-                            }
-                            
-                            <div className='flex flex-col items-center justify-center w-full'>
-                                
-                                <p  className="p-2 text-lg font-semibold text-neutral-800 dark:text-white" style={{fontSize: user.name.length >= 13 ? '1rem' : '1.3rem'}}>{user.name}</p>
-                                <p className="text-sm text-center dark:text-white" style={{fontSize: user.programName.length >= 13 ? '0.8rem' : '1rem'}}>{user.programName}</p>
+                            <div className='relative'>
+                                <input 
+                                    type="email" 
+                                    required 
+                                    name='email' 
+                                    value={email} 
+                                    onChange={(e) => setEmail(e.target.value)}  
+                                    className='w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl peer focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white'
+                                    placeholder=" "
+                                />
+                                <label className="absolute text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-gray-50 dark:bg-gray-700 px-2 peer-focus:px-2 peer-focus:text-blue-600 dark:peer-focus:text-blue-400 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3">
+                                    Email Address
+                                </label>
+                            </div>
+
+                            <div className='relative'>
+                                <input 
+                                    type="tel" 
+                                    required 
+                                    name='contactNum' 
+                                    value={contactNum} 
+                                    onChange={(e) => setContactNum(e.target.value)}  
+                                    className='w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl peer focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white'
+                                    placeholder=" "
+                                />
+                                <label className="absolute text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-gray-50 dark:bg-gray-700 px-2 peer-focus:px-2 peer-focus:text-blue-600 dark:peer-focus:text-blue-400 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3">
+                                    Contact Number
+                                </label>
+                            </div>
+
+                            <div className='relative'>
+                                <select 
+                                    name="programID" 
+                                    value={programID}  
+                                    required 
+                                    onChange={(e) => setProgramID(e.target.value)} 
+                                    className='w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white'
+                                >
+                                    <option value="">Select Program</option>
+                                    {programOption.map((program) => (
+                                        <option key={program.programID} value={program.programID}>
+                                            {program.programName}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className='relative'>
+                                <select 
+                                    name="areaID" 
+                                    value={areaID} 
+                                    required 
+                                    onChange={(e) => setAreaID(e.target.value)} 
+                                    className='w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white'
+                                >
+                                    <option value="">Select Area</option>
+                                    {areaOption.map((area) => (
+                                        <option key={area.areaID} value={area.areaID}>
+                                            {area.areaNum}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex justify-center mt-6 md:col-span-2">
+                                <button 
+                                    type="submit"
+                                    className='px-8 py-3 text-lg font-semibold text-white transition-all duration-300 transform shadow-lg bg-gradient-to-r from-green-500 to-green-600 rounded-xl hover:shadow-xl hover:scale-105'
+                                >
+                                    <FontAwesomeIcon icon={faPlus} className="mr-2" />
+                                    Create User
+                                </button>
                             </div>
                         </div>
-                    )))}
+                    </form>
                 </div>
+            </div>
 
-            {/* showing details of a user */}
-            <section>
-                { showDetails && selectedUser && (
-                    submittedUsers.map((user, index) => (
-                        // show the details of the clicked card
-                        <div className=" absolute w-1/3 h-[80%] left-[45%] bottom-[10%] bg-gray-300 text-neutral-800 rounded-2xl p-5 flex flex-col justify-center items-center gap-3 border border-gray-400 shadow-xl" key={index}>
-                            <button onClick={()=> exitShowDetails()}  className={` rounded-2xl top-0 right-0 absolute w-[11%] h-[8%] bg-gray-400`}>exit</button>
-                            {selectedUser.profilePic ? 
-                                <img src={selectedUser.profilePic} alt="" className='place-self-center w-[31%] h-[25%] object-cover rounded-full'/> : <FontAwesomeIcon icon={faCircleUser} className="text-gray-800 text-9xl"/>
-                            }
-                            <form action="" onSubmit={handleCreateUser} method='POST' className='flex flex-col w-full gap-4 gap'>
-                                <p className='ml-10'>Employee ID: <span>
-                                    <input type="text" value={selectedUser.employeeID} readOnly name='employeeID' className='p-1 ml-2 font-semibold border border-gray-400 rounded' />
-                                </span></p>
-                                <p className='ml-10'>Name: <span>
-                                    <input type="text" value={selectedUser.name} readOnly name='name' className='p-1 font-semibold border border-gray-400 rounded ml-14'/>
-                                </span></p>
-                                <p className='ml-10'>Area Assigned: <span>
-                                    <input type="text" value={selectedUser.areaNum + ": " + selectedUser.areaName} readOnly className='p-1 ml-8 font-semibold border border-gray-400 rounded' />
-                                </span></p>
-                                <p className='ml-10'>Program: <span>
-                                    <input type="text" value={selectedUser.programName} readOnly className='p-1 ml-3 font-semibold border border-gray-400 rounded' />
-
-                                    {/* <select  className='p-1 ml-3 font-semibold border border-gray-400 rounded w-6/10 ' >
-                                        <option value={selectedUser.program} selected></option>
-                                        <option value="BSIT">Information Technology</option>
-                                        <option value="Criminology">Criminology</option>
-                                        <option value="Accounting">Accounting</option>
-                                        <option value="Nursing">Nursing</option>
-                                    </select> */}
-                                </span></p>
-                                <p className='ml-10'>Email: <span>
-                                    <input type="email" value={selectedUser.email} readOnly className='p-1 font-semibold border border-gray-400 rounded ml-15' />
-                                </span></p>
-                            </form><br />
-
-                            {/* save changes and remove buttons */}
-                            <div className='flex items-center justify-center w-full gap-4'>
-                                <button className='p-2 bg-gray-300 border border-gray-400 shadow w-2/10 active:bg-gray-500 active:text-neutral-100 rounded-xl'>Save</button>
-                                <button className='p-2 bg-gray-300 border border-gray-400 shadow w-2/10 active:bg-gray-500 active:text-neutral-100 rounded-xl' onClick={()=> setRemoveConfirmation(true)}>Remove</button>
-                            </div>
-
-                            { removeConfirmation && (
-                                <div className="absolute rounded-2xl g-5 w-[80%] h-1/5 place-self-center top-105 bg-gray-300 flex justify-center items-center flex-col">
-                                        <p className="text-neutral-700">Are you sure you want to remove this user?</p><br />
-                                        <div className='flex items-center justify-center w-full gap-4'>
-                                        <button className='w-1/5 p-2 bg-gray-400 border border-gray-500 text-neutral-800 rounded-xl' onClick={handleDeleteUser}>Yes</button>
-                                        <button className='w-1/5 p-2 bg-gray-400 border border-gray-500 text-neutral-800 rounded-xl' onClick={()=> setRemoveConfirmation(false)}>No</button>
-                                        </div>
+            {/* Users List */}
+            <div className={`${visible === "list" ? "block" : "hidden"}`}>
+                {submittedUsers.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-20 border border-gray-200 shadow-xl bg-neutral-100/90 dark:bg-gray-800 rounded-2xl dark:border-gray-700">
+                        <FontAwesomeIcon icon={faUser} className="mb-4 text-gray-300 text-8xl dark:text-gray-600" />
+                        <p className="text-2xl font-semibold text-gray-500 dark:text-gray-400">No users yet</p>
+                        <p className="mt-2 text-gray-400 dark:text-gray-500">Add your first user to get started</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {submittedUsers.map((user, index) => (
+                            <div 
+                                key={index}  
+                                onClick={() => detailsAndSelectedUser(user)} 
+                                className="overflow-hidden transition-all duration-300 transform bg-white border border-gray-200 shadow-lg cursor-pointer dark:bg-gray-800 rounded-2xl hover:shadow-2xl hover:scale-105 dark:border-gray-700 group"
+                            >
+                                <div className="p-6 text-center">
+                                    <div className="mb-4">
+                                        {user.profilePic ? 
+                                            <img 
+                                                src={`http://localhost:5000/${user.profilePic}`} 
+                                                alt="Profile" 
+                                                className='object-cover w-20 h-20 mx-auto transition-colors duration-300 border-gray-200 rounded-full shadow-lg border-3 dark:border-gray-600 group-hover:border-blue-400'
+                                            /> : 
+                                            <div className="flex items-center justify-center w-20 h-20 mx-auto transition-all duration-300 rounded-full shadow-lg bg-gradient-to-br from-blue-100 to-blue-200 dark:from-gray-600 dark:to-gray-700 group-hover:from-blue-200 group-hover:to-blue-300">
+                                                <FontAwesomeIcon icon={faCircleUser} className="text-3xl text-blue-500 dark:text-gray-400" />
+                                            </div>
+                                        }
+                                    </div>
+                                    
+                                    <h3 className="mb-1 text-lg font-bold text-gray-800 transition-colors duration-300 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                                        {user.name}
+                                    </h3>
+                                    <p className="mb-2 text-sm text-gray-600 dark:text-gray-400">
+                                        {user.programName}
+                                    </p>
+                                    <div className="flex items-center justify-center text-xs text-gray-500 dark:text-gray-500">
+                                        <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-1" />
+                                        Area {user.areaNum}
+                                    </div>
                                 </div>
-                            )}
-                        
-                        </div>
-                    ))
+                            </div>
+                        ))}
+                    </div>
                 )}
-            </section>
-
-            {/* section for showing users from search bar */}
-            <section className={`${visible == "searchList" ? "block" : "hidden"} overflow-y-auto box-border h-[75%] mt-4 p-5 text-neutral-800 border border-neutral-400 rounded-3xl shadow-xl dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none`}>
-                <div className="flex flex-wrap gap-6">
-                    {filteredUsers.length > 0 ? (
-                        // map through filtered users and display them
-                        filteredUsers.map((user, index) => (
-                            // using users index in array as key
-                            <div key={index}  onClick={()=> detailsAndSelectedUser(user)} className=" cursor-pointer flex flex-row w-[23%] bg-neutral-300 p-1 rounded-lg min-w-[200px] dark:shadow-md dark:shadow-zuccini-800 dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
-                                {user.profilePic ? 
-                                    <img src={user.profilePic} alt="" className='place-self-center m-2 w-[21%] h-[80%] object-cover rounded-full'/> : <FontAwesomeIcon icon={faCircleUser} className="m-2 text-5xl text-gray-800 place-self-center dark:text-white" />
-                                }
-                                <div className='flex flex-col items-center justify-center w-full '> 
-                                    {/* make name smaller when it is too long */}
-                                    <p  className="p-2 text-lg text-neutral-800 dark:text-white" style={{fontSize: user.name.length >= 13 ? '0.8rem' : '1rem'}}>{user.name}</p>
-                                    <p className="text-sm dark:text-white" style={{fontSize: user.programName.length >= 13 ? '0.8rem' : '1rem'}}>{user.programName}</p>
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                        <p className="text-gray-500">No users match your search.</p>
-                    )}
-                </div>
-            </section>
-       </>
-    )
-};
+            </div>
+           </div> 
+    )}
 
 export default Users;

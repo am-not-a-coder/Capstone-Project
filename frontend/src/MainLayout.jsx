@@ -58,7 +58,7 @@ const MainLayout = () => {
 
   return(
     <>
-    <div className="grid grid-cols-[auto_1fr] grid-rows-[100px_1fr] h-screen w-screen bg-neutral-200 relative dark:bg-woodsmoke-950">
+    <div className="grid grid-cols-[auto_1fr] grid-rows-[100px_1fr] h-screen w-screen bg-neutral-200 relative dark:bg-gray-950">
           <Sidebar>      
                 <SidebarLinks
                   icon={faLayerGroup}

@@ -86,7 +86,7 @@ export default function CreateForm({
     <div className="fixed inset-0 z-50 flex items-center justify-center text-black bg-opacity-50">
       <div className="bg-white p-8 rounded-lg shadow-lg min-w-[400px] flex flex-col items-center">
 
-        <div className="flex gap-4 mb-4  w-full justify-center">
+        <div className="flex justify-center w-full gap-4 mb-4">
 
           <button onClick={() => handleModify("add")}
             className={`px-4 py-2 rounded font-semibold transition text-white ${activeModify === "add" ? "bg-green-700" : "bg-green-500 hover:bg-green-600"}`}>
@@ -110,12 +110,12 @@ export default function CreateForm({
               <div key={field.name}>
                 {field.type === "select" ? (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block mb-2 text-sm font-medium text-gray-700">
                       {field.label}
                     </label>
                     <select
                       name={field.name}
-                      className="border rounded p-2 w-full"
+                      className="w-full p-2 border rounded"
                       value={form[field.name] || ""}
                       onChange={handleChange}
                       required={field.required}
@@ -185,12 +185,12 @@ export default function CreateForm({
                   <div key={field.name}>
                     {field.type === "select" ? (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block mb-2 text-sm font-medium text-gray-700">
                           {field.label}
                         </label>
                         <select
                           name={field.name}
-                          className="border rounded p-2 w-full"
+                          className="w-full p-2 border rounded"
                           value={form[field.name] || ""}
                           onChange={handleChange}
                           required={field.required}

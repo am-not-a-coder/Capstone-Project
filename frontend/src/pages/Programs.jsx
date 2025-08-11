@@ -165,7 +165,7 @@ import axios from 'axios';
 
     return (
       <>
-        <div className="p-6 border rounded-xl border-neutral-800 dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
+        <div className="p-6 border rounded-xl border-neutral-800 dark:bg-gray-900 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
           <div className="flex flex-wrap mb-8 gap-15">
             {/* Create Card */}
             <CreateCard setShowForm={setShowForm}/>

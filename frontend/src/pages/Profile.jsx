@@ -158,10 +158,10 @@ const [form, setForm] = useState({
     
    
     return(
-    <div className='w-full p-5 border-2 border-neutral-800 rounded-2xl bg-neutral-100 dark:border-none dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-900'>
+    <div className='w-full p-5 border-2 border-neutral-800 rounded-2xl bg-neutral-200 dark:border-none dark:bg-gray-900 dark:inset-shadow-sm dark:inset-shadow-zuccini-900'>
         {/* View Profile */}
         <h1 className='text-2xl text-neutral-800 dark:text-white'>View Profile</h1>
-        <div className="grid grid-cols-3 gap-3 px-3 my-5 border shadow-xl text-neutral-800 rounded-2xl dark:bg-woodsmoke-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm">
+        <div className="grid grid-cols-3 gap-3 px-3 my-5 border shadow-xl text-neutral-800 rounded-2xl dark:bg-gray-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm">
             <div className='flex flex-col items-center justify-center dark:text-white'>
                 <h1 className='text-2xl font-semibold'>Department:</h1>
                 <h1 className='text-center text-md'>{user.department}</h1>
@@ -183,10 +183,10 @@ const [form, setForm] = useState({
             </div>
 
         </div>
-            <div className='p-5 mb-5 border shadow-xl border-neutral-800 rounded-xl dark:bg-woodsmoke-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
+            <div className='p-5 mb-5 border shadow-xl border-neutral-800 rounded-xl dark:bg-gray-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
                 <h1 className='mb-2 text-xl text-neutral-800 dark:text-white'>Contacts:</h1>
                 <div className='grid grid-cols-2 gap-5'>
-                    <div className='mb-5 text-neutral-800 p-5 border border-neutral-800 rounded-lg shadow-lg focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:text-white dark:bg-[#19181A] dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
+                    <div className='p-5 mb-5 border rounded-lg shadow-lg text-neutral-800 border-neutral-800 focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:text-white dark:bg-gray-900 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
                         <h1 className='mb-3 text-xl font-semibold text-neutral-800 dark:text-white'>Email</h1>
                         <FontAwesomeIcon 
                             icon={faEnvelope} 
@@ -195,7 +195,7 @@ const [form, setForm] = useState({
                         <h1 className='inline ml-2 text-xl italic font-light text-neutral-800 dark:text-white'>{user.email}</h1>
                     </div>
 
-                    <div className='mb-5 text-neutral-800 p-5 border border-neutral-800 rounded-lg shadow-lg focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:text-white dark:bg-[#19181A] dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
+                    <div className='p-5 mb-5 border rounded-lg shadow-lg text-neutral-800 border-neutral-800 focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:text-white dark:bg-gray-900 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
                         <h1 className='mb-3 text-xl font-semibold text-neutral-800 dark:text-white'>Contact Number</h1>
                         <FontAwesomeIcon 
                             icon={faPhone} 
@@ -206,7 +206,7 @@ const [form, setForm] = useState({
                 </div>
 
                 <h1 className='mb-2 text-xl text-neutral-800 dark:text-white'>Experiences:</h1>
-                <div className='whitespace-pre-line w-full text-lg font-medium min-h-[150px] text-neutral-800 p-5 border rounded-lg shadow-lg resize-none border-neutral-800 placeholder-neutral-400 focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:text-white dark:bg-[#19181A] dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
+                <div className='whitespace-pre-line w-full text-lg font-medium min-h-[150px] text-neutral-800 p-5 border rounded-lg shadow-lg resize-none border-neutral-800 placeholder-neutral-400 focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:text-white dark:bg-gray-900 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
                     {user.experience}
                 </div>
             </div>
@@ -217,7 +217,7 @@ const [form, setForm] = useState({
             id="edit-profile" 
             onSubmit={handleSubmit}
             onReset={() => {form}}
-            className="p-5 my-5 border text-neutral-800 dark:border-none dark:bg-woodsmoke-950 dark:text-white rounded-xl dark:inset-shadow-zuccini-900 dark:inset-shadow-sm"
+            className="p-5 my-5 border text-neutral-800 dark:border-none dark:bg-gray-950 dark:text-white rounded-xl dark:inset-shadow-zuccini-900 dark:inset-shadow-sm"
         >
             {/* upload photo */}
             <div className='flex flex-col items-center justify-center col-span-2 mb-5'>{profilePic ? 
@@ -252,7 +252,7 @@ const [form, setForm] = useState({
                         placeholder={user.firstName}
                         onChange={handleChange}
                         required
-                        className=" py-3 p-2 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-[#19181A] dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none"
+                        className="p-2 py-3 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-900 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none"
                     />
                 </div>
                 <div className="flex flex-col mr-5">
@@ -262,7 +262,7 @@ const [form, setForm] = useState({
                         placeholder={user.lastName}
                         onChange={handleChange}
                         required
-                        className="py-3 p-2 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-[#19181A] dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none"
+                        className="p-2 py-3 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-900 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none"
                     />
                 </div>
                 <div className="flex flex-col">
@@ -271,7 +271,7 @@ const [form, setForm] = useState({
                         name='suffix'
                         placeholder= "e.g. Jr, II, III "
                         onChange={handleChange}
-                        className="py-3 p-2 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-[#19181A] dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none"
+                        className="p-2 py-3 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-900 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none"
                     />
                 </div>
             </div>
@@ -286,7 +286,7 @@ const [form, setForm] = useState({
                     placeholder={user.email}
                     onChange={handleChange}
                     required
-                    className="py-3 p-2 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-[#19181A] dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none"
+                    className="p-2 py-3 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-900 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none"
                 />
                 </div>
                 <div className='flex flex-col'>
@@ -296,7 +296,7 @@ const [form, setForm] = useState({
                     placeholder={user.contactNum}
                     onChange={handleChange}
                     required
-                    className="py-3 p-2 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-[#19181A] dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none"
+                    className="p-2 py-3 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-900 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none"
                 />
                 </div>
             </div>
@@ -312,12 +312,12 @@ const [form, setForm] = useState({
                 - Associate Professor with over 10 years of teaching experience in higher education.
                 - Master's Degree in Information Technology
                 - Currently teaching at the College of Education.`}
-            className='scrollbar-hide placeholder-neutral-500 whitespace-pre-line resize-y min-h-[200px] px-4 py-3 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-[#19181A] dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none'       
+            className='scrollbar-hide placeholder-neutral-500 whitespace-pre-line resize-y min-h-[200px] px-4 py-3 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-900 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none'       
             />
             </div>
 
             {/* Password */}
-            <div className="flex flex-col items-start p-5 mb-5 border rounded-xl dark:bg-[#19181A] dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none">
+            <div className="flex flex-col items-start p-5 mb-5 border rounded-xl dark:bg-gray-900 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none">
                 <h1 className='mb-5 text-xl'>Change Password</h1>
                 
                 <div className='relative flex items-center w-full gap-5 mb-5'>
@@ -330,7 +330,7 @@ const [form, setForm] = useState({
                             placeholder='Enter New Password'
                             onChange={(e) => {setPassword(e.target.value), handlePassword(e.target.value), handleChange(e)}}
                             required
-                            className="relative min-w-[300px] ml-15 p-2 py-3 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-woodsmoke-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none"
+                            className="relative min-w-[300px] ml-15 p-2 py-3 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none"
                         />
                         
                         {/* show password */}
@@ -367,7 +367,7 @@ const [form, setForm] = useState({
                                 setPasswordError(e.target.value && e.target.value !== password ? "Passwords do not match" : "");
                             }}
                             required
-                            className="min-w-[300px] p-2 py-3 ml-5  font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-woodsmoke-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none"
+                            className="min-w-[300px] p-2 py-3 ml-5  font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none"
                         />
                         
                         <FontAwesomeIcon icon={hideConfirmPassword ? faEye : faEyeSlash} 
@@ -388,7 +388,7 @@ const [form, setForm] = useState({
                 {/* Cancel button */}
                 <input type="reset"     
                     value="Cancel" 
-                    className='px-10 py-3 font-semibold transition-all duration-500 shadow-lg cursor-pointer bg-neutral-400 rounded-xl hover:text-white hover:bg-neutral-500'
+                    className='px-10 py-3 font-semibold transition-all duration-500 shadow-lg cursor-pointer bg-neutral-500 rounded-xl hover:text-white hover:bg-neutral-600'
             />
                 {/* submit button */}
                 <input type="submit" 

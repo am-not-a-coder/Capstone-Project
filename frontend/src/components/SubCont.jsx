@@ -28,7 +28,7 @@ const SubCont = ({title, criteria}) => {
         {/* CriteriaGroup div */}
         <div 
         onClick={() => setCriteriaExpand(isOpen ? null : index)}
-        className='flex flex-row justify-between p-3 mb-2 ml-5 border shadow-md cursor-pointer rounded-2xl text-neutral-800 dark:text-white dark:border-none dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800'>
+        className='flex flex-row justify-between p-3 mb-2 ml-5 border shadow-md cursor-pointer rounded-2xl text-neutral-800 dark:text-white dark:border-none dark:bg-gray-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800'>
             <h2 className='font-semibold'>{groupName}</h2>
              <div className='mr-3'>
                     <FontAwesomeIcon 
@@ -43,7 +43,7 @@ const SubCont = ({title, criteria}) => {
             isOpen ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0' 
         }`}>
             {items.map((item, index) => (
-                <div key={index} className='flex flex-row justify-between gap-3 p-3 mb-2 ml-5 border shadow-md cursor-default rounded-2xl text-neutral-800 dark:border-none dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800'>
+                <div key={index} className='flex flex-row justify-between gap-3 p-3 mb-2 ml-5 border shadow-md cursor-default rounded-2xl text-neutral-800 dark:border-none dark:text-white dark:bg-gray-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800'>
                     <span className='break-words text-[15px] max-w-[65%]'>{item.content}</span>
 
                     <div className='flex flex-col items-center justify-center'>
@@ -73,7 +73,7 @@ const SubCont = ({title, criteria}) => {
         <li className='flex flex-col list-inside'>
             <button 
                 onClick={() => setExpanded(prev => !prev)}
-                className='flex flex-row justify-between p-3 mb-2 ml-5 border shadow-md cursor-pointer rounded-2xl text-neutral-800 dark:border-none dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800'>   
+                className='flex flex-row justify-between p-3 mb-2 ml-5 border shadow-md cursor-pointer rounded-2xl text-neutral-800 dark:border-none dark:text-white dark:bg-gray-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800'>   
                 <h1 className='font-semibold text-md'>{title}</h1>
                 <div className='mr-3'>
                     <FontAwesomeIcon 
