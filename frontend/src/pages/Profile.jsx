@@ -7,7 +7,9 @@ import {
     faEye,
     faEyeSlash
 } from '@fortawesome/free-solid-svg-icons';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { apiGet } from '../utils/api_utils';
+import { getCurrentUser } from '../utils/auth_utils';
 
 
 
@@ -57,22 +59,72 @@ const handleProfileChange = (e) => {
 
 
 
-//default user info
- const [user, setUser] = useState(
-    {
-        profile: avatar1,
-        firstName: 'John',
-        lastName: 'Doe',
-        suffix: '',
-        employeeID: '12-34-567',
-        password: '123456789',
-        email: 'johndoe123@gmail.com',
-        contactNum: '09123456789',
-        department: 'Bachelor of Science in Information Technology (BSIT)',
-        area: 'Area I: Governance and Administration',
-        experience: " - Ph.D. in Educational Management, Universidad de Manila. \n - Associate Professor with over 10 years of teaching experience in higher education. \n - Master's Degree in Information Technology \n - Currently teaching at the College of Education.",
-    },
- )
+//user info - variable for user
+const [user, setUser] = useState({})
+
+// Get logged-in user from authentication token
+const currentUser = getCurrentUser()
+
+// Load user profile data from database based on current users ID
+useEffect(() => {
+    const loadProfile = async () => {
+        try {
+            // Call backend API to get profile for currently logged-in user
+            const response = await apiGet(`/api/profile/${currentUser.employeeID}`)
+            
+            if (response.success && response.data.status === 'success') {
+                const { data } = response.data
+                
+                // Set real user data from database
+                setUser({
+                    profile: data.profilePic || avatar1, // Use user's profile pic or default
+                    firstName: data.firstName,
+                    lastName: data.lastName,
+                    suffix: data.suffix || '',
+                    employeeID: data.employeeID,
+                    email: data.email,
+                    contactNum: data.contactNumb,
+                    department: data.programName || 'Not Assigned',
+                    area: data.areaNum && data.areaName ? `${data.areaNum}: ${data.areaName}` : 'Not Assigned',
+                    experience: " - Ph.D. in Educational Management, Universidad de Manila. \n - Associate Professor with over 10 years of teaching experience in higher education. \n - Master's Degree in Information Technology \n - Currently teaching at the College of Education.",
+                })
+            } else {
+                console.error('Error loading profile:', response.error)
+                setUser({
+                    profile: avatar1,
+                    firstName: currentUser?.firstName || 'Unknown',
+                    lastName: currentUser?.lastName || 'User',
+                    suffix: '',
+                    employeeID: currentUser?.employeeID || '',
+                    email: currentUser?.email || '',
+                    contactNum: '',
+                    department: 'Not Available',
+                    area: 'Not Available',
+                    experience: ''
+                })
+            }
+        } catch(error) {
+            console.error('Network error loading profile:', error)
+            setUser({
+                profile: avatar1,
+                firstName: currentUser?.firstName || 'Unknown',
+                lastName: currentUser?.lastName || 'User', 
+                suffix: '',
+                employeeID: currentUser?.employeeID || '',
+                email: currentUser?.email || '',
+                contactNum: '',
+                department: 'Not Available',
+                area: 'Not Available', 
+                experience: ''
+            })
+        }
+    }
+    
+    // Only load profile if we have a logged-in user
+    if (currentUser?.employeeID) {
+        loadProfile()
+    }
+}, [currentUser?.employeeID]) // Re-run if user changes
 
 
 const [form, setForm] = useState({

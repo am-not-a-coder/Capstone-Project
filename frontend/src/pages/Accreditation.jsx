@@ -8,7 +8,7 @@ import axios from 'axios';
 import AreaCont from '../components/AreaCont';
 import SubCont from '../components/SubCont';
 import CreateModal from '../components/modals/CreateModal';
-
+import { apiGet } from '../utils/api_utils';
 
 const Accreditation = () => {
 
@@ -18,19 +18,10 @@ const Accreditation = () => {
 
     const [showCreateModal, setShowCreateModal] = useState(false);
 
-
-    const token = localStorage.getItem('token'); // gets the access token
-
     useEffect(()=>{
       const fetchArea = async () => {
-        
-        if (!token){
-            alert("No token found!");
-            return;
-        }
 
-        const response = await axios.get('http://localhost:5000/api/accreditation', 
-            {headers: {'Authorization': `Bearer ${token}`}}, {withCredentials: true})
+        const response = await apiGet('/api/accreditation')
 
         try{
           (Array.isArray(response.data) ? setArea(response.data) : setArea([]));
@@ -47,8 +38,8 @@ const Accreditation = () => {
     },[])
 
     const refreshAreas = async () => {
-       const response = await axios.get('http://localhost:5000/api/accreditation', 
-            {headers: {'Authorization': `Bearer ${token}`}}, {withCredentials: true})
+       const response = await apiGet('/api/accreditation', 
+            {withCredentials: true})
         Array.isArray(response.data) ? setArea(response.data) : setArea([]);
     }
     
