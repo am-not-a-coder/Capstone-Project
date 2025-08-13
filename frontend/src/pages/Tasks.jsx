@@ -235,7 +235,7 @@ const Tasks = () => {
     <>    
     {/* shows status when creating deadline */}
     {showStatusModal && (
-        <StatusModal message={statusMessage} type={statusType} onClick={()=>setShowStatusModal(false)} />
+        <StatusModal message={statusMessage} type={statusType} showModal={showStatusModal} onClick={()=>setShowStatusModal(false)} />
     )}
 
     {/* Container */}
@@ -377,7 +377,9 @@ const Tasks = () => {
                     color={selectedDeadline.color} 
                     content={selectedDeadline.content || 'No description'} 
                     id={selectedDeadline.id}
-                    onClick={handleCloseDeadline} />
+                    onClick={handleCloseDeadline}
+                    showModal={showDeadline}
+                    />
             )}
             
         </div>
@@ -401,7 +403,7 @@ const Tasks = () => {
 
             {/* EventModal */}
             {showEventModal && selectedEvent && (
-              <EventModal title={selectedEvent.title} date={selectedEvent.date} content={selectedEvent.content || 'N/A'} onClick={handleCloseModal} />
+              <EventModal title={selectedEvent.title} showModal={showEventModal} date={selectedEvent.date} content={selectedEvent.content || 'N/A'} onClick={handleCloseModal} />
             )}
 
         </div>

@@ -95,7 +95,7 @@ const Notification = () => {
         {/* Delete All Notificatios */}
         <button
           onClick={handleDeleteAll}
-          className='absolute z-10 px-2 text-base font-bold text-red-500 rounded-full cursor-pointer top-5 right-5 hover:bg-neutral-300 dark:hover:bg-neutral-800'
+          className='absolute z-0 px-2 text-base font-bold text-red-500 rounded-full cursor-pointer top-5 right-5 hover:bg-neutral-300 dark:hover:bg-neutral-800'
         >
           Delete All
         </button>

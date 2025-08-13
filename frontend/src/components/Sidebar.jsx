@@ -96,14 +96,14 @@ export const SidebarLinks = ({children, icon, text, active, alert, onClick, isBu
             <li className="relative flex items-center text-neutral-800 text-shadow-lg transition-all duration-500 min-h-[42px] group cursor-pointer">
             <div  
                 onClick={onClick}
-                 className={`flex items-center mb-0.5 py-2 px-0.5 text-xl rounded-l-xl font-semibold hover:bg-gray-900 dark:hover:bg-gray-900 ease-in-out transition-all duration-500 ${expanded ? 'w-65' : 'w-12'}`}>
+                 className={`flex items-center mb-0.5 py-2 px-0.5 text-xl rounded-l-xl font-semibold hover:bg-gray-400 dark:hover:bg-gray-900 ease-in-out transition-all duration-500 ${expanded ? 'w-65' : 'w-12'}`}>
                  {content}
             </div>
             </li>
          
         ): (
             <li className="relative flex items-center text-shadow-lg transition-all duration-500 min-h-[42px] group cursor-pointer">
-             <Link to={`/${text}`} onClick={onClick} className={`flex items-center mb-0.5 py-2 px-0.5 text-xl rounded-l-xl text-neutral-800 font-semibold hover:bg-gray-950 dark:hover:bg-gray-950 ease-in-out transition-all duration-500 ${expanded ? 'w-65' : 'w-12'} ${active ? 'bg-zuccini-800 text-white hover:bg-zuccini-900 dark:hover:bg-zuccini-900' : ''}`}>
+             <Link to={`/${text}`} onClick={onClick} className={`flex items-center mb-0.5 py-2 px-0.5 text-xl rounded-l-xl text-neutral-800 font-semibold hover:bg-gray-400 dark:hover:bg-gray-950 ease-in-out transition-all duration-500 ${expanded ? 'w-65' : 'w-12'} ${active ? 'bg-zuccini-800 text-white hover:bg-zuccini-900 dark:hover:bg-zuccini-900' : ''}`}>
                  {content}
              </Link>
             </li>

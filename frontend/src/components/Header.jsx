@@ -227,7 +227,7 @@ const Header = ({title}) => {
 
             {/* Messages */}
             {showMessages && (
-                <div ref={messageRef} className='fixed top-25 right-8 flex flex-col min-w-[40%] p-3 border-2 border-neutral-500 dark:border-gray-800 bg-neutral-200 text-neutral-900 dark:border-zuccini-950 dark:bg-gray-900 rounded-2xl z-20'>            
+                <div ref={messageRef} className='z-1000 fixed top-25 right-8 flex flex-col min-w-[40%] p-3 border-2 border-neutral-500 dark:border-gray-800 bg-neutral-200 text-neutral-900  dark:bg-gray-900 rounded-2xl '>            
                     <h1 className='mb-1 ml-2 text-2xl font-medium dark:text-white'>
                         Messages
                     </h1>

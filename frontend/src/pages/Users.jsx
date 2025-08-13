@@ -6,13 +6,13 @@ import{
     faPlus,
     faSearch,
     faTimes,
-    faEdit,
     faTrash,
+    faBookOpen,
     faUser,
     faEnvelope,
     faPhone,
     faBuilding,
-    faMapMarkerAlt
+    faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
 import axios from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -80,13 +80,14 @@ const Users = () => {
             formData.append("programID", programID);
             formData.append("areaID", areaID)
 
+          console.log("Form data being sent:");
+            for (let [key, value] of formData.entries()) {
+                console.log(key, value);
+            }
+
         try{
         const res = await axios.post('http://localhost:5000/api/user', formData,
-            {headers: 
-                {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'multipart/form-data' 
-                }}, {withCredentials: true});
+            {headers: {'Authorization': `Bearer ${token}`}, withCredentials: true});
             
             setStatusMessage(res.data.message);
             setShowStatusModal(true);
@@ -124,6 +125,11 @@ const Users = () => {
             setProfilePic(null)
             
         } catch(err){
+            console.log("Full error object:", err);
+            console.log("Error response:", err.response);
+            console.log("Error response data:", err.response?.data);
+            console.log("Error response status:", err.response?.status);
+            
             setStatusMessage("Server error. Please try again");
             setShowStatusModal(true);
             setStatusType("error");
@@ -139,8 +145,8 @@ const Users = () => {
                 return;
             }
             const res = await axios.get('http://localhost:5000/api/users',
-                {headers: {'Authorization': `Bearer ${token}`}
-            });
+                {headers: {'Authorization': `Bearer ${token}`}});
+                
             (Array.isArray(res.data.users)) ? setSubmittedUsers(res.data.users) : setSubmittedUsers([]); 
         } catch (err){
             console.error("Error occurred during user fetching", err);
@@ -155,7 +161,7 @@ const Users = () => {
     const fetchProgram = async () =>{
 
         const res = await axios.get('http://localhost:5000/api/program', 
-            {headers: {'Authorization': `Bearer ${token}`}}, {withCredentials: true}
+            {headers: {'Authorization': `Bearer ${token}`}, withCredentials: true}
         )
 
         try{
@@ -201,8 +207,7 @@ const Users = () => {
 
         try{
             const res = await axios.delete(`http://localhost:5000/api/user/${id}`,
-                {headers: {'Authorization' : `Bearer ${token}`}},
-                {withCredentials: true});
+                {headers: {'Authorization' : `Bearer ${token}`}, withCredentials: true});
             
             setStatusMessage(res.data.message);
             setShowStatusModal(true);
@@ -236,7 +241,7 @@ const Users = () => {
     return (
         <div className="min-h-screen p-6 border border-neutral-800 rounded-xl bg-neutral-200 dark:bg-gray-900">
             {showStatusModal && (
-                <StatusModal message={statusMessage} type={statusType} onClick={()=>setShowStatusModal(false)} />
+                <StatusModal message={statusMessage} type={statusType} showModal={showStatusModal} onClick={()=>setShowStatusModal(false)} />
             )}
 
            
@@ -390,7 +395,7 @@ const Users = () => {
                                     onChange={(e) => setSuffix(e.target.value)} 
                                     name='suffix' 
                                     className='w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl peer focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white'
-                                    placeholder=" "
+                                    placeholder="ex. Jr., Sr., III"
                                 />
                                 <label className="absolute text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-gray-50 dark:bg-gray-700 px-2 peer-focus:px-2 peer-focus:text-blue-600 dark:peer-focus:text-blue-400 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3">
                                     Suffix (Optional)
@@ -426,8 +431,8 @@ const Users = () => {
                                     name='email' 
                                     value={email} 
                                     onChange={(e) => setEmail(e.target.value)}  
-                                    className='w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl peer focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white'
-                                    placeholder=" "
+                                    className='w-full px-4 py-3 text-gray-800 placeholder-transparent transition-all duration-300 border-2 border-gray-200 outline-none focus:placeholder-gray-400 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl peer focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white'
+                                    placeholder="ex. example123@gmail.com"
                                 />
                                 <label className="absolute text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-gray-50 dark:bg-gray-700 px-2 peer-focus:px-2 peer-focus:text-blue-600 dark:peer-focus:text-blue-400 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3">
                                     Email Address
@@ -442,7 +447,7 @@ const Users = () => {
                                     value={contactNum} 
                                     onChange={(e) => setContactNum(e.target.value)}  
                                     className='w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl peer focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white'
-                                    placeholder=" "
+                                    placeholder="ex. 0912-345-678"
                                 />
                                 <label className="absolute text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-gray-50 dark:bg-gray-700 px-2 peer-focus:px-2 peer-focus:text-blue-600 dark:peer-focus:text-blue-400 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3">
                                     Contact Number
@@ -517,7 +522,7 @@ const Users = () => {
                                     <div className="mb-4">
                                         {user.profilePic ? 
                                             <img 
-                                                src={`http://localhost:5000/${user.profilePic}`} 
+                                                src={`http://localhost:5000${user.profilePic}`} 
                                                 alt="Profile" 
                                                 className='object-cover w-20 h-20 mx-auto transition-colors duration-300 border-gray-200 rounded-full shadow-lg border-3 dark:border-gray-600 group-hover:border-blue-400'
                                             /> : 
@@ -534,12 +539,111 @@ const Users = () => {
                                         {user.programName}
                                     </p>
                                     <div className="flex items-center justify-center text-xs text-gray-500 dark:text-gray-500">
-                                        <FontAwesomeIcon icon={faMapMarkerAlt} className="mr-1" />
-                                        Area {user.areaNum}
+                                        <FontAwesomeIcon icon={faBookOpen} className="mr-1" />
+                                        {user.areaNum}
                                     </div>
                                 </div>
                             </div>
                         ))}
+
+                        {showDetails && selectedUser && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                                
+                                <div className={`relative flex w-full max-w-3xl gap-2 p-8 bg-gray-200 border border-gray-200 shadow-xl dark:bg-gray-800 dark:border-gray-700 rounded-2xl ${showDetails ? "fade-in" : "fade-out"}`}>
+                                    <div className='absolute flex gap-5 px-5 py-4 top-4 right-4'>
+                                    
+                                    <button className='text-lg' onClick={() => setRemoveConfirmation(true)}>
+                                        <FontAwesomeIcon 
+                                            icon={faTrash} 
+                                            className='text-gray-500 transition-colors duration-300 cursor-pointer hover:text-red-700 dark:text-gray-400 dark:hover:text-red-500' 
+                                            onClick={() => setRemoveConfirmation(true)} 
+                                        />
+                                    </button>
+
+                                    <button className='text-lg' onClick={exitShowDetails}>
+                                        <FontAwesomeIcon 
+                                            icon={faTimes} 
+                                            className='text-gray-500 transition-colors duration-300 cursor-pointer hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300' 
+                                            onClick={exitShowDetails} 
+                                        />
+                                    </button>
+                                    
+                                </div>
+                                
+                                <div className="my-auto">
+                                    {selectedUser.profilePic ? 
+                                        <div className="relative w-40 h-40 mx-auto group">
+                                        <img 
+                                            src={`http://localhost:5000/${selectedUser.profilePic}`} 
+                                            alt="Profile" 
+                                            className='object-cover mx-auto transition-colors duration-300 border-blue-400 rounded-full shadow-lg border-3 dark:border-gray-600'
+                                        /> 
+                                        </div>: 
+                                        <div className="flex items-center justify-center w-40 h-40 mx-auto transition-all duration-300 rounded-full shadow-lg bg-gradient-to-br from-blue-200 to-blue-300">
+                                            <FontAwesomeIcon icon={faCircleUser} className="text-blue-500 text-7xl " />
+                                        </div>
+                                    }                                
+                                </div>
+
+                                <div className='flex flex-col w-full pl-5'>
+                                    <h1 className='mt-5 text-3xl font-bold text-gray-800 dark:text-gray-400'>
+                                        {selectedUser.name}
+                                    </h1>
+
+                                    <p className='text-gray-600 text-md dark:text-gray-500'> 
+                                        <span className='font-semibold'>Employee ID:</span> {selectedUser.employeeID}
+                                    </p>
+
+                                    <p className='mt-5 text-xl italic text-gray-600 text-md dark:text-gray-500'>
+                                        <FontAwesomeIcon icon={faBuilding} className='mr-3'/> {selectedUser.programName}
+                                    </p>
+
+                                    <p className='mt-5 text-xl italic text-gray-600 text-md dark:text-gray-500'>
+                                        <FontAwesomeIcon icon={faBookOpen} className='mr-3'/> {selectedUser.areaName}
+                                    </p>
+
+                                    <p className='mt-5 text-xl italic text-gray-600 text-md dark:text-gray-500'>
+                                        <FontAwesomeIcon icon={faEnvelope} className='mr-3'/> {selectedUser.email}
+                                    </p>
+
+                                    <p className='mt-5 text-xl italic text-gray-600 text-md dark:text-gray-500'>
+                                        <FontAwesomeIcon icon={faPhone} className='mr-3'/> {selectedUser.contactNum}
+                                    </p>
+                                    
+                                </div>
+                                
+                            </div>
+                                {removeConfirmation && (
+                                            <div className='absolute flex flex-col items-center justify-center p-4 border border-gray-200 shadow-lg bg-red-50 w-100 rounded-xl dark:bg-gray-700 dark:border-gray-600 fade-in'>
+                                                <div className='flex items-center justify-center mb-4 bg-red-200 rounded-full inset-shadow-sm w-18 h-18 inset-shadow-red-300'>
+                                                    <FontAwesomeIcon icon={faTriangleExclamation} className="m-auto text-4xl text-red-500"/>
+                                                </div>
+                                                
+                                                <p className='mb-4 text-lg font-semibold text-gray-800 dark:text-white'>
+                                                    Are you sure you want to delete this user? 
+                                                </p>
+                                                <div className='flex gap-4'>
+                                                    <button 
+                                                        className='px-4 py-2 text-white bg-red-500 rounded-lg hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700' 
+                                                        onClick={handleDeleteUser}
+                                                    >
+                                                        Yes
+                                                    </button>
+                                                    <button 
+                                                        className='px-4 py-2 text-gray-800 bg-gray-200 rounded-lg hover:bg-gray-300 dark:text-white dark:bg-gray-600 dark:hover:bg-gray-700' 
+                                                        onClick={() => setRemoveConfirmation(false)}
+                                                    >
+                                                        No
+                                                    </button>
+                                                </div>                                    
+                                            </div>
+                                        )}
+                            </div>
+                        )}
+                        
+
+
+
                     </div>
                 )}
             </div>

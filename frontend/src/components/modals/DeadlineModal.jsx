@@ -6,10 +6,10 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
-const DeadlineModal = ({id, programName, programCode, area, date, color = "#3B82F6", content, onClick}) => {
+const DeadlineModal = ({id, programName, programCode, area, date, color = "#3B82F6", content, onClick, showModal}) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden">
+      <div className={`relative bg-gray-200 dark:bg-gray-900 rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden ${showModal ? 'fade-in' : 'fade-out'}`}>
         {/* Header with accent color */}
         <div 
           className="w-full h-2"
@@ -70,7 +70,7 @@ const DeadlineModal = ({id, programName, programCode, area, date, color = "#3B82
               <FontAwesomeIcon icon={faClock} />
               <span className="font-medium">Description</span>
             </div>
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-6 min-h-[120px]">
+            <div className="bg-gray-100 dark:bg-gray-800 rounded-xl p-6 min-h-[120px]">
               <div className="leading-relaxed text-gray-700 whitespace-pre-line dark:text-gray-300">
                 {content || "No description provided."}
               </div>
