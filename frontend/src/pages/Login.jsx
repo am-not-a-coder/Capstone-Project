@@ -74,7 +74,7 @@ const Login = () => {
             <div className={`flex flex-row h-screen w-full lg:w-screen overflow-hidden bg-linear-to-br from-[#4c7a57] to-[#0e3844] relative`}>
 
             {/* Left-Side Container*/}
-            <div className="flex flex-col items-center justify-center w-3/4 h-screen  hidden lg:block" >
+            <div className="flex flex-col items-center justify-center w-3/4 h-screen hidden lg:block" >
             {/* UDM logo */}
             <img src={UDMLogo} alt="Universidad de Manila Logo" className='absolute top-5 left-5 h-18'/>
 

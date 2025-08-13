@@ -73,7 +73,7 @@ const Notification = () => {
     : notifications.filter((notif) => notif.alert); // only show alerts if "unread" is selected
 
   return (
-      <div className="relative border border-neutral-800 rounded-[20px] min-w-[950px] shadow-md p-2 pb-4 bg-neutral-200 text-neutral-900 dark:text-white dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
+      <div className="relative border border-neutral-800 rounded-[20px] min-w-[950px] shadow-md p-2 pb-4 bg-neutral-200 text-neutral-900 dark:text-white dark:bg-gray-900 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
 
         {/* All and Unread Filter*/}
         <div className='flex gap-4 mt-2'>
@@ -95,14 +95,14 @@ const Notification = () => {
         {/* Delete All Notificatios */}
         <button
           onClick={handleDeleteAll}
-          className='absolute px-2 top-5 right-5 z-10 text-base font-bold cursor-pointer text-red-500 rounded-full hover:bg-neutral-300 dark:hover:bg-neutral-800'
+          className='absolute z-0 px-2 text-base font-bold text-red-500 rounded-full cursor-pointer top-5 right-5 hover:bg-neutral-300 dark:hover:bg-neutral-800'
         >
           Delete All
         </button>
 
         
         
-        {/* Notificaations List */}
+        {/* Notifications List */}
         <div className='grid gap-1 pt-3'>
           {filteredNotifications.length > 0 ? (
             filteredNotifications.map((notification, index) => (
