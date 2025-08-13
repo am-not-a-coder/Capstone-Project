@@ -8,7 +8,7 @@ import axios from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect } from 'react';
 import StatusModal from '../components/modals/StatusModal';
-
+import { apiDelete, apiGet, apiPost } from '../utils/api_utils';
 
 
 const Users = () => {
@@ -41,8 +41,6 @@ const Users = () => {
     const [statusMessage, setStatusMessage] = useState(null); // status message
     const [statusType, setStatusType] = useState("success"); // status type (success/error)
 
-    const token = localStorage.getItem('token'); // gets the access token
-
 
     if (removeUser) {
         setSubmittedUsers(submittedUsers.filter(user => user !== selectedUser)); // remove selected user from submitted users
@@ -59,11 +57,6 @@ const Users = () => {
     const handleCreateUser = async (e) => {
         e.preventDefault(); // prevent default form submission
 
-        if (!token){
-            alert("No token found!");
-            return;
-        }
-
         //sends user data through a FormData
         const formData = new FormData();
             formData.append("employeeID", employeeID);
@@ -79,12 +72,8 @@ const Users = () => {
 
         try{
             //Post request
-        const res = await axios.post('http://localhost:5000/api/user', formData,
-            {headers: 
-                {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'multipart/form-data' // supports the file 
-                }}, {withCredentials: true});
+        const res = await apiPost('/api/user', formData,
+            {withCredentials: true});
             
             setStatusMessage(res.data.message);
             setShowStatusModal(true);
@@ -138,13 +127,8 @@ const Users = () => {
     useEffect(() => {
     const fetchUsers = async () => {
         try{                
-            if(!token){
-                alert("Token not found!");
-                return;
-            }
-            const res = await axios.get('http://localhost:5000/api/users',
-                {headers: {'Authorization': `Bearer ${token}`}
-            });
+
+            const res = await apiGet('/api/users');
             //checking the users before setting
             (Array.isArray(res.data.users)) ? setSubmittedUsers(res.data.users) : setSubmittedUsers([]); 
         } catch (err){
@@ -160,8 +144,8 @@ const Users = () => {
     useEffect(() => {
     const fetchProgram = async () =>{
 
-        const res = await axios.get('http://localhost:5000/api/program', 
-            {headers: {'Authorization': `Bearer ${token}`}}, {withCredentials: true}
+        const res = await apiGet('/api/program', 
+            {withCredentials: true}
         )
 
         try{
@@ -180,8 +164,7 @@ const Users = () => {
         
     const fetchArea = async () => {
         
-       const res = await axios.get('http://localhost:5000/api/area', 
-            {headers: {'Authorization': `Bearer ${token}`}},
+       const res = await apiGet('/api/area', 
             {withCredentials: true}
        )
 
@@ -214,8 +197,7 @@ const Users = () => {
 
         try{
 
-            const res = await axios.delete(`http://localhost:5000/api/user/${id}`,
-                {headers: {'Authorization' : `Bearer ${token}`}},
+            const res = await apiDelete(`/api/user/${id}`,
                 {withCredentials: true});
             
             setStatusMessage(res.data.message);
