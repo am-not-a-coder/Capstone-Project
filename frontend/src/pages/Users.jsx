@@ -19,6 +19,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect } from 'react';
 import StatusModal from '../components/modals/StatusModal';
 
+import { apiDelete, apiGet, apiPost } from '../utils/api_utils';
+
 const Users = () => {
     // user info
     const [employeeID, setEmployeeID] = useState("");  
@@ -36,17 +38,19 @@ const Users = () => {
     const [areaOption, setAreaOption] = useState([]);    
     const [visible, makeVisible] = useState("list");  
     const [submittedUsers, setSubmittedUsers] = useState([]); 
-    const [showDetails, setShowDetails] = useState(false); 
-    const [removeUser, setRemoveUser] = useState(false); 
-    const [selectedUser, setSelectedUser] = useState([]); 
-    const [removeConfirmation, setRemoveConfirmation] = useState(false); 
-    const [searchQuery, setSearchQuery] = useState(""); 
-    const[hidePassword, setHidePassword] = useState(); 
-    const [showStatusModal, setShowStatusModal] = useState(false); 
-    const [statusMessage, setStatusMessage] = useState(null); 
-    const [statusType, setStatusType] = useState("success"); 
 
-    const token = localStorage.getItem('token'); 
+    const [showDetails, setShowDetails] = useState(false); // state for showing user details
+    const [removeUser, setRemoveUser] = useState(false); // state for removing user
+    const [selectedUser, setSelectedUser] = useState([]); // state for selected user
+    const [removeConfirmation, setRemoveConfirmation] = useState(false); // state for showing remove button
+    const [searchQuery, setSearchQuery] = useState(""); // state for search query
+
+    const[hidePassword, setHidePassword] = useState(); //state for hiding the password
+
+    const [showStatusModal, setShowStatusModal] = useState(false); // shows the status modal
+    const [statusMessage, setStatusMessage] = useState(null); // status message
+    const [statusType, setStatusType] = useState("success"); // status type (success/error)
+
 
     if (removeUser) {
         setSubmittedUsers(submittedUsers.filter(user => user !== selectedUser)); 
@@ -63,10 +67,6 @@ const Users = () => {
     const handleCreateUser = async (e) => {
         e.preventDefault(); 
 
-        if (!token){
-            alert("No token found!");
-            return;
-        }
 
         const formData = new FormData();
             formData.append("employeeID", employeeID);
@@ -86,8 +86,11 @@ const Users = () => {
             }
 
         try{
-        const res = await axios.post('http://localhost:5000/api/user', formData,
-            {headers: {'Authorization': `Bearer ${token}`}, withCredentials: true});
+
+            //Post request
+        const res = await apiPost('/api/user', formData,
+            {withCredentials: true});
+          
             
             setStatusMessage(res.data.message);
             setShowStatusModal(true);
@@ -140,13 +143,10 @@ const Users = () => {
     useEffect(() => {
     const fetchUsers = async () => {
         try{                
-            if(!token){
-                alert("Token not found!");
-                return;
-            }
-            const res = await axios.get('http://localhost:5000/api/users',
-                {headers: {'Authorization': `Bearer ${token}`}});
-                
+
+            const res = await apiGet('/api/users');
+            //checking the users before setting
+
             (Array.isArray(res.data.users)) ? setSubmittedUsers(res.data.users) : setSubmittedUsers([]); 
         } catch (err){
             console.error("Error occurred during user fetching", err);
@@ -160,8 +160,10 @@ const Users = () => {
     useEffect(() => {
     const fetchProgram = async () =>{
 
-        const res = await axios.get('http://localhost:5000/api/program', 
-            {headers: {'Authorization': `Bearer ${token}`}, withCredentials: true}
+
+        const res = await apiGet('/api/program', 
+            {withCredentials: true}
+
         )
 
         try{
@@ -177,8 +179,9 @@ const Users = () => {
 
     useEffect(() => {
     const fetchArea = async () => {
-       const res = await axios.get('http://localhost:5000/api/area', 
-            {headers: {'Authorization': `Bearer ${token}`}},
+
+        
+       const res = await apiGet('/api/area', 
             {withCredentials: true}
        )
 
@@ -206,8 +209,10 @@ const Users = () => {
         }
 
         try{
-            const res = await axios.delete(`http://localhost:5000/api/user/${id}`,
-                {headers: {'Authorization' : `Bearer ${token}`}, withCredentials: true});
+
+            const res = await apiDelete(`/api/user/${id}`,
+                {withCredentials: true});
+
             
             setStatusMessage(res.data.message);
             setShowStatusModal(true);

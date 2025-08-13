@@ -1,5 +1,6 @@
 import { useState, useEffect} from 'react';
 import { useLocation, Outlet, useNavigate } from 'react-router-dom';
+import { clearTokens } from './utils/auth_utils';
 
 //Importing Components
 import './App.css'
@@ -51,7 +52,8 @@ const MainLayout = () => {
 
   useEffect(() => {
     if (logout){
-      localStorage.removeItem('token') // removes the token from the local storage
+      // removes access_token, refresh_token, and user info
+      clearTokens()
       navigate('/login')
     }
   }, [logout])
