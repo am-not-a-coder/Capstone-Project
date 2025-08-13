@@ -11,6 +11,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import EventModal from '../components/modals/EventModal';
 import StatusModal from '../components/modals/StatusModal';
 import DeadlineModal from '../components/modals/DeadlineModal';
+import { apiGet, apiPost } from '../utils/api_utils';
 // the progress bar is currently static  
 
 const Tasks = () => {
@@ -41,24 +42,16 @@ const Tasks = () => {
 
 
 
-    const token = localStorage.getItem('token'); //gets the token
-
+   
 
     // FETCH PROGRAM
     useEffect(() => {
-        if(!token){
-            console.error("No token found!");
-            return;
-        }
 
         const fetchProgram = async () => {
             
             try{
 
-                const res = await axios.get('http://localhost:5000/api/program', 
-                    {headers: {'Authorization': `Bearer${token}`}},
-                    {withCredentials: true}
-                )
+                const res = await apiGet('/api/program', {withCredentials: true})
 
                 Array.isArray(res.data.programs) ? setProgramOption(res.data.programs) : setProgramOption([]);
 
@@ -71,16 +64,11 @@ const Tasks = () => {
 
     // FETCH AREA
     useEffect(() => {
-        if(!token){
-            console.error("No token found!");
-            return;
-        }
 
         const fetchArea = async () => {
             
             try{
-                const res = await axios.get('http://localhost:5000/api/area', 
-                    {headers: {'Authorization': `Bearer ${token}`}}, {withCredentials: true})
+                const res = await apiGet('/api/area', {withCredentials: true})
 
                 Array.isArray(res.data.area) ? setAreaOption(res.data.area) : setAreaOption([]);
                 Array.isArray(res.data.area) ? setAreaProgressList(res.data.area) : setAreaProgressList([]);
@@ -95,17 +83,11 @@ const Tasks = () => {
     // FETCH DEADLINES
     useEffect(() => {
         
-        if(!token){
-            console.error("No token found!");
-            return;
-        }
-
         const fetchDeadline = async () => {
 
             try{
 
-            const res = await axios.get("http://localhost:5000/api/deadlines", 
-                {headers:{'Authorization': `Bearer${token}`}}, {withCredentials: true})
+            const res = await apiGet("/api/deadlines", {withCredentials: true})
 
                 Array.isArray(res.data.deadline) ? setDeadLines(res.data.deadline) : setDeadLines([]);   
                 
@@ -120,18 +102,12 @@ const Tasks = () => {
 
     // FETCH EVENTS (FOR CALENDAR)
     useEffect(() => {
-        
-        if(!token){
-            console.error("No token found!");
-            return;
-        }
 
         const fetchEvents = async () => {
 
             try{
 
-            const res = await axios.get("http://localhost:5000/api/events", 
-                {headers:{'Authorization': `Bearer${token}`}}, {withCredentials: true})
+            const res = await apiGet("/api/events", {withCredentials: true})
 
                 Array.isArray(res.data) ? setEvent(res.data) : setEvent([]);   
                 
@@ -156,8 +132,8 @@ const Tasks = () => {
 
         try{
             //create deadline api
-            const res = await axios.post('http://localhost:5000/api/deadline', formData, 
-                {headers: {'Authorization': `Bearer ${token}`}}, {withCredentials: true}) 
+            const res = await apiPost('/api/deadline', formData, 
+             {withCredentials: true}) 
 
                 setStatusMessage(res.data.message);
                 setShowStatusModal(true);
@@ -169,14 +145,13 @@ const Tasks = () => {
                 setDueDate("");
 
             // refetch deadline data
-            const deadlineRes = await axios.get("http://localhost:5000/api/deadlines", 
-                {headers:{'Authorization': `Bearer${token}`}}, {withCredentials: true})
+            const deadlineRes = await apiGet("api/deadlines", {withCredentials: true})
 
                 Array.isArray(deadlineRes.data.deadline) ? setDeadLines(deadlineRes.data.deadline) : setDeadLines([]);   
             
             // refetch event data
-            const eventRes = await axios.get("http://localhost:5000/api/events", 
-                {headers:{'Authorization': `Bearer${token}`}}, {withCredentials: true})
+            const eventRes = await apiGet("/api/events", 
+                 {withCredentials: true})
 
                 Array.isArray(eventRes.data) ? setEvent(eventRes.data) : setEvent([]);   
             

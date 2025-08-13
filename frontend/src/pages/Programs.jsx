@@ -3,25 +3,26 @@ import ProgramCard from "../components/ProgramCard";
 import CreateCard from "../components/CreateCard";
 import CreateForm from "../components/CreateForm";
 import { useState, useEffect } from "react";
-import axios from 'axios';
+import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api_utils';
+import { getCurrentUser } from '../utils/auth_utils';
 
 
   const Programs = () => {
-    const token = localStorage.getItem('token');
+    // Get user info using our centralized utility
+    const currentUser = getCurrentUser();
 
     useEffect(() => {
-      const fetchProgram = async () =>{
+      const fetchProgram = async () => {
+        try {
+          // Use our centralized API utility - no manual token handling!
+          const response = await apiGet('/api/program');
 
-        if(!token){
-          alert("Token not found!");
-                return;
-            }
-      try{
-         const response = await axios.get('http://localhost:5000/api/program', 
-          {headers: {'Authorization' : `Bearer ${token}`}},
-          {withCredentials: true});
-
-          Array.isArray(response.data.programs) ? setPrograms(response.data.programs) : setPrograms([]);
+          if (response.success) {
+            Array.isArray(response.data.programs) ? setPrograms(response.data.programs) : setPrograms([]);
+          } else {
+            console.error('Failed to fetch programs:', response.error);
+            setPrograms([]); // Set empty array on error
+          }
           
 
       } catch (err){
@@ -34,20 +35,23 @@ import axios from 'axios';
 
     useEffect(() => {
       const fetchEmployees = async () => {
-        if (!token) {
-          return;
-        }
         try {
-          const response = await axios.get('http://localhost:5000/api/users', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          Array.isArray(response.data.users) ? setEmployees(response.data.users) : setEmployees([]);
+         
+          const response = await apiGet('/api/users');
+          
+          if (response.success) {
+            Array.isArray(response.data.users) ? setEmployees(response.data.users) : setEmployees([]);
+          } else {
+            console.error("Error fetching employees:", response.error);
+            setEmployees([]);
+          }
         } catch (err) {
-          console.error("Error fetching employees", err);
+          console.error("Unexpected error fetching employees", err);
+          setEmployees([]);
         }
       };
       fetchEmployees();
-    }, [token]);
+    }, []); // No more token dependency!
 
     {/*use state function*/}
     const [programs, setPrograms] = useState([]);

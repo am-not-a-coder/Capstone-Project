@@ -1,5 +1,6 @@
 import {BrowserRouter as Router, Routes, Route, Navigate} from 'react-router-dom';
 import axios from 'axios';
+import { isLoggedIn } from './utils/auth_utils';
 // Importing Pages
 import Login from './pages/Login';
 import MainLayout from './MainLayout';
@@ -33,8 +34,8 @@ function App() {
 
   // If the user is not logged in it will redirect to login page
     const ProtectedRoute = ({children}) => {
-      const isAuthenticated = localStorage.getItem('token') // checks if the jwt auth token from the backend is present
-      return isAuthenticated ? children : <Navigate to="/Login" />
+      // Use   authentication check instead of direct localStorage access
+      return isLoggedIn() ? children : <Navigate to="/Login" />
     }
   
   return (

@@ -3,9 +3,9 @@ from app.models import Employee
 from app import db
 from werkzeug.security import check_password_hash, generate_password_hash, _hash_internal
 from werkzeug.utils import secure_filename
-from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
+from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, get_jwt
 from flask_jwt_extended.exceptions import JWTExtendedException
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria
 
@@ -55,8 +55,42 @@ def register_routes(app):
                 user.isOnline = True
                 db.session.commit()      
                 try:
-                    access_token = create_access_token(identity=empID)
-                    return jsonify({'success': True, 'message': 'Login successful', 'access_token': access_token})
+                    # Create both access token (15 minutes) and refresh token (7 days)
+                    access_token = create_access_token(
+                        identity=empID,
+                        expires_delta=timedelta(minutes=15),  # Short-lived for security
+                        additional_claims={
+                            'role': 'admin' if user.isAdmin else 'user',
+                            'firstName': user.fName,
+                            'lastName': user.lName
+                        }
+                    )
+                    
+                    refresh_token = create_refresh_token(
+                        identity=empID,
+                        expires_delta=timedelta(days=7)  # Longer-lived for convenience
+                    )
+                    
+                    # Prepare user data (without sensitive information)
+                    user_data = {
+                        'employeeID': user.employeeID,
+                        'firstName': user.fName,
+                        'lastName': user.lName,
+                        'suffix': user.suffix,
+                        'email': user.email,
+                        'contactNum': user.contactNum,
+                        'profilePic': user.profilePic,
+                        'isAdmin': user.isAdmin,
+                        'role': 'admin' if user.isAdmin else 'user'
+                    }
+                    
+                    return jsonify({
+                        'success': True, 
+                        'message': 'Login successful',
+                        'access_token': access_token,
+                        'refresh_token': refresh_token,
+                        'user': user_data
+                    })
                 except Exception as jwt_error:
                     current_app.logger.error(f"JWT Error: {jwt_error}")
                     return jsonify({'success': False, 'message': 'Token generation failed'}), 500
@@ -75,6 +109,78 @@ def register_routes(app):
          # Access the identity of the current user with get_jwt_identity
         current_user = get_jwt_identity()
         return jsonify(logged_in_as=current_user), 200
+    
+    
+    # REFRESH TOKEN ENDPOINT
+    @app.route('/api/refresh-token', methods=["POST"])
+    @jwt_required(refresh=True)  # This decorator requires refresh token, not access token
+    def refresh():
+        """
+        Endpoint to refresh access token using refresh token
+        
+        How it works:
+        1. Frontend sends request with refresh token in Authorization header
+        2. We verify refresh token is valid and not expired
+        3. We create new access token with same user identity
+        4. Optionally create new refresh token for extended security
+        5. Return new tokens to frontend
+        
+        Why this is secure:
+        - Refresh tokens are longer-lived but can be revoked
+        - Access tokens are short-lived, limiting damage if compromised
+        - User doesn't need to re-enter credentials
+        """
+        try:
+            # Get the user identity from the refresh token
+            current_user_id = get_jwt_identity()
+            
+            # Fetch user from database to get latest info
+            user = Employee.query.filter_by(employeeID=current_user_id).first()
+            
+            if not user:
+                return jsonify({'success': False, 'message': 'User not found'}), 404
+            
+            # Create new access token with fresh data
+            new_access_token = create_access_token(
+                identity=current_user_id,
+                expires_delta=timedelta(minutes=15),
+                additional_claims={
+                    'role': 'admin' if user.isAdmin else 'user',
+                    'firstName': user.fName,
+                    'lastName': user.lName
+                }
+            )
+            
+            # Optionally create new refresh token (recommended for security)
+            new_refresh_token = create_refresh_token(
+                identity=current_user_id,
+                expires_delta=timedelta(days=7)
+            )
+            
+            # Prepare updated user data
+            user_data = {
+                'employeeID': user.employeeID,
+                'firstName': user.fName,
+                'lastName': user.lName,
+                'suffix': user.suffix,
+                'email': user.email,
+                'contactNum': user.contactNum,
+                'profilePic': user.profilePic,
+                'isAdmin': user.isAdmin,
+                'role': 'admin' if user.isAdmin else 'user'
+            }
+            
+            return jsonify({
+                'success': True,
+                'message': 'Token refreshed successfully',
+                'access_token': new_access_token,
+                'refresh_token': new_refresh_token,  # Send new refresh token
+                'user': user_data  # Send updated user info
+            }), 200
+            
+        except Exception as e:
+            current_app.logger.error(f"Token refresh error: {e}")
+            return jsonify({'success': False, 'message': 'Token refresh failed'}), 500
     
     
     #LOGOUT API
@@ -277,6 +383,68 @@ def register_routes(app):
                                         #DATA FETCHING ROUTES
                                         
                                                             
+    # GET USER PROFILE BY EMPLOYEE ID
+    @app.route('/api/profile/<string:employeeID>', methods=["GET"])
+    @jwt_required()
+    def get_user_profile(employeeID):
+        try:
+            # Query user with additional related data
+            user = (Employee.query
+                   .outerjoin(Program, Employee.programID == Program.programID)
+                   .outerjoin(Area, Employee.areaID == Area.areaID)
+                   .filter(Employee.employeeID == employeeID)
+                   .add_columns(
+                       Employee.employeeID,
+                       Employee.fName, 
+                       Employee.lName,
+                       Employee.suffix,
+                       Employee.email,
+                       Employee.contactNum,
+                       Employee.profilePic,
+                       Employee.isAdmin,
+                       Program.programName,
+                       Program.programCode,
+                       Area.areaName,
+                       Area.areaNum
+                   ).first())
+            
+            if not user:
+                return jsonify({
+                    'success': False, 
+                    'message': 'Employee not found'
+                }), 404
+            
+            # Prepare detailed profile data
+            profile_data = {
+                'employeeID': user.employeeID,
+                'firstName': user.fName,
+                'lastName': user.lName, 
+                'suffix': user.suffix or '',
+                'email': user.email,
+                'contactNumb': user.contactNum,  # Note: matches your frontend expectation
+                'profilePic': user.profilePic,
+                'isAdmin': user.isAdmin,
+                'role': 'admin' if user.isAdmin else 'user',
+                # Additional program/area info for profile display
+                'programName': user.programName or 'Not Assigned',
+                'programCode': user.programCode or 'N/A', 
+                'areaName': user.areaName or 'Not Assigned',
+                'areaNum': user.areaNum or 'N/A'
+            }
+            
+            return jsonify({
+                'status': 'success',  # Note: matches your frontend check
+                'success': True,
+                'data': profile_data
+            }), 200
+            
+        except Exception as e:
+            current_app.logger.error(f"Get profile error: {e}")
+            return jsonify({
+                'success': False, 
+                'message': 'Failed to fetch profile'
+            }), 500
+
     #Get the users 
     @app.route('/api/users', methods=["GET"])
     @jwt_required()
