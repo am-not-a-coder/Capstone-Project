@@ -8,7 +8,7 @@ import axios from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect } from 'react';
 import StatusModal from '../components/modals/StatusModal';
-import { apiDelete, apiGet, apiPost } from '../utils/api_utils';
+import { apiDelete, apiGet, apiPostForm } from '../utils/api_utils';
 
 
 const Users = () => {
@@ -72,8 +72,7 @@ const Users = () => {
 
         try{
             //Post request
-        const res = await apiPost('/api/user', formData,
-            {withCredentials: true});
+            const res = await apiPostForm('/api/user', formData, {withCredentials: true});
             
             setStatusMessage(res.data.message);
             setShowStatusModal(true);
@@ -348,8 +347,17 @@ const Users = () => {
                     (submittedUsers.map((user, index) => (
                         
                         <div key={index}  onClick={()=> detailsAndSelectedUser(user)} className=" cursor-pointer flex flex-row max-w-[31%] bg-neutral-300 p-1 rounded-lg min-w-[200px] dark:shadow-md dark:shadow-zuccini-800 dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
+                            
                             {user.profilePic ? 
-                                <img src={`http://localhost:5000/${user.profilePic}`} alt="Profile" className='place-self-center m-2 w-[21%] h-[80%] object-cover rounded-full mr-2'/> : <FontAwesomeIcon icon={faCircleUser} className="ml-2 mr-3 text-5xl text-gray-800 place-self-center dark:text-white" />
+                                <img 
+                                src={
+                                    typeof user.profilePic === 'string' 
+                                        ? `http://localhost:5000${user.profilePic}`  // API data (string path)
+                                        : user.profilePic.file 
+                                            ? URL.createObjectURL(user.profilePic.file)  // New upload (File object)
+                                            : `http://localhost:5000${user.profilePic}`   // Fallback
+                                } alt="Profile" className='place-self-center m-2 w-[21%] h-[80%] object-cover rounded-full mr-2'/> 
+                                : <FontAwesomeIcon icon={faCircleUser} className="ml-2 mr-3 text-5xl text-gray-800 place-self-center dark:text-white" />
                             }
                             
                             <div className='flex flex-col items-center justify-center w-full'>
