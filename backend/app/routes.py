@@ -7,18 +7,13 @@ from flask_jwt_extended import create_access_token, create_refresh_token, get_jw
 from flask_jwt_extended.exceptions import JWTExtendedException
 from datetime import datetime, timedelta
 import os
+import re
 from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria
 
 
 def register_routes(app):
                                         #AUTHENTICATION(LOGIN/LOGOUT) PAGE ROUTES 
 
-
-    # CHECKS IF THE BACKEND IS WORKING
-    @app.route('/api/checkdb', methods=['GET'])
-    def checkdb():
-        return jsonify({'message': "The backend is working"})
-    
     # JWT Exception Handler
     @app.errorhandler(JWTExtendedException)
     def handle_jwt_exception(e):
@@ -193,37 +188,56 @@ def register_routes(app):
     def create_user():
         # get the user input 
         data = request.form
-        empID = data.get("employeeID")
-        password = data.get("password")
+        empID = data.get("employeeID").strip()
+        password = data.get("password").strip()
+        first_name = data.get("fName").strip()
+        last_name = data.get("lName").strip()
+        suffix = data.get("suffix").strip()
+        email = data.get("email").strip()
+        contactNum = data.get("contactNum").strip()
+        programID = data.get("programID")
+        areaID = data.get("areaID")
+
+        #email regex for validation
+        validEmail = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         
         # Validate required fields
         if not password or len(password.strip()) == 0:
             return jsonify({'success': False, 'message': 'Password cannot be empty'}), 400
         if not empID:
             return jsonify({'success': False, 'message': 'Employee ID is required'}), 400
-        first_name = data.get("fName").strip()
-        last_name = data.get("lName").strip()
-        suffix = data.get("suffix").strip()
-        email = data.get("email").strip()
-        contactNum = data.get("contactNum")
-        programID = data.get("programID")
-        areaID = data.get("areaID")
+        if not first_name:
+            return jsonify({'success': False, 'message': 'First name is required'}), 400
+        if not last_name:
+            return jsonify({'success': False, 'message': 'Last name is required' }), 400
+        # Validate email format
+        if not email or len(email.strip()) == 0:
+            return jsonify({'success': False, 'message': 'Email is required' }), 400
+        elif not re.match(validEmail, email):
+            return jsonify({'success': False, 'message': 'Please enter a valid email'}), 400
+        if not contactNum:
+            return jsonify({'success': False, 'message': 'Contact number is required'}), 400
+        elif not re.match(r'^\d{11}$', contactNum):
+            return jsonify({'success': False, 'message': 'Contact number must be 11 digits'}), 400
 
         # Get the profile picture file
+        profilePic = None
         file = request.files.get("profilePic")
 
-        if file:
+        if file and file.filename:
+            try:
+                filename = secure_filename(file.filename)
+                
+                # Make sure the folder exists
+                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-            filename = secure_filename(file.filename)
-            
-            # Make sure the folder exists
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(file_path)
+                profilePic = f"/uploads/{filename}"
+            except Exception as e:
+                print(f"File Upload Error: {e}")
+                return jsonify({'success': False, 'message': 'Failed to upload profile picture'}), 400
 
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(file_path)
-            profilePic = f"/uploads/{filename}"
-        else:
-            profilePic = None
 
 
         # Checks if the user already exists
@@ -233,7 +247,7 @@ def register_routes(app):
         else:
             new_user = Employee(
                 employeeID = empID,
-                password = generate_password_hash(password),
+                password = generate_password_hash(password, method="pbkdf2:sha256"),
                 fName = first_name,
                 lName = last_name,
                 suffix = suffix,
@@ -247,7 +261,6 @@ def register_routes(app):
             db.session.commit()
             return jsonify({'success': True, "message": "Employee created successfully"}), 201  
         
-
 
     #Reset user password (for fixing invalid password hashes)
     @app.route('/api/user/<string:employeeID>/reset-password', methods=["POST"])
@@ -480,6 +493,17 @@ def register_routes(app):
             user_list.append(user_data)
         return jsonify({"users" : user_list}), 200
     
+    # Get the uploaded file by filename
+    @app.route('/uploads/<filename>', methods=["GET"])
+    def get_uploaded_file(filename):
+        try:
+            return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=False)
+        except FileNotFoundError:
+            return jsonify({'error': 'File not found'}), 404
+
+    
+                                        #PROGRAM PAGE ROUTES
+    
 
     #edit program base on program id
     @app.route('/api/program/<int:programID>', methods=['PUT'])
@@ -657,14 +681,13 @@ def register_routes(app):
     def get_area():
         areas = (Area.query
                  .join(Program, Area.programID == Program.programID)
-                 .join(Subarea, Area.subareaID == Subarea.subareaID)
+                 .outerjoin(Subarea, Area.areaID == Subarea.areaID)
                  .add_columns(
                     Area.areaID,
                     Program.programCode,
                     Area.areaName,
                     Area.areaNum,
                     Area.progress,
-                    Subarea.subareaName
                 )
             ).all()
 
@@ -676,7 +699,7 @@ def register_routes(app):
                 'programCode': area.programCode,
                 'areaName': f"{area.areaNum}: {area.areaName}",
                 'progress': area.progress,
-                'subareaName': area.subareaName,
+                
                 'areaNum': area.areaNum
             }
             area_list.append(area_data)
@@ -838,7 +861,7 @@ def register_routes(app):
                 }
 
             match row.criteriaType:
-                case "Input":
+                case "Input/s":
                     result[area_id]['subareas'][subarea_id]['criteria']['inputs'].append(criteria_data)
                 case "Processes":
                     result[area_id]['subareas'][subarea_id]['criteria']['processes'].append(criteria_data)
@@ -847,8 +870,6 @@ def register_routes(app):
 
         for area in result.values():
             area['subareas'] = list(area['subareas'].values())
-
-        print(result.values())
 
 
         return jsonify(list(result.values())) 
@@ -959,16 +980,9 @@ def register_routes(app):
     def upload_file():
         file = request.files.get("uploadedfile")
 
-        if file:
 
-            fileName = secure_filename(file.filename)
-            
-            # Make sure the folder exists
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], fileName)
-            file.save(file_path)
-            return {"file_url": f"/preview/{fileName}"}
+
 
     
     @app.route('/api/preview/<filename>')   

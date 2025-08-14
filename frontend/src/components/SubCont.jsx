@@ -8,7 +8,7 @@ import { useState} from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import UploadModal from './modals/UploadModal';
 
-const SubCont = ({title, criteria}) => {
+const SubCont = ({title, criteria, onClick}) => {
     const [expanded, setExpanded] = useState(false);
     const [criteriaExpand, setCriteriaExpand] = useState(null);
     const [showUpload, setShowUpload] = useState(false);
@@ -28,7 +28,7 @@ const SubCont = ({title, criteria}) => {
         {/* CriteriaGroup div */}
         <div 
         onClick={() => setCriteriaExpand(isOpen ? null : index)}
-        className='flex flex-row justify-between p-3 mb-2 ml-5 border shadow-md cursor-pointer rounded-2xl text-neutral-800 dark:text-white dark:border-none dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800'>
+        className='flex flex-row justify-between p-3 mb-2 ml-5 border shadow-md cursor-pointer rounded-2xl text-neutral-800 dark:text-white dark:border-none dark:bg-gray-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800'>
             <h2 className='font-semibold'>{groupName}</h2>
              <div className='mr-3'>
                     <FontAwesomeIcon 
@@ -38,13 +38,13 @@ const SubCont = ({title, criteria}) => {
             </div>            
         </div>
 
-            {/* CriteriaContent div - Fixed animation classes */}
+            
         <div className={`flex flex-col ml-5 overflow-hidden transition-all duration-400 ease-in-out ${
             isOpen ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0' 
         }`}>
-            {items.map((item, index) => (
-                <div key={index} className='flex flex-row justify-between gap-3 p-3 mb-2 ml-5 border shadow-md cursor-default rounded-2xl text-neutral-800 dark:border-none dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800'>
-                    <span className='break-words text-[15px] max-w-[65%]'>{item.content}</span>
+            {items.length > 0 ? items.map((item, index) => (
+                <div key={index} className='flex flex-row justify-between gap-3 p-3 mb-2 ml-5 border shadow-md cursor-default rounded-2xl text-neutral-800 dark:border-none dark:text-white dark:bg-gray-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800'>
+                    <span className='break-words text-[15px] max-w-[65%] whitespace-pre-wrap'>{item.content}</span>
 
                     <div className='flex flex-col items-center justify-center'>
                         <h2 className='font-semibold'>Attached File</h2>
@@ -62,7 +62,13 @@ const SubCont = ({title, criteria}) => {
                         />
                     </div>
                 </div>
-            ))}
+            )) : (
+                <div className='flex flex-col items-center justify-center p-5 mb-3 text-neutral-800 bg-neutral-300/50 dark:bg-gray-800/50 dark:text-white rounded-2xl'>
+                      <h1 className='text-lg font-semibold'>No Criteria found</h1>
+                      <p className='mb-1 font-light text-md'>Want to Create one?</p>
+                      <button onClick={onClick}  className='px-10 py-2 transition-all duration-300 cursor-pointer bg-neutral-300 dark:bg-gray-600 hover:text-white hover:bg-zuccini-600/60 rounded-2xl'>Create</button>
+                    </div>
+            )}
         </div>
         </>
         )
@@ -73,7 +79,7 @@ const SubCont = ({title, criteria}) => {
         <li className='flex flex-col list-inside'>
             <button 
                 onClick={() => setExpanded(prev => !prev)}
-                className='flex flex-row justify-between p-3 mb-2 ml-5 border shadow-md cursor-pointer rounded-2xl text-neutral-800 dark:border-none dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800'>   
+                className='flex flex-row justify-between p-3 mb-2 ml-5 border shadow-md cursor-pointer rounded-2xl text-neutral-800 dark:border-none dark:text-white dark:bg-gray-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800'>   
                 <h1 className='font-semibold text-md'>{title}</h1>
                 <div className='mr-3'>
                     <FontAwesomeIcon 
@@ -83,7 +89,7 @@ const SubCont = ({title, criteria}) => {
                 </div>
             </button>
 
-            {/* Main dropdown - Fixed animation classes */}
+            
             <div className={`flex flex-col ml-5 overflow-hidden transition-all duration-400 ease-in-out ${
                 expanded ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0' }`}>    
                         {renderCriteriaGroup("Input/s", criteria.inputs, 0)}
@@ -91,9 +97,9 @@ const SubCont = ({title, criteria}) => {
                         {renderCriteriaGroup("Outcomes", criteria.outcomes, 2)}
             </div>
 
-            {/* Render Upload Modal */}
+            {/* Upload Modal */}
             {showUpload && (
-                <UploadModal onClose={handleCloseModal} />
+                <UploadModal showModal={showUpload} onClose={handleCloseModal} />
             )}
         </li>
     )

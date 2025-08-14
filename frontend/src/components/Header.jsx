@@ -129,16 +129,16 @@ const Header = ({title}) => {
 
 
     return(
-        <header className="w-full z-10 fixed lg:relative flex items-center col-span-5 col-start-2 p-4 -mt-5 mb-3 pl-10">
+        <header className="fixed z-10 flex items-center w-full col-span-5 col-start-2 p-4 pl-10 mb-3 -mt-5 lg:relative lg:pl-5">
              <HeaderTitle title={title}/>
              {/* Profile, messages, notifications */}
         <div className='w-full'><div 
             ref={iconContainerRef}
-            className="bg-gray-300 lg:rounded-3xl fixed top-0 lg:top-4 lg:right-10 right-0 flex justify-end items-center lg:w-45 w-full lg:h-16 h-19 p-2 shadow-lg border border-gray-300 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 ">
+            className="fixed top-0 right-0 flex items-center justify-around w-full p-2 bg-gray-300 border border-gray-300 shadow-lg lg:rounded-3xl lg:top-4 lg:right-10 lg:w-45 lg:h-16 h-19 dark:bg-gray-900 dark:border-gray-800 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 ">
                 {/* Message button */}
                 <FontAwesomeIcon 
                     icon={faComment} 
-                    className="bg-neutral-300 text-zuccini-800 text-lg lg:text-xl p-2 rounded-lg cursor-pointer dark:text-zuccini-700 dark:bg-[#242424] transition-all duration-500"
+                    className="p-2 text-lg transition-all duration-500 rounded-lg cursor-pointer bg-neutral-300 text-zuccini-800 lg:text-xl dark:text-zuccini-700 dark:bg-gray-800 dark:shadow-sm dark:shadow-zuccini-800"
                     onClick={() => {
                         setShowMessages((current) => !current);
                         setShowNotification(false);
@@ -148,7 +148,7 @@ const Header = ({title}) => {
                 {/* Notification button */}
                 <FontAwesomeIcon 
                     icon={faBell} 
-                    className="bg-neutral-300 text-zuccini-800 text-center text-xl p-2 rounded-lg ml-2 cursor-pointer dark:text-zuccini-700 dark:bg-[#242424] transition-all duration-500" 
+                    className="p-2 ml-2 text-xl text-center transition-all duration-500 rounded-lg cursor-pointer bg-neutral-300 text-zuccini-800 dark:text-zuccini-700 dark:bg-gray-800 dark:shadow-sm dark:shadow-zuccini-800" 
                     onClick={ () => {
                         setShowNotification ((current) => !current)
                         setShowMessages(false);
@@ -158,7 +158,7 @@ const Header = ({title}) => {
                 {/* Profile button */}
                 <FontAwesomeIcon 
                     icon={faCircleUser}
-                    className="ml-2 lg:ml-8 text-4xl transition-all duration-500 cursor-pointer text-zuccini-800 dark:text-zuccini-700" 
+                    className="ml-2 text-4xl transition-all duration-500 cursor-pointer lg:ml-8 text-zuccini-800 dark:text-zuccini-700" 
                     onClick={ () => {
                         setShowProfile ((current) => !current);
                         setShowNotification(false);
@@ -169,12 +169,12 @@ const Header = ({title}) => {
             
             {/* Shows the profile tab */}
             {showProfile && (
-                <div ref={profileRef} className='fixed top-25 right-8 flex flex-col p-3 border-2 border-neutral-500 bg-neutral-200 text-neutral-900 transition-all duration-500 dark:border-zuccini-950 dark:bg-[#19181A] w-[350px] rounded-2xl z-20'>
+                <div ref={profileRef} className='fixed top-25 right-8 flex flex-col p-3 border-2  border-neutral-500 bg-neutral-200 text-neutral-900 transition-all duration-500 dark:border-gray-800 dark:bg-gray-900 w-[350px] rounded-2xl z-20'>
                      <h1 className='mb-1 ml-2 text-2xl font-medium dark:text-white'>
                         Profile
                     </h1>
                         {/* profile preview */}
-                        <div className='flex flex-col justify-center w-full px-5 py-10 mb-5 border rounded-lg dark:bg-woodsmoke-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
+                        <div className='flex flex-col justify-center w-full px-5 py-10 mb-5 border rounded-lg dark:bg-gray-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
                             <FontAwesomeIcon 
                                 icon={faCircleUser} 
                                 className='mb-5 text-6xl dark:text-white' 
@@ -183,7 +183,7 @@ const Header = ({title}) => {
                             <h2 className='text-center text-md font-extralight dark:text-white'>johndoe123@gmail.com</h2>
                         </div>
                         {/* View Profile */}
-                        <Link to='/Profile' className='flex items-center w-full p-3 mb-5 text-xl transition-all duration-300 bg-neutral-300 border-neutral-900 rounded-xl inset-shadow-xs inset-shadow-neutral-400 hover:text-white hover:bg-zuccini-700 dark:bg-woodsmoke-950 dark:text-white dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
+                        <Link to='/Profile' className='flex items-center w-full p-3 mb-5 text-xl transition-all duration-300 bg-neutral-300 border-neutral-900 dark:border-gray-800 rounded-xl inset-shadow-xs inset-shadow-neutral-400 hover:text-white hover:bg-zuccini-700 dark:bg-gray-950 dark:text-white dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
                             <FontAwesomeIcon 
                                 icon={faAddressCard} 
                                 className='mr-4'
@@ -191,7 +191,7 @@ const Header = ({title}) => {
                             <h1 className='font-light'>View Profile</h1>
                         </Link>
                         {/* Edit Profile */}
-                        <Link to="/Profile#edit-profile" className='flex items-center w-full p-3 text-xl transition-all duration-300 bg-neutral-300 border-neutral-900 rounded-xl inset-shadow-xs inset-shadow-neutral-400 hover:text-white hover:bg-zuccini-700 dark:bg-woodsmoke-950 dark:text-white dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
+                        <Link to="/Profile#edit-profile" className='flex items-center w-full p-3 text-xl transition-all duration-300 bg-neutral-300 border-neutral-900 rounded-xl inset-shadow-xs inset-shadow-neutral-400 hover:text-white hover:bg-zuccini-700 dark:bg-gray-950 dark:text-white dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
                             <FontAwesomeIcon 
                                 icon={faPenToSquare} 
                                 className='mr-5'
@@ -204,17 +204,17 @@ const Header = ({title}) => {
             
             {/* Shows the Notification Tab*/}
             {showNotification && (
-                 <div ref={notifRef}  className='fixed top-25 right-8 flex flex-col w-[300px] min-w-[35%] p-3 border-2 border-neutral-500 bg-neutral-200 text-neutral-900 transition-all duration-500 dark:border-zuccini-950 dark:text-white dark:inset-shadow-xs dark:inset-shadow-zuccini-800 dark:bg-[#19181A] rounded-2xl z-20'>
+                 <div ref={notifRef}  className='fixed top-25 right-8 flex flex-col w-[300px] min-w-[35%] p-3 border-2 border-neutral-500 bg-neutral-200 text-neutral-900 transition-all duration-500 dark:border-gray-800 dark:text-white dark:inset-shadow-xs dark:inset-shadow-zuccini-800 dark:bg-gray-900 rounded-2xl z-20'>
                         {/* Notification tab */}
                         <div className='flex items-center justify-between'>
                             <h1 className='mb-1 ml-2 text-2xl font-medium'>
                                 Notifications
                             </h1>
-                            <Link className='ml-2 px-2 text-lg font-medium text-blue-500 hover:bg-neutral-300 dark:hover:bg-neutral-800'
+                            <Link className='px-2 ml-2 text-lg font-medium text-blue-500 hover:bg-neutral-300 dark:hover:bg-neutral-800'
                             to='/Notification'>See All
                             </Link>
                         </div>
-                       <div className='flex flex-col min-h-[300px] p-3 bg-neutral-300 w-full rounded-xl inset-shadow-sm inset-shadow-neutral-400 transition-all duration-500 dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
+                       <div className='flex flex-col min-h-[300px] p-3 bg-neutral-300 w-full rounded-xl inset-shadow-sm inset-shadow-neutral-400 transition-all duration-500 dark:text-white dark:border-gray-800 dark:bg-gray-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
                             {notifications && notifications.length > 0 ? (
                             notifications.map((notification, index) => (
                                 <Notifications key={index} picture={notification.profilePic} notifTitle={notification.title} content={notification.content} date={notification.date} alert={notification.alert} link={notification.link}/>
@@ -227,11 +227,11 @@ const Header = ({title}) => {
 
             {/* Messages */}
             {showMessages && (
-                <div ref={messageRef} className='fixed top-25 right-8 flex flex-col min-w-[40%] p-3 border-2 border-neutral-500 bg-neutral-200 text-neutral-900 dark:border-zuccini-950 dark:bg-[#19181A] rounded-2xl z-20'>            
+                <div ref={messageRef} className='z-1000 fixed top-25 right-8 flex flex-col min-w-[40%] p-3 border-2 border-neutral-500 dark:border-gray-800 bg-neutral-200 text-neutral-900  dark:bg-gray-900 rounded-2xl '>            
                     <h1 className='mb-1 ml-2 text-2xl font-medium dark:text-white'>
                         Messages
                     </h1>
-                    <div className='flex flex-col p-3 min-h-[300px] bg-neutral-300 w-full rounded-xl dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-xs dark:inset-shadow-zuccini-800'>
+                    <div className='flex flex-col p-3 min-h-[300px] bg-neutral-300 w-full rounded-xl dark:text-white dark:bg-gray-950 dark:inset-shadow-xs dark:inset-shadow-zuccini-800'>
                         {messages && messages.length > 0 ? (
                             messages.map((message, index) => (
                                 <Messages key={index} picture={message.profilePic} userName={message.user} message={message.message} time={message.time} alert={message.alert}/>
@@ -272,7 +272,7 @@ export const Notifications = ({notifTitle, content, date, alert, picture, link})
         
     <div 
     onClick={handleClick}
-    className='relative flex items-center w-full min-h-[50px] p-3 border mb-2 rounded-xl bg-neutral-200 shadow-md transition-transform duration-200 cursor-pointer hover:shadow-lg hover:scale-101 dark:border-none dark:bg-[#19181A] dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
+    className='relative flex items-center w-full min-h-[50px] p-3 border mb-2 rounded-xl bg-neutral-200 shadow-md transition-transform duration-200 cursor-pointer hover:shadow-lg hover:scale-101 dark:border-none dark:bg-gray-900 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
         {/* Hole */}
         <img 
         src={picture} 
@@ -298,7 +298,7 @@ export const Notifications = ({notifTitle, content, date, alert, picture, link})
 export const Messages = ({picture, userName, message, time, alert}) => {
 
     return (
-        <div className='relative flex items-center w-full min-h-[50px] p-3 border mb-2 rounded-xl bg-neutral-200 shadow-md transition-transform duration-200 cursor-pointer hover:shadow-lg hover:scale-101 dark:border-none dark:bg-[#19181A] dark:inset-shadow-zuccini-900 dark:inset-shadow-sm '>
+        <div className='relative flex items-center w-full min-h-[50px] p-3 border mb-2 rounded-xl bg-neutral-200 shadow-md transition-transform duration-200 cursor-pointer hover:shadow-lg hover:scale-101 dark:border-none dark:bg-gray-900 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm '>
             <img 
             src={picture} 
             alt="profile picture"

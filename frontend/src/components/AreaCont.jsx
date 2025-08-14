@@ -11,7 +11,7 @@ export default function AreaCont(props) {
     return(
         <button 
             onClick={props.onClick}
-            className='flex flex-row justify-between min-w-full p-3 mb-2 border shadow-md cursor-pointer rounded-2xl text-neutral-800 dark:border-none dark:text-white dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800'>
+            className='flex flex-row justify-between min-w-full p-3 mb-2 border shadow-md cursor-pointer rounded-2xl text-neutral-800 dark:border-none dark:text-white dark:bg-gray-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800'>
             <h1 className='font-semibold text-md'>{props.title}</h1>
             <div className='mr-3'>
                 <FontAwesomeIcon 

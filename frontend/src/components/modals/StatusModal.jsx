@@ -5,12 +5,12 @@ import{
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 
-const StatusModal = ({message, onClick, type = "success"}) =>{
+const StatusModal = ({message, onClick, showModal, type = "success"}) =>{
     const isError = type === "error"
     
     return(
     <div className="fixed inset-0 z-50 flex items-center justify-center transition-all duration-300 transform scale-100 bg-black/60 backdrop-blur-sm">
-        <div className={`flex flex-col justify-center items-center px-5 py-3 h-[50%] w-[45%] bg-neutral-200 border-t-10 ${isError ? 'border-red-500 ' : 'border-zuccini-500 '}shadow-2xl rounded-xl dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-900 transition`}>
+        <div className={`flex flex-col justify-center items-center px-5 py-3 h-[50%] w-[45%] bg-neutral-200 border-t-10 ${isError ? 'border-red-500 ' : 'border-zuccini-500 '}shadow-2xl rounded-xl dark:bg-gray-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 transition ${showModal ? 'fade-in' : 'fade-out'}`}>
 
             <div className='flex items-center justify-center mb-5'>
             <FontAwesomeIcon
