@@ -224,8 +224,8 @@ const Tasks = () => {
         {areaProgressList && areaProgressList.length > 0 ? (
         <>
         
-        {areaProgressList.map((area) => (                
-            <Area key={area} areaTitle={area.areaNum} desc={area.areaName} program={area.programCode} progress={area.progress}/>)
+        {areaProgressList.slice(0,3).map((area) => (                
+            <Area key={area.areaID} areaTitle={area.areaNum} desc={area.areaName} program={area.programCode} progress={area.progress}/>)
         )}
             <div className='absolute right-0 col-start-3 flex items-center justify-center min-w-[275px] h-full overflow-hidden opacity-90 transition-all duration-500 hover:min-w-[278px] hover:opacity-95 hover:scale-110 bg-gradient-to-r from-transparent via-neutral-800 to-neutral-900 dark:bg-gradient-to-r dark:from-transparent dark:via-gray-800 dark:to-gray-900 cursor-pointer'>
                     <h1 className='z-10 text-xl font-semibold text-neutral-200'>View All</h1>

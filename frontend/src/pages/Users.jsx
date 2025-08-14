@@ -14,12 +14,12 @@ import{
     faBuilding,
     faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
-import axios from 'axios';
+
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect } from 'react';
 import StatusModal from '../components/modals/StatusModal';
 
-import { apiDelete, apiGet, apiPost } from '../utils/api_utils';
+import { apiDelete, apiGet, apiPostForm } from '../utils/api_utils';
 
 const Users = () => {
     // user info
@@ -64,6 +64,10 @@ const Users = () => {
         setShowDetails(true); 
     }
 
+    const previewURL = (file) => {
+        return file ? URL.createObjectURL(file) : "";
+    };
+
     const handleCreateUser = async (e) => {
         e.preventDefault(); 
 
@@ -79,16 +83,11 @@ const Users = () => {
              if(profilePic?.file) formData.append("profilePic", profilePic.file); 
             formData.append("programID", programID);
             formData.append("areaID", areaID)
-
-          console.log("Form data being sent:");
-            for (let [key, value] of formData.entries()) {
-                console.log(key, value);
-            }
-
+            
         try{
 
             //Post request
-        const res = await apiPost('/api/user', formData,
+        const res = await apiPostForm('/api/user', formData,
             {withCredentials: true});
           
             
@@ -108,7 +107,7 @@ const Users = () => {
                     name: `${fName} ${lName} ${suffix}`,
                     email,
                     contactNum,
-                    profilePic,
+                    profilePic: previewURL(profilePic?.file),
                     programID,
                     areaID,
                     programName: selectedProgramName,

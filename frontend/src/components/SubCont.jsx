@@ -13,10 +13,18 @@ const SubCont = ({title, criteria, onClick}) => {
     const [criteriaExpand, setCriteriaExpand] = useState(null);
     const [showUpload, setShowUpload] = useState(false);
 
+    const [selectedCriteriaID, setSelectedCriteriaID] = useState(null); // State to hold the selected criteria ID
+
     const [done, setDone] = useState(false);
     // Function to close the modal
     const handleCloseModal = () => {
         setShowUpload(false);
+        setSelectedCriteriaID(null)
+    };
+
+      const handleUploadTrigger = (criteriaID) => {
+        setSelectedCriteriaID(criteriaID);
+        setShowUpload(true);
     };
 
     //renders the input, process, outcome
@@ -48,7 +56,17 @@ const SubCont = ({title, criteria, onClick}) => {
 
                     <div className='flex flex-col items-center justify-center'>
                         <h2 className='font-semibold'>Attached File</h2>
-                        <span className='font-light text-center cursor-pointer text-small hover:underline'>{item.docName}</span>
+                        {item.docName ? (
+                            <a 
+                        href={'http://localhost:5000/api/accreditation/preview/' + item.docName}
+                        target='_blank'
+                        className='font-light text-center cursor-pointer text-sm hover:underline'>{item.docName}</a>
+
+                        ) : (
+                            <span className='text-sm text-gray-500'>No file attached</span>
+                        )
+                        }
+                        
                     </div>
 
                     <div className='flex items-center justify-between gap-5 mr-3'>
@@ -57,7 +75,11 @@ const SubCont = ({title, criteria, onClick}) => {
                         className={`text-xl ${done ? 'text-zuccini-600' : 'text-neutral-500 '} cursor-pointer`} />
                         <FontAwesomeIcon 
                             icon={faPlus} 
-                            onClick={() => setShowUpload(true)} 
+                            onClick={(e) => { 
+                                 e.stopPropagation(); // Prevent event bubbling                                
+                                handleUploadTrigger(item.criteriaID);
+                            }
+                            } 
                             className="text-xl transition-colors cursor-pointer hover:text-blue-600" 
                         />
                     </div>
@@ -73,6 +95,9 @@ const SubCont = ({title, criteria, onClick}) => {
         </>
         )
     }
+
+
+
 
     return(
         // subarea container div
@@ -98,8 +123,12 @@ const SubCont = ({title, criteria, onClick}) => {
             </div>
 
             {/* Upload Modal */}
-            {showUpload && (
-                <UploadModal showModal={showUpload} onClose={handleCloseModal} />
+            {showUpload && selectedCriteriaID && (
+                <UploadModal 
+                    showModal={showUpload} 
+                    onClose={handleCloseModal}  
+                    criteriaID={selectedCriteriaID}
+                />
             )}
         </li>
     )

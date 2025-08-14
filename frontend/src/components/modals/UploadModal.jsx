@@ -6,18 +6,27 @@ import {
     faCircleCheck
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import StatusModal from './StatusModal';
+import { apiPostForm } from '../../utils/api_utils';
 
-const UploadModal = ({ onClose, showModal }) => {
+const UploadModal = ({ onClose, showModal, criteriaID }) => {
+
+
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
   const fileInputRef = useRef(null);
 
   const [fileType, setFileType] = useState(''); // State to hold the file type
   const [fileName, setFileName] = useState(''); // State to hold the file name
-  const [uploader, setUploader] = useState(''); // State to hold the uploader's name
-  const [filePath, setFilePath] = useState(''); // State to hold the file path
+  
+  const errorMessage = useRef(null);
 
-  const files = Array.from(e.dataTransfer.files);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [statusType, setStatusType] = useState("success");
+
+
+  
   // Auto-open the modal when component mounts
   useEffect(() => {
     // You can add any initialization logic here
@@ -48,7 +57,7 @@ const UploadModal = ({ onClose, showModal }) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    
+    const files = e.dataTransfer.files;
     
     if (files.length > 0) {
       handleFileSelection(files[0]);
@@ -56,12 +65,21 @@ const UploadModal = ({ onClose, showModal }) => {
   };
 
   const handleFileSelection = (file) => {
+    if (!file || file.type !== '.pdf') {
+      errorMessage.current.textContent = 'Please upload a valid PDF file.';
+      return;
+    }
+    
     setUploadedFile({
       name: file.name,
       size: file.size,
       type: file.type,
       file: file
     });
+
+    setFileType(file.type);
+    setFileName(file.name);
+    
   };
 
   const handleFileInputChange = (e) => {
@@ -93,12 +111,30 @@ const UploadModal = ({ onClose, showModal }) => {
       onClose();
     }
   };
-  const handleUpload = () =>{
-    if (uploadedFile) {
-      console.log('Uploading file:', uploadedFile);
-      // Here you would typically handle the actual upload
-      alert(`File "${uploadedFile.name}" ready for upload!`);
-      closeModal();
+  const handleUpload = async () =>{
+    
+    const formData = new FormData()
+      formData.append('uploadedFile', uploadedFile.file);
+      formData.append('fileType', fileType);
+      formData.append('fileName', fileName);
+      formData.append('criteriaID',)
+
+    try{
+      
+      const response = await apiPostForm('/api/accreditation/upload', formData,{withCredentials: true});
+      
+      if(response.success){
+        setStatusMessage('File uploaded successfully!');
+        setStatusType('success');
+        setShowStatusModal(true);
+        resetUpload(); // Reset the upload state after successful upload
+      }
+
+    }catch(err){
+      setStatusMessage('File upload failed. Please try again.');
+      setStatusType('error');
+      setShowStatusModal(true);
+      resetUpload(); // Reset the upload state after successful upload
     }
 
 
@@ -109,6 +145,9 @@ const UploadModal = ({ onClose, showModal }) => {
     <div>
       {/* Modal Overlay*/}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"> 
+        {showStatusModal && (
+          <StatusModal showModal={showStatusModal} message={statusMessage} type={statusType} onClick={(e) => {setShowStatusModal(false); closeModal(e)}} /> 
+        )}
         <div className={`bg-gray-100 dark:bg-gray-900  rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto ${showModal ? 'fade-in' : 'fade-out'}`}>
           {/* Modal Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -138,8 +177,12 @@ const UploadModal = ({ onClose, showModal }) => {
                 <h3 className="mb-2 text-lg font-medium text-gray-900 dark:text-gray-300">
                   {isDragging ? 'Drop your file here' : 'Upload a file'}
                 </h3>
-                <p className="mb-4 text-gray-600 dark:text-gray-500">
+                <p className="text-gray-600 dark:text-gray-500">
                   Drag and drop your file here, or click to browse
+                </p>
+
+                 <p className="mb-4 italic text-gray-600/50 dark:text-gray-500">
+                  Supported formats: PDF (max 10MB)
                 </p>
                 <button
                   onClick={() => fileInputRef.current?.click()}
@@ -150,10 +193,12 @@ const UploadModal = ({ onClose, showModal }) => {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  name="uploadedfile"
+                  name="uploadedFile"
                   onChange={handleFileInputChange}
                   className="hidden"
                 />
+                <p ref={errorMessage} className="mt-2 text-sm italic text-red-500" />
+
               </div>
             
             ) : (
@@ -189,10 +234,10 @@ const UploadModal = ({ onClose, showModal }) => {
           <div className="flex items-center justify-end p-6 space-x-3 border-t border-gray-200">
             <button
               onClick={closeModal}
-              className="px-4 py-2 font-medium transition-colors bg-gray-700 rounded-md cursor-pointer text-neutral-700 dark:text-gray-300 hover:text-gray-900 dark:hover:bg-gray-600 dark:hover:text-gray-200"
+              className="px-4 py-2 font-medium transition-colors bg-gray-300 rounded-md cursor-pointer dark:bg-gray-700 text-neutral-500 dark:text-gray-300 hover:text-gray-900 hover:bg-gray-400/50 dark:hover:bg-gray-600 dark:hover:text-gray-200"
             >Cancel</button>
             <button
-              onClick={() => {handleUpload()}}
+              onClick={handleUpload}
               disabled={!uploadedFile}
               className={`px-4 py-2 rounded-md font-medium transition-colors ${
                 uploadedFile

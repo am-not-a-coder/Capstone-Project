@@ -4,11 +4,11 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {useEffect, useState} from 'react'
-import axios from 'axios';
 import AreaCont from '../components/AreaCont';
 import SubCont from '../components/SubCont';
 import CreateModal from '../components/modals/CreateModal';
 import { apiGet } from '../utils/api_utils';
+import PreviewFile from '../components/PreviewFile';
 
 const Accreditation = () => {
 
@@ -18,6 +18,8 @@ const Accreditation = () => {
 
     const [showCreateModal, setShowCreateModal] = useState(false);
 
+
+
     useEffect(()=>{
       const fetchArea = async () => {
 
@@ -25,7 +27,7 @@ const Accreditation = () => {
 
         try{
           (Array.isArray(response.data) ? setArea(response.data) : setArea([]));
-          console.log(response.data);
+          
         } catch(err){
           console.log(err.response?.data || err.message)
           
@@ -48,10 +50,15 @@ const Accreditation = () => {
       setExpandedAreaIndex(expandedAreaIndex === areaID ? null : areaID)
     }
 
+    const handleFilePreview =() => {
+
+
+    }
+
 
     return(
     <>
-        <div className="flex flex-row justify-around border border-neutral-800 rounded-[20px] min-w-[950px] min-h-[90%] shadow-md p-3 bg-neutral-200 dark:bg-gray-900 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
+        <div className="relative flex flex-row justify-around border border-neutral-800 rounded-[20px] min-w-[950px] min-h-[90%] shadow-md p-3 bg-neutral-200 dark:bg-gray-900 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
            <div className='flex flex-col w-full p-3 overflow-auto'>
                 <div className='flex flex-row gap-5 mb-5'>
                     <button onClick={() => {setShowCreateModal(true)}}  className='flex flex-row items-center justify-around px-3 font-semibold transition-all duration-300 border border-black shadow-lg cursor-pointer rounded-2xl text-neutral-800 hover:scale-105 hover:shadow-2xl hover:bg-zuccini-600 hover:text-white dark:border-none dark:text-white dark:bg-gray-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800'>
@@ -112,7 +119,7 @@ const Accreditation = () => {
           
             </div>
 
-           {/* <div className='w-full border border-black'>Picture</div> */}
+           <PreviewFile />
             
         </div>
 
