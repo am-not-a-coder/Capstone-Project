@@ -10,9 +10,10 @@ export const MakeApiCalls = async (endpoint, options = {}) => {
     // Get current access token for authentication
     const accessToken = getAccessToken()
     
-    // default headers every request
-    const defaultHeaders = {
-        'Content-Type': 'application/json',
+    const defaultHeaders = {}
+    
+    if (!(options.body instanceof FormData)) {
+        defaultHeaders['Content-Type'] = 'application/json'
     }
     
     // Add authorization header if token exists
@@ -28,6 +29,8 @@ export const MakeApiCalls = async (endpoint, options = {}) => {
             ...options.headers // Allow overriding default headers
         }
     }
+    
+
     
     try {
         // Make the actual HTTP request
@@ -162,20 +165,10 @@ export const apiDelete = (endpoint, additionalOptions = {}) => {
     })
 }
 
-/**
- Note:formdatta automatically set by bowser
- */
 export const apiPostForm = (endpoint, formData, additionalOptions = {}) => {
-    const accessToken = getAccessToken()
-    
     return MakeApiCalls(endpoint, {
         method: 'POST',
         body: formData,
-        headers: {
-            
-            ...(accessToken && { 'Authorization': `Bearer ${accessToken}` }),
-            ...additionalOptions.headers
-        },
         ...additionalOptions
     })
 }
