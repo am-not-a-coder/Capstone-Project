@@ -115,14 +115,14 @@ const Header = ({title}) => {
             user: 'Jayson Permejo',
             message: "Hello? How are you, I'm under the water, I'm so much drowning, bulululul",
             time: '5h',
-            alert: true
+            alert: false
         },
         {
             profilePic: avatar3,
             user: 'Rafael Caparic',
             message: "Nothing beats a jet2 holiday!",
             time: '4d',
-            alert: true
+            alert: false
         }
     ]
 
@@ -227,10 +227,15 @@ const Header = ({title}) => {
 
             {/* Messages */}
             {showMessages && (
-                <div ref={messageRef} className='z-1000 fixed top-25 right-8 flex flex-col min-w-[40%] p-3 border-2 border-neutral-500 dark:border-gray-800 bg-neutral-200 text-neutral-900  dark:bg-gray-900 rounded-2xl '>            
-                    <h1 className='mb-1 ml-2 text-2xl font-medium dark:text-white'>
-                        Messages
-                    </h1>
+                <div ref={messageRef} className='z-1000 fixed top-25 right-8 flex flex-col min-w-[40%] p-3 border-2 border-neutral-500 dark:border-gray-800 bg-neutral-200 text-neutral-900  dark:bg-gray-900 rounded-2xl '>  
+                    <div className='flex items-center justify-between'>      
+                        <h1 className='mb-1 ml-2 text-2xl font-medium dark:text-white'>
+                            Messages
+                        </h1>
+                        <Link className='px-2 ml-2 text-lg font-medium text-blue-500 hover:bg-neutral-300 dark:hover:bg-neutral-800'
+                        to='/Messages'>See All
+                        </Link>
+                    </div>    
                     <div className='flex flex-col p-3 min-h-[300px] bg-neutral-300 w-full rounded-xl dark:text-white dark:bg-gray-950 dark:inset-shadow-xs dark:inset-shadow-zuccini-800'>
                         {messages && messages.length > 0 ? (
                             messages.map((message, index) => (
