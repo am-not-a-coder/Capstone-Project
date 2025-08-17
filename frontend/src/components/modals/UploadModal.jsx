@@ -3,21 +3,21 @@ import {
     faArrowUpFromBracket,
     faCircleXmark,
     faFile,
-    faCircleCheck
+    faCircleCheck,
+    faSpinner  // Add this import
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import StatusModal from './StatusModal';
 import { apiPostForm } from '../../utils/api_utils';
 
-const UploadModal = ({ onClose, showModal, criteriaID }) => {
-
+const UploadModal = ({ onClose, showModal, criteriaID, onUploadSuccess}) => {
 
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
   const fileInputRef = useRef(null);
 
-  const [fileType, setFileType] = useState(''); // State to hold the file type
-  const [fileName, setFileName] = useState(''); // State to hold the file name
+  const [fileType, setFileType] = useState('');
+  const [fileName, setFileName] = useState('');
   
   const errorMessage = useRef(null);
 
@@ -25,12 +25,11 @@ const UploadModal = ({ onClose, showModal, criteriaID }) => {
   const [statusMessage, setStatusMessage] = useState('');
   const [statusType, setStatusType] = useState("success");
 
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
-  
-  // Auto-open the modal when component mounts
   useEffect(() => {
-    // You can add any initialization logic here
-    
+    // Initialization logic here
   }, []);
 
   const handleDragEnter = (e) => {
@@ -42,7 +41,6 @@ const UploadModal = ({ onClose, showModal, criteriaID }) => {
   const handleDragLeave = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    // Only set dragging to false if we're leaving the drop zone entirely
     if (!e.currentTarget.contains(e.relatedTarget)) {
       setIsDragging(false);
     }
@@ -65,7 +63,7 @@ const UploadModal = ({ onClose, showModal, criteriaID }) => {
   };
 
   const handleFileSelection = (file) => {
-    if (!file || file.type !== '.pdf') {
+    if (!file || file.type !== 'application/pdf') {
       errorMessage.current.textContent = 'Please upload a valid PDF file.';
       return;
     }
@@ -80,6 +78,9 @@ const UploadModal = ({ onClose, showModal, criteriaID }) => {
     setFileType(file.type);
     setFileName(file.name);
     
+    // Reset progress when new file is selected
+    setUploadProgress(0);
+    setIsUploading(false);
   };
 
   const handleFileInputChange = (e) => {
@@ -98,6 +99,8 @@ const UploadModal = ({ onClose, showModal, criteriaID }) => {
   };
 
   const resetUpload = () => {
+    setIsUploading(false);
+    setUploadProgress(0);
     setUploadedFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -106,40 +109,68 @@ const UploadModal = ({ onClose, showModal, criteriaID }) => {
 
   const closeModal = () => {
     resetUpload();
-    // Call the onClose callback passed from parent
     if (onClose) {
       onClose();
     }
   };
-  const handleUpload = async () =>{
+
+  const startProgress = () => {
+    setUploadProgress(0)
+    const interval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 90){
+          clearInterval(interval);
+          return 90;
+        }
+        return prev + Math.random() * 15;
+      });
+    }, 200)
+    return interval;
+  }
+
+  const handleUpload = async () => {
+    setIsUploading(true)
+    setUploadProgress(0)
+
+    const progressInterval = startProgress();
     
     const formData = new FormData()
-      formData.append('uploadedFile', uploadedFile.file);
-      formData.append('fileType', fileType);
-      formData.append('fileName', fileName);
-      formData.append('criteriaID',)
+    formData.append('uploadedFile', uploadedFile.file);
+    formData.append('fileType', fileType);
+    formData.append('fileName', fileName);
+    formData.append('criteriaID', criteriaID);
 
     try{
-      
       const response = await apiPostForm('/api/accreditation/upload', formData,{withCredentials: true});
       
+      // Clear the simulation interval
+      clearInterval(progressInterval);
+      setUploadProgress(100)
+
       if(response.success){
-        setStatusMessage('File uploaded successfully!');
-        setStatusType('success');
-        setShowStatusModal(true);
-        resetUpload(); // Reset the upload state after successful upload
+        // Delay to show the 100% completion
+        setTimeout(() => {
+          setStatusMessage('File uploaded successfully!');
+          setStatusType('success');
+          setIsUploading(false);
+          setShowStatusModal(true);
+          resetUpload();
+          
+          if(onUploadSuccess){
+            onUploadSuccess();
+          }
+        }, 500);       
       }
 
     }catch(err){
+      clearInterval(progressInterval); // Add this line
       setStatusMessage('File upload failed. Please try again.');
       setStatusType('error');
+      setIsUploading(false);
+      setUploadProgress(0);
       setShowStatusModal(true);
-      resetUpload(); // Reset the upload state after successful upload
     }
-
-
   }
-
 
   return (
     <div>
@@ -152,10 +183,12 @@ const UploadModal = ({ onClose, showModal, criteriaID }) => {
           {/* Modal Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Upload File</h2>
-            <FontAwesomeIcon onClick={closeModal} icon={faCircleXmark}
-               className="text-2xl text-gray-400 transition-colors hover:text-gray-600"
+            <FontAwesomeIcon 
+              onClick={closeModal} 
+              icon={faCircleXmark}
+              className={`text-2xl text-gray-400 transition-colors hover:text-gray-600 ${isUploading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+              style={{ pointerEvents: isUploading ? 'none' : 'auto' }}
             />
-            
           </div>
 
           {/* Modal Content */}
@@ -167,7 +200,7 @@ const UploadModal = ({ onClose, showModal, criteriaID }) => {
                   isDragging
                     ? 'border-blue-500 bg-blue-50 dark:bg-blue-900'
                     : 'border-gray-300 hover:border-gray-400 dark:bg-gray-800'
-                }`}
+                } ${isUploading ? 'pointer-events-none opacity-50' : ''}`}
                 onDragEnter={handleDragEnter}
                 onDragLeave={handleDragLeave}
                 onDragOver={handleDragOver}
@@ -187,6 +220,7 @@ const UploadModal = ({ onClose, showModal, criteriaID }) => {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="px-4 py-2 font-medium text-white transition-colors bg-blue-600 rounded-md hover:bg-blue-700"
+                  disabled={isUploading}
                 >
                   Choose File
                 </button>
@@ -196,6 +230,7 @@ const UploadModal = ({ onClose, showModal, criteriaID }) => {
                   name="uploadedFile"
                   onChange={handleFileInputChange}
                   className="hidden"
+                  disabled={isUploading}
                 />
                 <p ref={errorMessage} className="mt-2 text-sm italic text-red-500" />
 
@@ -204,9 +239,16 @@ const UploadModal = ({ onClose, showModal, criteriaID }) => {
             ) : (
               /* File Preview */
               <div className="space-y-4">
+                {/* Success Icon or Spinner */}
                 <div className="flex items-center justify-center mb-4">
-                  <FontAwesomeIcon icon={faCircleCheck} className="text-4xl text-green-500" />
+                  {isUploading ? (
+                    <FontAwesomeIcon icon={faSpinner} className="text-4xl text-blue-500 animate-spin" />
+                  ): (
+                    <FontAwesomeIcon icon={faCircleCheck} className="text-4xl text-green-500" />
+                  )}
                 </div>
+                  
+                {/* File Details */}
                 <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800">
                   <div className="flex items-start space-x-3">
                     <FontAwesomeIcon icon={faFile} className="mt-1 text-gray-400 dark:text-gray-500" />
@@ -220,12 +262,32 @@ const UploadModal = ({ onClose, showModal, criteriaID }) => {
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={resetUpload}
-                  className="w-full py-2 font-medium text-blue-600 transition-colors cursor-pointer hover:text-blue-700"
-                >
-                  Choose Different File
-                </button>
+
+                {/* Progress Bar */}
+                {isUploading && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600 dark:text-gray-400">Uploading...</span>
+                      <span className="text-gray-600 dark:text-gray-400">{Math.round(uploadProgress)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+                        style={{ width: `${uploadProgress}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Change File Button */}
+                {!isUploading && (
+                  <button
+                    onClick={resetUpload}
+                    className="w-full py-2 font-medium text-blue-600 transition-colors cursor-pointer hover:text-blue-700"
+                  >
+                    Choose Different File
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -234,18 +296,32 @@ const UploadModal = ({ onClose, showModal, criteriaID }) => {
           <div className="flex items-center justify-end p-6 space-x-3 border-t border-gray-200">
             <button
               onClick={closeModal}
-              className="px-4 py-2 font-medium transition-colors bg-gray-300 rounded-md cursor-pointer dark:bg-gray-700 text-neutral-500 dark:text-gray-300 hover:text-gray-900 hover:bg-gray-400/50 dark:hover:bg-gray-600 dark:hover:text-gray-200"
-            >Cancel</button>
+              disabled={isUploading}
+              className={`px-4 py-2 font-medium transition-colors rounded-md ${
+                isUploading 
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
+                  : 'bg-gray-300 dark:bg-gray-700 text-neutral-500 dark:text-gray-300 hover:text-gray-900 hover:bg-gray-400/50 dark:hover:bg-gray-600 dark:hover:text-gray-200 cursor-pointer'
+              }`}
+            >
+              Cancel
+            </button>
             <button
               onClick={handleUpload}
-              disabled={!uploadedFile}
-              className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                uploadedFile
+              disabled={!uploadedFile || isUploading}
+              className={`px-4 py-2 rounded-md font-medium transition-colors flex items-center ${
+                uploadedFile && !isUploading
                   ? 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
             >
-              Upload
+              {isUploading ? (
+                <>
+                  <FontAwesomeIcon icon={faSpinner} className="mr-2 animate-spin"/> 
+                  Uploading...
+                </>
+              ): (
+                'Upload'
+              )}
             </button>
           </div>
         </div>

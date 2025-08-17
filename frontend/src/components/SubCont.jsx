@@ -8,7 +8,7 @@ import { useState} from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import UploadModal from './modals/UploadModal';
 
-const SubCont = ({title, criteria, onClick}) => {
+const SubCont = ({title, criteria, onClick, onRefresh, onFilePreview}) => {
     const [expanded, setExpanded] = useState(false);
     const [criteriaExpand, setCriteriaExpand] = useState(null);
     const [showUpload, setShowUpload] = useState(false);
@@ -30,6 +30,9 @@ const SubCont = ({title, criteria, onClick}) => {
     //renders the input, process, outcome
     const renderCriteriaGroup = (groupName, items, index) => {
       const isOpen = criteriaExpand === index;
+
+      
+
 
         return(
         <>
@@ -57,10 +60,9 @@ const SubCont = ({title, criteria, onClick}) => {
                     <div className='flex flex-col items-center justify-center'>
                         <h2 className='font-semibold'>Attached File</h2>
                         {item.docName ? (
-                            <a 
-                        href={'http://localhost:5000/api/accreditation/preview/' + item.docName}
-                        target='_blank'
-                        className='font-light text-center cursor-pointer text-sm hover:underline'>{item.docName}</a>
+                            <button
+                            onClick={() =>{onFilePreview(item.docName, item.docPath)}}
+                            className='font-light text-center cursor-pointer text-sm hover:underline'>{item.docName}</button>
 
                         ) : (
                             <span className='text-sm text-gray-500'>No file attached</span>
@@ -128,6 +130,7 @@ const SubCont = ({title, criteria, onClick}) => {
                     showModal={showUpload} 
                     onClose={handleCloseModal}  
                     criteriaID={selectedCriteriaID}
+                    onUploadSuccess={onRefresh}
                 />
             )}
         </li>
