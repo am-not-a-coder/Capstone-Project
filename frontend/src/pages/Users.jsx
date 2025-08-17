@@ -14,7 +14,7 @@ import{
     faBuilding,
     faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
-import axios from 'axios';
+
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect } from 'react';
 import StatusModal from '../components/modals/StatusModal';
@@ -64,6 +64,10 @@ const Users = () => {
         setShowDetails(true); 
     }
 
+    const previewURL = (file) => {
+        return file ? URL.createObjectURL(file) : "";
+    };
+
     const handleCreateUser = async (e) => {
         e.preventDefault(); 
 
@@ -79,17 +83,14 @@ const Users = () => {
              if(profilePic?.file) formData.append("profilePic", profilePic.file); 
             formData.append("programID", programID);
             formData.append("areaID", areaID)
-
-          console.log("Form data being sent:");
-            for (let [key, value] of formData.entries()) {
-                console.log(key, value);
-            }
-
+            
         try{
 
             //Post request
 
-            const res = await apiPostForm('/api/user', formData, {withCredentials: true});
+        const res = await apiPostForm('/api/user', formData,
+            {withCredentials: true});
+          
 
             
             setStatusMessage(res.data.message);
@@ -108,7 +109,7 @@ const Users = () => {
                     name: `${fName} ${lName} ${suffix}`,
                     email,
                     contactNum,
-                    profilePic,
+                    profilePic: previewURL(profilePic?.file),
                     programID,
                     areaID,
                     programName: selectedProgramName,

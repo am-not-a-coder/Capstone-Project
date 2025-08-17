@@ -69,6 +69,7 @@ def register_routes(app):
                     # Prepare user data (without sensitive information)
                     user_data = {
                         'employeeID': user.employeeID,
+                        'name': f"{user.fName} {user.lName}{user.suffix or ''}",
                         'firstName': user.fName,
                         'lastName': user.lName,
                         'suffix': user.suffix,
@@ -215,6 +216,7 @@ def register_routes(app):
             return jsonify({'success': False, 'message': 'Email is required' }), 400
         elif not re.match(validEmail, email):
             return jsonify({'success': False, 'message': 'Please enter a valid email'}), 400
+        # Validate contact number format (11 digits)
         if not contactNum:
             return jsonify({'success': False, 'message': 'Contact number is required'}), 400
         elif not re.match(r'^\d{11}$', contactNum):
@@ -803,6 +805,8 @@ def register_routes(app):
     # Accreditation page
     @app.route('/api/accreditation', methods=["GET"])
     def get_areas():
+        program_code = request.args.get('programCode', "BSIT")
+
         data = (
             db.session.query(
                 Area.areaID,
@@ -812,6 +816,7 @@ def register_routes(app):
                 Area.progress,
                 Subarea.subareaID,
                 Subarea.subareaName,
+                Criteria.criteriaID,
                 Criteria.criteriaContent,
                 Criteria.criteriaType,
                 Document.docID,
@@ -823,7 +828,8 @@ def register_routes(app):
             .outerjoin(Subarea, Area.areaID == Subarea.areaID)
             .outerjoin(Criteria, Subarea.subareaID == Criteria.subareaID)
             .outerjoin(Document, Criteria.docID == Document.docID)       
-            .order_by(Area.areaID)
+            .order_by(Area.areaID.asc(), Subarea.subareaID.asc())
+            .filter(Program.programCode == program_code)
             .all() 
         )
 
@@ -854,9 +860,10 @@ def register_routes(app):
             
             if row.criteriaContent:
                 criteria_data = {
+                    'criteriaID': row.criteriaID ,
                     'content': row.criteriaContent,
                     'docID': row.docID,
-                    'docName': f"{row.docName}{row.docType}",
+                    'docName': row.docName,
                     'docPath': row.docPath
                 }
 
@@ -975,17 +982,98 @@ def register_routes(app):
         return jsonify({'message': 'Criteria created successfully!'}), 200
 
 
-
     @app.route('/api/accreditation/upload', methods=["POST"])
+    @jwt_required()
     def upload_file():
-        file = request.files.get("uploadedfile")
-
-
-
-
-
+       # ==== Get and Validate Form Data ====
+        # Get form data
+        file = request.files.get("uploadedFile")
+        file_type = request.form.get("fileType")
+        file_name = request.form.get("fileName")
+        criteria_id = request.form.get("criteriaID")
+        
     
-    @app.route('/api/preview/<filename>')   
+        # Check if file exists
+        if not file:
+            return jsonify({'success': False, 'message': 'No file provided'}), 400
+        
+        
+        # Check if file has a valid name and extension
+        if not file.filename or '.' not in file.filename:        
+            return jsonify({'success': False, 'message': 'Invalid file name'}), 400
+        
+        allowed_extensions = {'pdf'}
+        file_extension = file.filename.rsplit('.', 1)[1].lower()
+        
+        if file_extension not in allowed_extensions:            
+            return jsonify({'success': False, 'message': 'Invalid file format. Only PDF files are allowed.'}), 400
+        
+        # Get uploader info
+        try:
+            uploader = Employee.query.filter_by(employeeID=get_jwt_identity()).first()
+        
+            if not uploader:
+                return jsonify({'success': False, 'message': 'User not found'}), 400
+            
+        except Exception as e:
+            return jsonify({'success': False, 'message': 'Authentication error'}), 400
+        
+        # ==== Save File ====
+        # Generate secure filename
+        filename = secure_filename(file.filename)
+
+        
+        if not filename:
+            return jsonify({'success': False, 'message': 'Invalid filename'}), 400
+        
+        try:
+            # Create upload directory
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            
+            # Save file
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            print("Saving file to:", file_path)
+            file.save(file_path)
+            
+            file_url = f"/uploads/{filename}"
+            
+            # ==== Create document record ====
+
+            # Create database record
+            new_document = Document(
+                docName=file_name,
+                docType=file_type,
+                docPath=file_url,
+                employeeID=uploader.employeeID  
+            )
+            
+            db.session.add(new_document)
+            db.session.flush() # Get the docID after adding to session
+
+            # ==== Link document to criteria ====
+            criteria = Criteria.query.get(criteria_id)
+
+            if not criteria:
+                db.session.rollback()
+                return jsonify({'success': False, 'message': 'Criteria not found'}), 404
+            
+            criteria.docID = new_document.docID  # Link document to criteria
+
+            db.session.commit()
+            
+            return jsonify({
+                'success': True, 
+                'message': 'File uploaded successfully!', 
+                'filePath': file_url
+            }), 200
+            
+        except Exception as e:
+            db.session.rollback()  # Rollback on error
+            return jsonify({'success': False, 'message': f'Failed to upload file: {str(e)}'}), 400
+        
+
+
+    @app.route('/api/accreditation/preview/<filename>')   
     def preview_file(filename):   
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
