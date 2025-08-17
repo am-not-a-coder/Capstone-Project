@@ -10,8 +10,10 @@ export const MakeApiCalls = async (endpoint, options = {}) => {
     // Get current access token for authentication
     const accessToken = getAccessToken()
 
+
     // Default headers (don't set Content-Type for FormData)
     const defaultHeaders = {}
+
     if (!(options.body instanceof FormData)) {
         defaultHeaders['Content-Type'] = 'application/json'
     }
@@ -145,7 +147,9 @@ export const apiDelete = (endpoint, additionalOptions = {}) => {
     return MakeApiCalls(endpoint, { method: 'DELETE', ...additionalOptions })
 }
 
+
 // POST request with FormData (e.g. file uploads)
+
 export const apiPostForm = (endpoint, formData, additionalOptions = {}) => {
     return MakeApiCalls(endpoint, {
         method: 'POST',

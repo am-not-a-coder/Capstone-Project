@@ -113,18 +113,12 @@ def register_routes(app):
     def refresh():
         """
         Endpoint to refresh access token using refresh token
-        
-        How it works:
-        1. Frontend sends request with refresh token in Authorization header
-        2. We verify refresh token is valid and not expired
-        3. We create new access token with same user identity
-        4. Optionally create new refresh token for extended security
-        5. Return new tokens to frontend
-        
-        Why this is secure:
-        - Refresh tokens are longer-lived but can be revoked
-        - Access tokens are short-lived, limiting damage if compromised
-        - User doesn't need to re-enter credentials
+
+        Frontend sends request with refresh token in Authorization header
+        We verify refresh token is valid and not expired
+        We create new access token with same user identity
+        Optionally create new refresh token for extended security
+        Return new tokens to frontend
         """
         try:
             # Get the user identity from the refresh token
