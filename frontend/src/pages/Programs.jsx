@@ -8,65 +8,80 @@ import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api_utils';
 import { getCurrentUser } from '../utils/auth_utils';
 
 
-
-
-
-   
-
   const Programs = () => {
+    {/*use state function*/}
+  const [programs, setPrograms] = useState([]);
+  const [employees, setEmployees] = useState([]);    
+  const [showForm, setShowForm] = useState(false);
+  const [activeModify, setActiveModify] = useState(null);
+  const [editIndex, setEditIndex] = useState(null);
+    
     // Get user info using our centralized utility
     const currentUser = getCurrentUser();
 
-    useEffect(() => {
-      const fetchProgram = async () => {
-        try {
-          // Use our centralized API utility - no manual token handling!
-          const response = await apiGet('/api/program');
+useEffect(() => {
+  const fetchProgram = async () => {
+    try {
+      // Use our centralized API utility - no manual token handling!
+      const response = await apiGet('/api/program');
 
-          if (response.success) {
-            Array.isArray(response.data.programs) ? setPrograms(response.data.programs) : setPrograms([]);
-          } else {
-            console.error('Failed to fetch programs:', response.error);
-            setPrograms([]); // Set empty array on error
-          }
-          
-    const fetchArea = async () => {
-     
-      try{
-        const response = await apiGet('/api/area', {withCredentials: true});
-        
-        Array.isArray(response.data.areas) ? setAreas(response.data.areas) : setAreas([]);
+      if (response.success) {
+        Array.isArray(response.data.programs)
+          ? setPrograms(response.data.programs)
+          : setPrograms([]);
+      } else {
+        console.error('Failed to fetch programs:', response.error);
+        setPrograms([]); // Set empty array on error
       }
-
-      catch (err){
-        console.error("Error occurred when fetching area", err)
-      }
-    } 
-    fetchArea()
-
-    const fetchSubarea = async()=> {     
-      try {
-        const response = await axios.get('/api/subarea', {withCredentials: true});
-      Array.isArray(response.data.subareas ? setSubareas(response.data.subareas) : setSubareas([]))
-      }
-      catch (err){
-        console.log("Error when fetching Subareas: ", err)
-      }
+    } catch (err) {
+      console.error("Error occurred when fetching programs:", err);
+      setPrograms([]);
     }
-    fetchSubarea()
+  };
 
-    const fetchCriteria = async()=> {   
-      try {
-        const response = await axios.get('/api/criteria',{withCredentials:true})
-        Array.isArray(response.data.criterias ? setCriterias(response.data.criterias) : setCriterias([]))
-      }
-      catch(err){
-        console.log("Error when fetching criterias", err)
-      }
+  const fetchArea = async () => {
+    try {
+      const response = await apiGet('/api/area', { withCredentials: true });
+      Array.isArray(response.data.areas)
+        ? setAreas(response.data.areas)
+        : setAreas([]);
+    } catch (err) {
+      console.error("Error occurred when fetching area:", err);
+      setAreas([]);
     }
-    fetchCriteria()
+  };
 
-  }, [])
+  const fetchSubarea = async () => {
+    try {
+      const response = await apiGet('/api/subarea', { withCredentials: true });
+      Array.isArray(response.data.subareas)
+        ? setSubareas(response.data.subareas)
+        : setSubareas([]);
+    } catch (err) {
+      console.log("Error when fetching Subareas:", err);
+      setSubareas([]);
+    }
+  };
+
+  const fetchCriteria = async () => {
+    try {
+      const response = await apiGet('/api/criteria', { withCredentials: true });
+      Array.isArray(response.data.criterias)
+        ? setCriterias(response.data.criterias)
+        : setCriterias([]);
+    } catch (err) {
+      console.log("Error when fetching criterias:", err);
+      setCriterias([]);
+    }
+  };
+
+  // Call all functions
+  fetchProgram();
+  fetchArea();
+  fetchSubarea();
+  fetchCriteria();
+}, []);
+
 
     useEffect(() => {
       const fetchEmployees = async () => {
@@ -88,13 +103,7 @@ import { getCurrentUser } from '../utils/auth_utils';
       fetchEmployees();
     }, []); // No more token dependency!
 
-    {/*use state function*/}
-  const [programs, setPrograms] = useState([]);
-  const [employees, setEmployees] = useState([]);    
-  const [showForm, setShowForm] = useState(false);
-  const [activeModify, setActiveModify] = useState(null);
-  const [editIndex, setEditIndex] = useState(null);
-
+    
     function handleModify(mode) {
 
       setActiveModify((prev) => (prev === mode ? null : mode));
@@ -129,9 +138,7 @@ import { getCurrentUser } from '../utils/auth_utils';
           const programToDelete = programs[editIndex];
           
           // Call DELETE API
-          await axios.delete(`http://localhost:5000/api/program/${programToDelete.programID}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
+          await apiDelete(`/api/program/${programToDelete.programID}`);
           
           // Remove from local state only if API call succeeds
           setPrograms(programs.filter((_, idx) => idx != editIndex));
@@ -163,10 +170,8 @@ import { getCurrentUser } from '../utils/auth_utils';
       try {
         if (activeModify === "edit" && editIndex !== null) {
           // Edit mode
-          const response = await axios.put(`
-            http://localhost:5000/api/program/${programs[editIndex].programID}`, form,
-            { headers: {'Authorization': `Bearer ${token}`}}
-          )
+          const response = await apiPut(`/api/program/${programs[editIndex].programID}`, form)
+          
           //update localstate with response
           const updated = [...programs];
           updated[editIndex] = response.data.updated_program
@@ -174,9 +179,7 @@ import { getCurrentUser } from '../utils/auth_utils';
 
         } else {
           // Add mode
-          const response = await axios.post('http://localhost:5000/api/program', form,
-            { headers: {'Authorization': `Bearer ${token}`} }
-          );
+          const response = await apiPost('http://localhost:5000/api/program', form);
           //add data to localstate
           setPrograms([...programs, response.data])
         }
@@ -228,11 +231,11 @@ import { getCurrentUser } from '../utils/auth_utils';
 
   return (
       <>
-          <div className="flex flex-wrap mb-8 gap-5 mt-20 lg:mt-8" >
+          <div className="flex flex-wrap gap-5 mt-20 mb-8 lg:mt-8" >
 
             {/* Navigation route */}
-            <div className="w-full h-10 p-2 bg-gray-200 fixed lg:relative left-0 -mt-5 -mb-3 text-center">
-              <p  className=" text-md lg:text-lg text-gray-700 font-semibold text-nowrap overflow-scroll scrollbar-thin overflow-y-hidden left-0 lg:relative z-20 bg-gray-250 flex items-center">
+            <div className="fixed left-0 w-full h-10 p-2 -mt-5 -mb-3 text-center bg-gray-200 lg:relative">
+              <p  className="left-0 z-20 flex items-center overflow-scroll overflow-y-hidden font-semibold text-gray-700 text-md lg:text-lg text-nowrap scrollbar-thin lg:relative bg-gray-250">
                 <span onClick={()=> backToPrograms()} className="cursor-pointer hover:text-blue-800">Programs</span> 
                 <span>{selectedProgram ? ' / ' + selectedProgram.programName : null}</span>
                 <span>{selectedArea ? ' / ' + selectedArea.areaName : null}</span>

@@ -117,8 +117,8 @@ const SubCont = ({title, criteria, onClick, onRefresh, onFilePreview}) => {
             </button>
 
             
-            <div className={`flex flex-col ml-5 overflow-hidden transition-all duration-400 ease-in-out ${
-                expanded ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0' }`}>    
+            <div className={`flex flex-col ml-5 transition-all duration-400 ease-in-out ${
+                expanded ? 'max-h-screen opacity-100 overflow-visible' : 'overflow-hidden max-h-0 opacity-0' }`}>    
                         {renderCriteriaGroup("Input/s", criteria.inputs, 0)}
                         {renderCriteriaGroup("Processes", criteria.processes, 1)}
                         {renderCriteriaGroup("Outcomes", criteria.outcomes, 2)}
