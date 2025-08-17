@@ -181,10 +181,6 @@ const Programs = () => {
     setSelectedProgram(program);
   }
 
-  function visibleSubarea(area){
-    
-  }
-
   // Clear navigation route to programs
   function backToPrograms(){
     setVisible("programs");
