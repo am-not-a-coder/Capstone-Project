@@ -8,14 +8,21 @@ import { getCurrentUser } from '../utils/auth_utils';
 
 
   const Programs = () => {
+    {/*use state function*/}
+  const [programs, setPrograms] = useState([]);
+  const [employees, setEmployees] = useState([]);    
+  const [showForm, setShowForm] = useState(false);
+  const [activeModify, setActiveModify] = useState(null);
+  const [editIndex, setEditIndex] = useState(null);
+    
     // Get user info using our centralized utility
     const currentUser = getCurrentUser();
 
-    useEffect(() => {
-      const fetchProgram = async () => {
-        try {
-          // Use our centralized API utility - no manual token handling!
-          const response = await apiGet('/api/program');
+useEffect(() => {
+  const fetchProgram = async () => {
+    try {
+      // Use our centralized API utility - no manual token handling!
+      const response = await apiGet('/api/program');
 
           if (response.success) {
             Array.isArray(response.data.programs) ? setPrograms(response.data.programs) : setPrograms([]);
@@ -53,13 +60,7 @@ import { getCurrentUser } from '../utils/auth_utils';
       fetchEmployees();
     }, []); // No more token dependency!
 
-    {/*use state function*/}
-    const [programs, setPrograms] = useState([]);
-    const [employees, setEmployees] = useState([]);
-    
-    const [showForm, setShowForm] = useState(false);
-    const [activeModify, setActiveModify] = useState(null);
-    const [editIndex, setEditIndex] = useState(null);
+
 
 
 
@@ -94,9 +95,7 @@ import { getCurrentUser } from '../utils/auth_utils';
           const programToDelete = programs[editIndex];
           
           // Call DELETE API
-          await axios.delete(`http://localhost:5000/api/program/${programToDelete.programID}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
+          await apiDelete(`/api/program/${programToDelete.programID}`);
           
           // Remove from local state only if API call succeeds
           setPrograms(programs.filter((_, idx) => idx != editIndex));
@@ -127,10 +126,8 @@ import { getCurrentUser } from '../utils/auth_utils';
       try {
         if (activeModify === "edit" && editIndex !== null) {
           // Edit mode
-          const response = await axios.put(`
-            http://localhost:5000/api/program/${programs[editIndex].programID}`, form,
-            { headers: {'Authorization': `Bearer ${token}`}}
-          )
+          const response = await apiPut(`/api/program/${programs[editIndex].programID}`, form)
+          
           //update localstate with response
           const updated = [...programs];
           updated[editIndex] = response.data.updated_program
@@ -138,9 +135,7 @@ import { getCurrentUser } from '../utils/auth_utils';
 
         } else {
           // Add mode
-          const response = await axios.post('http://localhost:5000/api/program', form,
-            { headers: {'Authorization': `Bearer ${token}`} }
-          );
+          const response = await apiPost('http://localhost:5000/api/program', form);
           //add data to localstate
           setPrograms([...programs, response.data])
         }

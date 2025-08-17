@@ -64,6 +64,10 @@ const Users = () => {
         setShowDetails(true); 
     }
 
+    const previewURL = (file) => {
+        return file ? URL.createObjectURL(file) : "";
+    };
+
     const handleCreateUser = async (e) => {
         e.preventDefault(); 
 
@@ -196,9 +200,14 @@ const Users = () => {
 
     function removeAndClose() {
         setRemoveUser(true); 
-        setRemoveConfirmation(false); 
-        exitShowDetails(); 
+        setRemoveUser(false); 
+        setShowDetails(false); 
     }
+
+    const handleQuery = (e) => {
+        makeVisible("searchList"); 
+        setSearchQuery(e.target.value); 
+    };
 
     const handleDeleteUser = async () => { 
         const id = selectedUser?.employeeID;
@@ -231,11 +240,6 @@ const Users = () => {
         setRemoveConfirmation(false); 
         setShowDetails(false); 
     }
-
-    const handleQuery = (e) => {
-        makeVisible("searchList"); 
-        setSearchQuery(e.target.value); 
-    };
 
     const filteredUsers = submittedUsers.filter(
         user =>
