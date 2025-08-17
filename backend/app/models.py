@@ -3,7 +3,7 @@ from app import db
 class Employee(db.Model):
     __tablename__ = 'employee'
 
-    employeeID = db.Column(db.Integer, primary_key=True, nullable=False)
+    employeeID = db.Column(db.VARCHAR, primary_key=True, nullable=False)
     programID = db.Column(db.Integer, nullable=False)
     areaID = db.Column(db.Integer, nullable=False)
     fName = db.Column(db.String(50), nullable=False)
@@ -18,8 +18,8 @@ class Employee(db.Model):
 
 class Area(db.Model):
     __tablename__ = 'area'
-
-    areaID = db.Column(db.Integer, primary_key=True, nullable=False)
+    
+    areaID = db.Column(db.Integer, primary_key=True, autoincrement=True)
     programID = db.Column(db.Integer, db.ForeignKey('program.programID'), nullable=False)
     areaName = db.Column(db.String(100))
     areaNum = db.Column(db.String(10))
@@ -33,7 +33,7 @@ class Program(db.Model):
     __tablename__ = 'program'
 
     programID = db.Column(db.Integer, primary_key=True, nullable=False)
-    employeeID = db.Column(db.Integer, db.ForeignKey('employee.employeeID'))
+    employeeID = db.Column(db.VARCHAR, db.ForeignKey('employee.employeeID'))
     programCode = db.Column(db.String(20))
     programName = db.Column(db.String(100))
     programColor = db.Column(db.String(30))
@@ -45,6 +45,8 @@ class Subarea(db.Model):
     __tablename__ = 'subarea'
 
     subareaID = db.Column(db.Integer, primary_key=True, nullable=False)
+    areaID = db.Column(db.Integer, db.ForeignKey('area.areaID'))
+    subareaName = db.Column(db.String(100))    
     areaID = db.Column(db.Integer, db.ForeignKey('area.areaID'), nullable=False)
     subareaName = db.Column(db.String(100))
     criteriaID = db.Column(db.Integer)
@@ -70,7 +72,7 @@ class Document(db.Model):
     __tablename__ = 'document'
 
     docID = db.Column(db.Integer, primary_key=True, nullable=False)
-    employeeID = db.Column(db.Integer, nullable=False)
+    employeeID = db.Column(db.VARCHAR, nullable=False)
     docName = db.Column(db.String(150), nullable=False)
     docType = db.Column(db.String(50), nullable=False)
     docTag = db.Column(db.String(50), nullable=False)
@@ -84,7 +86,7 @@ class Institute(db.Model):
 
     instID = db.Column(db.Integer, primary_key=True, nullable=False)
     programID = db.Column(db.Integer, nullable=False)
-    employeeID = db.Column(db.Integer, nullable=False)
+    employeeID = db.Column(db.VARCHAR, nullable=False)
     instCode = db.Column(db.String(50), nullable=False)
     instName = db.Column(db.String(100), nullable=False)
     instPic = db.Column(db.Text)
@@ -103,7 +105,7 @@ class AuditLog(db.Model):
     __tablename__ = 'audit_log'
 
     logID = db.Column(db.Integer, primary_key=True, nullable=False)
-    employeeID = db.Column(db.Integer, nullable=False)
+    employeeID = db.Column(db.VARCHAR, nullable=False)
     action = db.Column(db.String(255))
     timestamp = db.Column(db.DateTime)
 
@@ -111,6 +113,6 @@ class Announcement(db.Model):
     __tablename__ = 'announcement'
 
     announceID = db.Column(db.Integer, primary_key=True, nullable=False)
-    employeeID = db.Column(db.Integer, nullable=False)
+    employeeID = db.Column(db.VARCHAR, nullable=False)
     announceText = db.Column(db.Text)
     duration = db.Column(db.Date)

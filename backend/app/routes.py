@@ -1,5 +1,4 @@
 from flask import jsonify, request, session, send_from_directory, current_app
-from app.models import Employee
 from app import db
 from werkzeug.security import check_password_hash, generate_password_hash, _hash_internal
 from werkzeug.utils import secure_filename
@@ -504,6 +503,7 @@ def register_routes(app):
             return jsonify({'error': 'File not found'}), 404
 
     
+
                                         #PROGRAM PAGE ROUTES
     
 
@@ -654,7 +654,7 @@ def register_routes(app):
             return jsonify({'error': 'Database error occurred'}), 500
         
 
-    #Get the program
+    #Get the programs
     @app.route('/api/program', methods=["GET"])
     def get_program():
         programs = Program.query.all()
@@ -667,9 +667,7 @@ def register_routes(app):
 
             program_data = {
                 'programID': program.programID,
-
                 'programDean': f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A",
-
                 'programCode': program.programCode,
                 'programName': program.programName,
                 'programColor': program.programColor,
@@ -678,37 +676,92 @@ def register_routes(app):
             program_list.append(program_data)
         return jsonify({"programs": program_list}), 200
 
-    #Get the area for displaying in tasks
+
+    #Get the area
     @app.route('/api/area', methods=["GET"])
     def get_area():
-        areas = (Area.query
-                 .join(Program, Area.programID == Program.programID)
-                 .outerjoin(Subarea, Area.areaID == Subarea.areaID)
-                 .add_columns(
+        areas = Area.query.all()
+        area_list = []
+        for area in areas:
+            areas = (Area.query
+                .join(Program, Area.programID == Program.programID)
+                .outerjoin(Subarea, Area.subareaID == Subarea.subareaID)
+                .add_columns(
                     Area.areaID,
-                    Program.programCode,
-                    Area.areaName,
-                    Area.areaNum,
-                    Area.progress,
+                    Area.programID if Area.programID is not None else "",
+                    Area.subareaID if Area.subareaID is not None else "",
+                    Program.programCode if Program.programCode is not None else "",
+                    Area.areaName if Area.areaName is not None else "",
+                    Area.areaNum if Area.areaNum is not None else "",
+                    Area.progress if Area.progress is not None else "",
+                    Subarea.subareaName if Subarea.subareaName is not None else ""
                 )
             ).all()
-
-        area_list = []
-
+            area_list = []
         for area in areas:
             area_data = {
                 'areaID' : area.areaID,
+                'programID': area.programID,
+                'subareaID': area.subareaID,
+                'areaName': area.areaName,
                 'programCode': area.programCode,
                 'areaName': f"{area.areaNum}: {area.areaName}",
                 'progress': area.progress,
-                
                 'areaNum': area.areaNum
             }
             area_list.append(area_data)
-        
+        return jsonify({"areas": area_list}), 200
 
-        return jsonify({"area": area_list}), 200
+    # Get the subareas
+    @app.route('/api/subarea', methods=["GET"])
+    def get_subarea():
+        subareas = (Subarea.query
+            .join(Area, Subarea.areaID == Area.areaID)
+            .add_columns(
+                Subarea.subareaID,
+                Subarea.subareaName if Subarea.subareaName is not None else "",
+                Subarea.areaID
+            )
+        ).all()
 
+        subarea_list= []
+    
+        for subarea in subareas:
+            subarea_data = {
+                'subareaID': subarea.subareaID,
+                'subareaName': subarea.subareaName,
+                'areaID': subarea.areaID
+            }
+            subarea_list.append(subarea_data)
+        return jsonify({"subareas": subarea_list}), 200
+
+    # Get the Criterias
+    @app.route('/api/criteria', methods=["GET"])
+    def get_criteria():
+        criterias = (Criteria.query
+            .join(Subarea, Criteria.subareaID == Subarea.subareaID)
+            .add_columns(
+                Criteria.criteriaID,
+                Criteria.subareaID,
+                Criteria.criteriaContent if Criteria.criteriaContent is not None else "",
+                Criteria.criteriaType if Criteria.criteriaType is not None else "",
+                Criteria.docID if Criteria.docID is not None else ""
+            )
+        ).all()
+
+        criteria_list = []
+
+        for criteria in criterias:
+            criteria_data = {
+                'criteriaID': criteria.criteriaID,
+                'criteriaContent': criteria.criteriaContent,
+                'criteriaType': criteria.criteriaType,
+                'docID': criteria.docID,
+                'subareaID': criteria.subareaID
+            }
+            criteria_list.append(criteria_data)
+        return jsonify({"criterias": criteria_list}), 200
+            
 
     #Create deadline
     @app.route('/api/deadline', methods=["POST"])

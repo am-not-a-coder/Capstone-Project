@@ -213,12 +213,14 @@ const Tasks = () => {
         <StatusModal message={statusMessage} type={statusType} showModal={showStatusModal} onClick={()=>setShowStatusModal(false)} />
     )}
 
+
     {/* Container */}
     <div className="relative w-full p-5 border bg-neutral-200 border-neutral-700 text-neutral-800 rounded-2xl dark:border-none dark:bg-gray-900 dark:inset-shadow-sm dark:inset-shadow-zuccini-900">
 
         {/* Area Progress */}
         <h1 className="mx-3 mb-3 text-xl font-semibold transition-all duration-500 dark:text-white">Area Progress</h1>
         <section className="relative grid grid-cols-3 gap-2 p-3 min-h-[220px] text-neutral-800 border-1 border-neutral-900 rounded-lg shadow-2xl overflow-hidden dark:bg-gray-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-900">
+
             {/* Areas */}
 
         {areaProgressList && areaProgressList.length > 0 ? (
@@ -239,6 +241,7 @@ const Tasks = () => {
         </section>
 
 {/* Reports */}
+
 <h1 className="mx-3 mt-5 mb-3 text-xl font-semibold dark:text-white">Reports</h1>
     <section className="grid grid-cols-2 grid-rows-[auto_1fr] relative p-3 gap-5 text-neutral-800 border-1 border-neutral-900 rounded-lg shadow-xl transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-gray-950">
     {/* Create Deadlines */}
@@ -357,8 +360,37 @@ const Tasks = () => {
                     />
             )}
             
-        </div>
+        {/* Deadlines */}
+            <div className="flex w-full h-full items-center flex-col p-3 border border-gray-400 shadow-xl rounded-md dark:bg-[#19181A] dark:border-black dark:inset-shadow-sm dark:inset-shadow-zuccini-900">                    
+                <div className='grid w-full grid-cols-3 font-medium text-center dark:text-white '>
+                    <h2>Program</h2>
+                    <h2>Task</h2>
+                    <h2>Deadline</h2>
+                </div>
+                {/* Deadline container */}
+                <div className='flex flex-col items-center mt-2 h-full w-full p-1 bg-neutral-300 rounded-md relative dark:bg-woodsmoke-950 ' >
+                    {deadLines && deadLines.length > 0 ? deadLines.map((deadline) => (
+                        <Deadline key={deadline.deadlineID} data={deadline} program={deadline.programCode} areaTitle={deadline.areaName} date={deadline.due_date} onClick={() => handleViewDeadline(deadline)}/>
+                    )) : (
+                            <p className="m-auto text-lg text-center text-gray-500 font-extralight">No deadlines ahead.</p>
+                    )
+                    }            
+                </div>
 
+
+                {showDeadline && selectedDeadline && (
+                    <DeadlineModal 
+                        programName={selectedDeadline.programName} 
+                        programCode={selectedDeadline.programCode} 
+                        area={selectedDeadline.areaName} 
+                        date={selectedDeadline.date} 
+                        color={selectedDeadline.color} 
+                        content={selectedDeadline.content || 'No description'} 
+                        id={selectedDeadline.id}
+                        onClick={handleCloseDeadline} />
+                )}
+                
+            </div>
     
     {/* Calendar */}
         <div className="relative col-start-2 row-start-2 p-5 transition-all duration-500 bg-transparent border rounded-md dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:text-white dark:bg-gray-900 dark:border-none">
@@ -381,10 +413,9 @@ const Tasks = () => {
               <EventModal title={selectedEvent.title} showModal={showEventModal} date={selectedEvent.date} content={selectedEvent.content || 'N/A'} onClick={handleCloseModal} />
             )}
 
-        </div>
+            </div>
 
     </section>
-    </div>            
     </>
     )
 };

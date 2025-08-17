@@ -18,18 +18,18 @@ import Messages from './pages/Messages';
 
 function App() {
 
-  //Checks if the token is not expired and directs the user to login if it is
-  // axios.interceptors.response.use(
-  //   response => response,
-  //   error => {
-  //     if (error.response?.status === 401){
-  //       console.log("Your token is expired!")
-  //       localStorage.removeItem('token');
-  //       window.location.href = '/login'
-  //     }
-  //     return Promise.reject(error);
-  //   }
-  // )
+  // Checks if the token is not expired and directs the user to login if it is
+  axios.interceptors.response.use(
+    response => response,
+    error => {
+      if (error.response?.status === 401){
+        console.log("Your token is expired!")
+        localStorage.removeItem('token');
+        window.location.href = '/login'
+      }
+      return Promise.reject(error);
+    }
+  )
 
 
 
@@ -37,6 +37,7 @@ function App() {
     const ProtectedRoute = ({children}) => {
       // Use   authentication check instead of direct localStorage access
       return isLoggedIn() ? children : <Navigate to="/Login" />
+
     }
   
   return (
@@ -46,7 +47,6 @@ function App() {
         <Route path="/" element={<Navigate to="/Login" />}/>
         <Route path="/Login" element={<Login />}/>
 
-        
         
         {/* These are the routes that needs authentication */}
         {/* MainLayout wraps other pages */}

@@ -245,6 +245,7 @@ const Users = () => {
     );
 
     return (
+
         <div className="min-h-screen p-6 border border-neutral-800 rounded-xl bg-neutral-200 dark:bg-gray-900">
             {showStatusModal && (
                 <StatusModal message={statusMessage} type={statusType} showModal={showStatusModal} onClick={()=>setShowStatusModal(false)} />
