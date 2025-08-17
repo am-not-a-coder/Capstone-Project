@@ -8,7 +8,7 @@ from flask_jwt_extended.exceptions import JWTExtendedException
 from datetime import datetime, timedelta
 import os
 import re
-from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria
+from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message
 
 
 def register_routes(app):
@@ -81,7 +81,7 @@ def register_routes(app):
                     
                     return jsonify({
                         'success': True, 
-                        'message': 'Login successful',
+                        'message': f'Welcome!, {user_data["lastName"]}',
                         'access_token': access_token,
                         'refresh_token': refresh_token,
                         'user': user_data
@@ -985,17 +985,288 @@ def register_routes(app):
 
 
     
-    @app.route('/api/preview/<filename>')   
+    @app.route('/api/preview/<filename>')  
     def preview_file(filename):   
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
+    
+    #                                   MESSAGING API ROUTES
+    
+    # Get all conversations for current user
+    @app.route('/api/conversations', methods=["GET"])
+    @jwt_required()
+    def get_conversations():
+        try:
+            current_user_id = get_jwt_identity()
             
-           
-
-
-
-        
+            # Use SQLAlchemy ORM to get conversations where user is participant
+            user_conversations = (db.session.query(Conversation)
+                .join(ConversationParticipant, Conversation.conversationID == ConversationParticipant.conversationID)
+                .filter(ConversationParticipant.employeeID == current_user_id)
+                .filter(ConversationParticipant.isActive == True)
+                .filter(Conversation.isActive == True)
+                .order_by(Conversation.createdAt.desc())
+                .all())
+            
+            conversations_list = []
+            for conv in user_conversations:
+                # For direct conversations, get the other participant
+                if conv.conversationType == 'direct':
+                    other_participant = (db.session.query(ConversationParticipant)
+                        .join(Employee, ConversationParticipant.employeeID == Employee.employeeID)
+                        .filter(ConversationParticipant.conversationID == conv.conversationID)
+                        .filter(ConversationParticipant.employeeID != current_user_id)
+                        .filter(ConversationParticipant.isActive == True)
+                        .first())
                     
-        
+                    if other_participant:
+                        other_user = other_participant.employee
+                        conversation_name = f"{other_user.fName} {other_user.lName}"
+                        profile_pic = other_user.profilePic
+                        other_user_id = other_user.employeeID
+                    else:
+                        conversation_name = "Unknown User"
+                        profile_pic = None
+                        other_user_id = None
+                else:
+                    # Group conversation
+                    conversation_name = conv.conversationName or "Group Chat"
+                    profile_pic = None
+                    other_user_id = None
+                
+                # Get latest message for this conversation
+                latest_message = (db.session.query(Message)
+                    .filter(Message.conversationID == conv.conversationID)
+                    .filter(Message.isDeleted == False)
+                    .order_by(Message.sentAt.desc())
+                    .first())
+                
+                if latest_message:
+                    latest_message_text = latest_message.messageContent
+                    # Calculate time ago
+                    time_diff = datetime.now() - latest_message.sentAt
+                    if time_diff.days > 0:
+                        time_ago = f"{time_diff.days}d"
+                    elif time_diff.seconds // 3600 > 0:
+                        time_ago = f"{time_diff.seconds // 3600}h"
+                    else:
+                        time_ago = f"{(time_diff.seconds // 60) or 1}m"
+                    
+                    has_alert = latest_message.senderID != current_user_id
+                else:
+                    latest_message_text = "No messages yet"
+                    time_ago = "now"
+                    has_alert = False
+                
+                conversations_list.append({
+                    'id': conv.conversationID,
+                    'conversationType': conv.conversationType,
+                    'conversationName': conversation_name,
+                    'profilePic': profile_pic,
+                    'otherUserId': other_user_id,
+                    'latestMessage': latest_message_text,
+                    'latestMessageTime': time_ago,
+                    'hasAlert': has_alert
+                })
+            
+            return jsonify({
+                'success': True,
+                'conversations': conversations_list
+            })
+            
+        except Exception as e:
+            current_app.logger.error(f"Error fetching conversations: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    # Get users available to message (excluding current user)
+    @app.route('/api/users/available', methods=["GET"])
+    @jwt_required()
+    def get_available_users():
+        try:
+            current_user_id = get_jwt_identity()
+            
+            # Use SQLAlchemy ORM to get all users except current user
+            users = (db.session.query(Employee)
+                .filter(Employee.employeeID != current_user_id)
+                .order_by(Employee.fName.asc())
+                .all())
+            
+            users_list = []
+            for user in users:
+                users_list.append({
+                    'employeeID': user.employeeID,
+                    'name': f"{user.fName} {user.lName}",
+                    'firstName': user.fName,
+                    'lastName': user.lName,
+                    'profilePic': user.profilePic,
+                    'isOnline': user.isOnline or False
+                })
+            
+            return jsonify({
+                'success': True,
+                'users': users_list
+            })
+            
+        except Exception as e:
+            current_app.logger.error(f"Error fetching available users: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    # Start new conversation with a user
+    @app.route('/api/conversations/start', methods=["POST"])
+    @jwt_required()
+    def start_conversation():
+        try:
+            current_user_id = get_jwt_identity()
+            data = request.get_json()
+            other_user_id = data.get('otherUserId')
+            
+            if not other_user_id:
+                return jsonify({'success': False, 'error': 'Other user ID required'}), 400
+            
+            # Check if direct conversation already exists
+            existing_conv = (db.session.query(Conversation)
+                .join(ConversationParticipant, Conversation.conversationID == ConversationParticipant.conversationID)
+                .filter(Conversation.conversationType == 'direct')
+                .filter(ConversationParticipant.employeeID.in_([current_user_id, other_user_id]))
+                .group_by(Conversation.conversationID)
+                .having(db.func.count(ConversationParticipant.participantID) == 2)
+                .first())
+            
+            if existing_conv:
+                # Check if both users are participants
+                participants = (db.session.query(ConversationParticipant.employeeID)
+                    .filter(ConversationParticipant.conversationID == existing_conv.conversationID)
+                    .all())
+                participant_ids = [p[0] for p in participants]
+                
+                if current_user_id in participant_ids and other_user_id in participant_ids:
+                    conversation_id = existing_conv.conversationID
+                else:
+                    existing_conv = None
+            
+            if not existing_conv:
+                # Create new conversation
+                new_conversation = Conversation(
+                    conversationType='direct',
+                    createdBy=current_user_id
+                )
+                db.session.add(new_conversation)
+                db.session.flush()  # Get the ID
+                
+                conversation_id = new_conversation.conversationID
+                
+                # Add participants
+                for user_id in [current_user_id, other_user_id]:
+                    participant = ConversationParticipant(
+                        conversationID=conversation_id,
+                        employeeID=user_id
+                    )
+                    db.session.add(participant)
+                
+                db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'conversationID': conversation_id
+            })
+            
+        except Exception as e:
+            current_app.logger.error(f"Error starting conversation: {e}")
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    # Send a new message
+    @app.route('/api/conversations/<int:conversation_id>/messages', methods=["POST"])
+    @jwt_required()
+    def send_message(conversation_id):
+        try:
+            current_user_id = get_jwt_identity()
+            data = request.get_json()
+            message_content = data.get('messageContent', '').strip()
+            
+            if not message_content:
+                return jsonify({'success': False, 'error': 'Message content required'}), 400
+            
+            # Verify user is participant
+            participant_check = (db.session.query(ConversationParticipant)
+                .filter(ConversationParticipant.conversationID == conversation_id)
+                .filter(ConversationParticipant.employeeID == current_user_id)
+                .filter(ConversationParticipant.isActive == True)
+                .first())
+            
+            if not participant_check:
+                return jsonify({'success': False, 'error': 'Access denied'}), 403
+            
+            # Create message
+            new_message = Message(
+                conversationID=conversation_id,
+                senderID=current_user_id,
+                messageContent=message_content
+            )
+            db.session.add(new_message)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': {
+                    'messageID': new_message.messageID,
+                    'sentAt': new_message.sentAt.isoformat(),
+                    'senderID': current_user_id,
+                    'messageContent': message_content
+                }
+            })
+            
+        except Exception as e:
+            current_app.logger.error(f"Error sending message: {e}")
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    # Get messages for a specific conversation
+    @app.route('/api/conversations/<int:conversation_id>/messages', methods=["GET"])
+    @jwt_required()
+    def get_conversation_messages(conversation_id):
+        try:
+            current_user_id = get_jwt_identity()
+            
+            # Verify user is participant
+            participant_check = (db.session.query(ConversationParticipant)
+                .filter(ConversationParticipant.conversationID == conversation_id)
+                .filter(ConversationParticipant.employeeID == current_user_id)
+                .filter(ConversationParticipant.isActive == True)
+                .first())
+            
+            if not participant_check:
+                return jsonify({'success': False, 'error': 'Access denied'}), 403
+            
+            # Get messages for this conversation
+            messages = (db.session.query(Message)
+                .join(Employee, Message.senderID == Employee.employeeID)
+                .filter(Message.conversationID == conversation_id)
+                .order_by(Message.sentAt.asc())
+                .all())
+            
+            # Format messages
+            messages_list = []
+            for msg in messages:
+                sender = (db.session.query(Employee)
+                    .filter(Employee.employeeID == msg.senderID)
+                    .first())
+                
+                messages_list.append({
+                    'messageID': msg.messageID,
+                    'messageContent': msg.messageContent,
+                    'senderID': msg.senderID,
+                    'senderName': f"{sender.fName} {sender.lName}" if sender else 'Unknown',
+                    'sentAt': msg.sentAt.isoformat()
+                })
+            
+            return jsonify({
+                'success': True,
+                'messages': messages_list
+            })
+            
+        except Exception as e:
+            current_app.logger.error(f"Error fetching conversation messages: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
 
     

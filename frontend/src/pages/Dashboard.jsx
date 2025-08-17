@@ -10,12 +10,30 @@ import{
 } from '@fortawesome/free-solid-svg-icons';
 import {useNavigate} from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import toast , { Toaster } from 'react-hot-toast';
+import { getCurrentUser } from '../utils/auth_utils';
 
 const Dashboard = () => {
 
+    const logged = sessionStorage.getItem('LoggedIn')
+    useEffect(() => {
+        if (logged) {
+            const currentUser = getCurrentUser()
+            if (currentUser?.employeeID) {
+                toast.success(`Welcome, ${currentUser.lastName} | ${currentUser.employeeID}!`, {
+                    duration: 2000,
+                    icon: '🎊'
+                })
+            }
+            sessionStorage.removeItem('LoggedIn')
+        }
+        
+    })
+
     return (
         <>
+        <Toaster />
             {/* Dashboard links */}
             <section className='grid grid-rows-4 gap-1 mt-20 mb-5 lg:mt-8 lg:grid-cols-4 lg:grid-rows-1'>   
                 <DashboardLinks icon={faUsers} text="Users" />            

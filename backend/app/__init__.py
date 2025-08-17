@@ -4,10 +4,12 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 from dotenv import load_dotenv
 from flask_jwt_extended import JWTManager
+from flask_socketio import SocketIO
 import os
 
 db = SQLAlchemy()
 migrate = Migrate()
+socketio = SocketIO()
 
 
 def create_app():
@@ -27,12 +29,19 @@ def create_app():
     JWTManager(app)
     CORS(app, origins=["http://localhost:5173"], supports_credentials=True)
 
+    # Initialize SocketIO with CORS settings
+    socketio.init_app(app, cors_allowed_origins="http://localhost:5173", 
+                      async_mode='threading', logger=True, engineio_logger=True)
+
     from app.routes import register_routes
     register_routes(app)
+
+    # Import socket handlers to register events
+    from . import socket_handlers
 
     upload_folder = os.path.join(os.getcwd(), 'uploads')
     app.config['UPLOAD_FOLDER'] = upload_folder
 
     
-    return app
+    return app, socketio
     

@@ -1,10 +1,11 @@
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Carousel from '../components/Carousel';
 import { apiPost } from '../utils/api_utils';
 import { storeToken } from '../utils/auth_utils';
 import udmsLogo from '../assets/udms-logo.png';
 import UDMLogo from '../assets/UDM-logo.png';
+import toast , { Toaster } from 'react-hot-toast';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
     faKey,
@@ -20,20 +21,30 @@ const Login = () => {
     const [error, setError] = useState(null);
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState();
+    const [loading, setLoading] = useState(false);
 
     const navigate = useNavigate()
 
+
+
     const handleLogin = async (e) => {
         e.preventDefault();
+        setLoading(true)
 
+        const toastId = toast.loading('Logging in...')
+        
         // Client-side validation
         if (!employeeID.trim() || !password.trim()) {
             setError('Please enter a valid employee ID and password')
+            setLoading(false)
+            toast.dismiss(toastId)
             return;
         }
+        
+        
 
         try {
-            // Use our centralized API utility instead of direct axios
+            
             // This automatically handles headers, error formatting, etc.
             const response = await apiPost('/api/login', {
                 employeeID: employeeID.trim(),
@@ -53,23 +64,34 @@ const Login = () => {
                 });
                 
                 // Navigate to dashboard after successful login
+                sessionStorage.setItem('LoggedIn', 'true')
+                toast.dismiss(toastId)
                 navigate('/Dashboard');
                 
             } else {
                 // Display backend error message to user
                 setError(response.error || response.data?.message || 'Login failed');
+                toast.error('Login Failed')
+                setLoading(false)
+                toast.dismiss(toastId)
             }
+            
             
         } catch (err) {
             // Handle unexpected errors (network issues, etc.)
             console.error('Login error:', err);
             setError('Server error. Please try again.');
+            setLoading(false)
+            toast.dismiss(toastId)
         }
     }
 
     return(
+        
     <>
     {/* container w/ gradient-background */}
+            {/* toaster */}
+            <Toaster />
     
             <div className={`flex flex-row h-screen w-full lg:w-screen overflow-hidden bg-linear-to-br from-[#4c7a57] to-[#0e3844] relative`}>
 

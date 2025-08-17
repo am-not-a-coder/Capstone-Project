@@ -1,4 +1,5 @@
 from app import db
+from datetime import datetime
 
 class Employee(db.Model):
     __tablename__ = 'employee'
@@ -106,3 +107,49 @@ class Announcement(db.Model):
     employeeID = db.Column(db.Integer, nullable=False)
     announceText = db.Column(db.Text)
     duration = db.Column(db.Date)
+
+# Messaging System Models
+class Conversation(db.Model):
+    __tablename__ = 'conversation'
+    
+    conversationID = db.Column(db.Integer, primary_key=True, nullable=False)
+    conversationName = db.Column(db.String(100))  # For group chats
+    conversationType = db.Column(db.String(20), nullable=False)  # 'direct' or 'group'
+    createdBy = db.Column(db.String(50), db.ForeignKey('employee.employeeID'), nullable=False)
+    createdAt = db.Column(db.DateTime, default=datetime.utcnow)
+    isActive = db.Column(db.Boolean, default=True)
+    
+    # Relationships
+    creator = db.relationship("Employee", backref="created_conversations")
+    messages = db.relationship("Message", back_populates="conversation", cascade="all, delete-orphan")
+    participants = db.relationship("ConversationParticipant", back_populates="conversation", cascade="all, delete-orphan")
+
+class ConversationParticipant(db.Model):
+    __tablename__ = 'conversation_participant'
+    
+    participantID = db.Column(db.Integer, primary_key=True, nullable=False)
+    conversationID = db.Column(db.Integer, db.ForeignKey('conversation.conversationID'), nullable=False)
+    employeeID = db.Column(db.String(50), db.ForeignKey('employee.employeeID'), nullable=False)
+    joinedAt = db.Column(db.DateTime, default=datetime.utcnow)
+    lastReadAt = db.Column(db.DateTime)
+    isActive = db.Column(db.Boolean, default=True)
+    
+    # Relationships
+    conversation = db.relationship("Conversation", back_populates="participants")
+    employee = db.relationship("Employee", backref="conversation_participations")
+
+class Message(db.Model):
+    __tablename__ = 'message'
+    
+    messageID = db.Column(db.Integer, primary_key=True, nullable=False)
+    conversationID = db.Column(db.Integer, db.ForeignKey('conversation.conversationID'), nullable=False)
+    senderID = db.Column(db.String(50), db.ForeignKey('employee.employeeID'), nullable=False)
+    messageContent = db.Column(db.Text, nullable=False)
+    messageType = db.Column(db.String(20), default='text')  # 'text', 'file', 'image'
+    sentAt = db.Column(db.DateTime, default=datetime.utcnow)
+    editedAt = db.Column(db.DateTime)
+    isDeleted = db.Column(db.Boolean, default=False)
+    
+    # Relationships
+    conversation = db.relationship("Conversation", back_populates="messages")
+    sender = db.relationship("Employee", backref="sent_messages")

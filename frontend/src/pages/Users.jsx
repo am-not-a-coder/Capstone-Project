@@ -407,58 +407,6 @@ const Users = () => {
                                 </label>
                             </div>
 
-
-                    {/* upload profile */}
-                    <div className='flex flex-col items-start w-full lg:w-1/3 gap-4'>
-                        {profilePic ? 
-                            <div className="w-[70%] h-[70%] place-self-center object-cover rounded-full relative">
-                                <img src={profilePic.preview} alt="Profile" className='w-full h-full rounded-full' />
-                                <button onClick={()=> setProfilePic(null)} className='absolute top-0 right-0 text-sm bg-gray-300 rounded-full cursor-pointer w-1/10 h-1/10'>X</button>
-                            </div>  
-                            : <FontAwesomeIcon icon={faCircleUser} className="place-self-center text-[14rem] text-gray-800 m-2" /> 
-                        }
-                        <label htmlFor="fileInput" className="px-4 py-1 text-sm text-gray-800 bg-gray-300 border border-gray-400 rounded cursor-pointer place-self-center ">Choose File</label>
-                        <input type="file" id='fileInput' name='profilePic' hidden onChange={(e)=> {
-                            const file = e.target.files[0];
-                            if (file) {
-                                setProfilePic({
-                                    preview: URL.createObjectURL(file), //creates a url for the preview
-                                    file: file // sends the file backend
-                                })
-                            }
-                        }}/>
-                        
-                    </div>
-                </form>
-
-            {/* section for the list of users */}
-                {/* adding users in the list */}
-                <div className={`${visible == "list" ? "block" : "hidden"} gap-6 mt-5 flex flex-row flex-wrap`}>
-                    {submittedUsers.length === 0 ? (
-                        <p className="flex py-20 justify-center items-center text-gray-500 rounded-2xl h-1/4 w-full bg-gray-300 text-3xl dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">No users yet.</p> 
-                    ) : 
-                    
-                    (submittedUsers.map((user, index) => (
-                        
-                        <div key={index}  onClick={()=> detailsAndSelectedUser(user)} className=" cursor-pointer flex flex-row max-w-[31%] bg-neutral-300 p-1 rounded-lg min-w-[200px] dark:shadow-md dark:shadow-zuccini-800 dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
-                            
-                            {user.profilePic ? 
-                                <img 
-                                src={
-                                    typeof user.profilePic === 'string' 
-                                        ? `http://localhost:5000${user.profilePic}`  // API data (string path)
-                                        : user.profilePic.file 
-                                            ? URL.createObjectURL(user.profilePic.file)  // New upload (File object)
-                                            : `http://localhost:5000${user.profilePic}`   // Fallback
-                                } alt="Profile" className='place-self-center m-2 w-[21%] h-[80%] object-cover rounded-full mr-2'/> 
-                                : <FontAwesomeIcon icon={faCircleUser} className="ml-2 mr-3 text-5xl text-gray-800 place-self-center dark:text-white" />
-                            }
-                            
-                            <div className='flex flex-col items-center justify-center w-full'>
-                                
-                                <p  className="p-2 text-lg font-semibold text-neutral-800 dark:text-white" style={{fontSize: user.name.length >= 13 ? '1rem' : '1.3rem'}}>{user.name}</p>
-                                <p className="text-sm text-center dark:text-white" style={{fontSize: user.programName.length >= 13 ? '0.8rem' : '1rem'}}>{user.programName}</p>
-
                             <div className='relative'>
                                 <input 
                                     type={!hidePassword ? "password" : "text"} 
@@ -491,7 +439,7 @@ const Users = () => {
                                     className='w-full px-4 py-3 text-gray-800 placeholder-transparent transition-all duration-300 border-2 border-gray-200 outline-none focus:placeholder-gray-400 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl peer focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white'
                                     placeholder="ex. example123@gmail.com"
                                 />
-                                <label className="absolute text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-gray-50 dark:bg-gray-700 px-2 peer-focus:px-2 peer-focus:text-blue-600 dark:peer-focus:text-blue-400 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3">
+                                <label className="absolute text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3 text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-gray-50 dark:bg-gray-700 px-2 peer-focus:px-2 peer-focus:text-blue-600 dark:peer-focus:text-blue-400 peer-placeholder-shown:scale-100">
                                     Email Address
                                 </label>
                             </div>
@@ -553,7 +501,6 @@ const Users = () => {
                                     <FontAwesomeIcon icon={faPlus} className="mr-2" />
                                     Create User
                                 </button>
-
                             </div>
                         </div>
                     </form>
@@ -705,7 +652,8 @@ const Users = () => {
                     </div>
                 )}
             </div>
-           </div> 
-    )}
+        </div>
+    );
+};
 
 export default Users;
