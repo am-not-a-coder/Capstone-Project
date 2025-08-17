@@ -1,5 +1,6 @@
 import { useState, useEffect} from 'react';
 import { useLocation, Outlet, useNavigate } from 'react-router-dom';
+import { clearTokens } from './utils/auth_utils';
 
 //Importing Components
 import './App.css'
@@ -51,14 +52,15 @@ const MainLayout = () => {
 
   useEffect(() => {
     if (logout){
-      localStorage.removeItem('token') // removes the token from the local storage
+      // removes access_token, refresh_token, and user info
+      clearTokens()
       navigate('/login')
-    } 
+    }
   }, [logout])
 
   return(
     <>
-    <div className="grid grid-cols-[auto_1fr] grid-rows-[100px_1fr] h-screen w-screen bg-neutral-200 relative dark:bg-woodsmoke-950">
+    <div className="grid grid-cols-[auto_1fr] grid-rows-[100px_1fr] h-screen w-screen bg-neutral-200 relative dark:bg-gray-950">
           <Sidebar>      
                 <SidebarLinks
                   icon={faLayerGroup}
@@ -125,7 +127,7 @@ const MainLayout = () => {
       
       {showLogout && (
         <div className="fixed inset-0 z-50 flex items-center justify-center transition-all duration-500 bg-neutral-900/50">
-          <div className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-xl border-2 border-neutral-700 transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:border-none dark:bg-[#19181A] min-h-[55%] min-w-[50%]">
+          <div className="flex flex-col items-center justify-center p-6 bg-gray-200 rounded-2xl shadow-xl border-2 border-neutral-700 transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:border-none dark:bg-gray-800 min-h-[55%] min-w-[50%]">
             <h1 className='mb-5 text-4xl font-semibold text-zuccini-500'>Logout</h1>
             <img src={logOut} alt="Log out illustration" 
               className='h-40 mb-2'

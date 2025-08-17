@@ -29,7 +29,8 @@ export const SidebarContext = createContext();
             
             <aside className={`absolute lg:relative row-span-5 h-screen lg:h-[96%] mt-0 lg:mt-3 ml-0 lg:ml-3 transition-all duration-500 ${ expanded ? 'w-70' : 'hidden lg:block w-12'} z-40`}>
                 
-                <nav className={` h-full ${expanded ? '' : 'hidden lg:block'} relative flex flex-col bg-woodsmoke-200 border-1 border-black rounded-lg shadow-neutral-500 shadow-lg transition-all duration-500 dark:bg-[#19181A] dark:shadow-none dark:border-none`}>
+
+                <nav className={` h-full ${expanded ? '' : 'hidden lg:block'} relative flex flex-col bg-woodsmoke-200 border-1 border-black rounded-lg shadow-neutral-500 shadow-lg transition-all duration-500 dark:bg-gray-900 dark:shadow-none dark:border-none`}>
 
                 {/* Title and Logo */}
                 <div className="flex items-center justify-between pt-3 pb-2 pl-2 pr-10 transition-all duration-500">
@@ -45,7 +46,7 @@ export const SidebarContext = createContext();
                     <input
                         type="text" 
                         placeholder="Search..." 
-                        className={`min-w-65 p-2 pl-10 text-black placeholder-neutral-200 rounded-xl bg-woodsmoke-300 border border-gray-900 transition-colors duration-500 focus:outline-none focus:ring-2 focus:ring-zuccini-900 ${expanded ? '' : 'cursor-pointer'} dark:border-neutral-800 dark:bg-[#242424]`}
+                        className={`min-w-65 p-2 pl-10 text-black placeholder-neutral-200 rounded-xl bg-gray-300 border dark:bg-gray-950 dark:border-gray-800 border-gray-900 transition-colors duration-500 focus:outline-none focus:ring-2 focus:ring-zuccini-900 ${expanded ? '' : 'cursor-pointer'} dark:border-neutral-800 dark:bg-[#242424]`}
                     />
                 </div>
 
@@ -60,7 +61,7 @@ export const SidebarContext = createContext();
                 
             </aside>
 
-            <button onClick={() => setExpanded(current => !current)} className={`${expanded ? 'left-65 lg:left-67' : 'left-2 lg:left-4'} z-50 top-4 absolute p-2 px-4 transition-none lg:transition-all duration-500 rounded-lg bg-zuccini-900`}>
+            <button onClick={() => setExpanded(current => !current)} className={`${expanded ? 'left-65 lg:left-67 lg:top-8' : 'left-2 lg:left-4'} z-50 top-4 absolute p-2 px-4 transition-none lg:transition-all duration-500 rounded-lg bg-zuccini-900`}>
                 { expanded ? <FontAwesomeIcon icon={faAngleLeft} /> : <FontAwesomeIcon icon={faAngleRight} /> }
             </button>
         </>
@@ -96,14 +97,14 @@ export const SidebarLinks = ({children, icon, text, active, alert, onClick, isBu
             <li className="relative flex items-center text-neutral-800 text-shadow-lg transition-all duration-500 min-h-[42px] group cursor-pointer">
             <div  
                 onClick={onClick}
-                 className={`flex items-center mb-0.5 py-2 px-0.5 text-xl rounded-l-xl font-semibold hover:bg-neutral-400 dark:hover:bg-neutral-800 ease-in-out transition-all duration-500 ${expanded ? 'w-65' : 'w-12'}`}>
+                 className={`flex items-center mb-0.5 py-2 px-0.5 text-xl rounded-l-xl font-semibold hover:bg-gray-400 dark:hover:bg-gray-900 ease-in-out transition-all duration-500 ${expanded ? 'w-65' : 'w-12'}`}>
                  {content}
             </div>
             </li>
          
         ): (
             <li className="relative flex items-center text-shadow-lg transition-all duration-500 min-h-[42px] group cursor-pointer">
-             <Link to={`/${text}`} onClick={onClick} className={`flex items-center mb-0.5 py-2 px-0.5 text-xl rounded-l-xl text-neutral-800 font-semibold hover:bg-neutral-400 dark:hover:bg-neutral-800 ease-in-out transition-all duration-500 ${expanded ? 'w-65' : 'w-12'} ${active ? 'bg-zuccini-800 text-white hover:bg-zuccini-900 dark:hover:bg-zuccini-900' : ''}`}>
+             <Link to={`/${text}`} onClick={onClick} className={`flex items-center mb-0.5 py-2 px-0.5 text-xl rounded-l-xl text-neutral-800 font-semibold hover:bg-gray-400 dark:hover:bg-gray-950 ease-in-out transition-all duration-500 ${expanded ? 'w-65' : 'w-12'} ${active ? 'bg-zuccini-800 text-white hover:bg-zuccini-900 dark:hover:bg-zuccini-900' : ''}`}>
                  {content}
              </Link>
             </li>

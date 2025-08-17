@@ -1,5 +1,6 @@
 import {BrowserRouter as Router, Routes, Route, Navigate} from 'react-router-dom';
 import axios from 'axios';
+import { isLoggedIn } from './utils/auth_utils';
 // Importing Pages
 import Login from './pages/Login';
 import MainLayout from './MainLayout';
@@ -11,6 +12,8 @@ import Programs from './pages/Programs';
 import Users from './pages/Users';
 import Tasks from './pages/Tasks';
 import Profile from './pages/Profile';
+import Notification from './pages/Notification';
+import Messages from './pages/Messages';
 
 
 function App() {
@@ -32,8 +35,9 @@ function App() {
 
   // If the user is not logged in it will redirect to login page
     const ProtectedRoute = ({children}) => {
-      const isAuthenticated = localStorage.getItem('token') // checks if the jwt auth token from the backend is present
-      return isAuthenticated ? children : <Navigate to="/Login" />
+      // Use   authentication check instead of direct localStorage access
+      return isLoggedIn() ? children : <Navigate to="/Login" />
+
     }
   
   return (
@@ -43,7 +47,6 @@ function App() {
         <Route path="/" element={<Navigate to="/Login" />}/>
         <Route path="/Login" element={<Login />}/>
 
-        
         
         {/* These are the routes that needs authentication */}
         {/* MainLayout wraps other pages */}
@@ -62,6 +65,8 @@ function App() {
 
         {/* Profile page */}
          <Route path='/Profile' element={<Profile />}/>
+         <Route path='/Notification' element={<Notification />}/>
+         <Route path='/Messages' element={<Messages />} />
         </Route>
 
 

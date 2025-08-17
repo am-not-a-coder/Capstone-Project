@@ -17,7 +17,7 @@ const Dashboard = () => {
     return (
         <>
             {/* Dashboard links */}
-            <section className='grid grid-rows-4 mb-5 lg:grid-cols-4 lg:grid-rows-1 gap-1 mt-20'>   
+            <section className='grid grid-rows-4 gap-1 mt-20 mb-5 lg:mt-8 lg:grid-cols-4 lg:grid-rows-1'>   
                 <DashboardLinks icon={faUsers} text="Users" />            
                 <DashboardLinks icon={faGraduationCap} text="Programs" />            
                 <DashboardLinks icon={faSchool} text="Institutes" />            
@@ -25,7 +25,9 @@ const Dashboard = () => {
             </section>
 
             {/* Announcements */}
-            <section className={` relative mt-4 mb-8 p-5 text-neutral-800 border-1 border-gray-400 rounded-3xl shadow-xl transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-[#19181A]`}>
+
+            <section className={` relative mt-4 mb-8 p-5 text-neutral-800 border-1 border-gray-400 rounded-3xl shadow-xl transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-gray-900`}>
+
                 <div className='flex flex-row'>
                     <FontAwesomeIcon icon={faBullhorn} className="p-2 dark:text-white" />
                     <h2 className="mb-4 text-xl font-semibold text-neutral-800 dark:text-white">Announcements</h2>
@@ -36,32 +38,34 @@ const Dashboard = () => {
                     <h1 className="text-lg dark:text-white">New</h1>
                 </div>
                 
-                <div className="p-4 transition-all duration-500 rounded-lg bg-neutral-300 dark:bg-woodsmoke-950">
+                <div className="p-4 transition-all duration-500 rounded-lg bg-neutral-300 dark:bg-gray-950">
                     <p className="p-5 font-light text-center text-gray-700 transition-all duration-500 dark:text-white">No new announcements</p>
                 </div>
             </section>
 
-            <section className='grid grid-rows-2 lg:grid-cols-2 lg:grid-rows-1 gap-4 mt-4'>
+            <section className='grid grid-rows-2 gap-4 mt-4 lg:grid-cols-2 lg:grid-rows-1'>
 
             {/* Pending Documents */}
-            <div className="mb-8 p-5 text-neutral-800 border-1 border-neutral-400 rounded-3xl shadow-xl transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-[#19181A]" >
+            <div className="mb-8 p-5 text-neutral-800 border-1 border-neutral-400 rounded-3xl shadow-xl transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-gray-900" >
                 <div className='flex flex-row'>
                     <FontAwesomeIcon icon={faHourglassHalf}  className="p-2 transition-all duration-500 dark:text-white" />
                     <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Pending Documents</h2>
                 </div>
-                <div className="flex items-center justify-center p-5 transition-all duration-500 rounded-lg h-60 bg-neutral-300 dark:bg-woodsmoke-950">
+                <div className="flex items-center justify-center p-5 transition-all duration-500 rounded-lg h-60 bg-neutral-300 dark:bg-gray-950">
                     <p className="p-5 m-auto text-center text-gray-700 transition-all duration-500 dark:text-white">No pending documents.</p>
                 </div>
             </div>
             {/* Audit Logs */}
             
-            <div className="mb-10 p-5 text-neutral-800 border-1 border-neutral-400 rounded-3xl shadow-xl transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-[#19181A]">
+
+            <div className="mb-10 p-5 text-neutral-800 border-1 border-neutral-400 rounded-3xl shadow-xl transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-gray-900">
+
                 <div className='flex flex-row'>
                     <FontAwesomeIcon icon={faGears}  className="p-2 transition-all duration-500 dark:text-white" />
                     <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Audit Logs</h2>
                 </div>
 
-                <div className="flex items-center justify-center p-4 rounded-lg h-60 bg-neutral-300 dark:bg-woodsmoke-950">
+                <div className="flex items-center justify-center p-4 rounded-lg h-60 bg-neutral-300 dark:border-gray-900 dark:bg-gray-950">
                     <p className="p-5 text-center text-gray-700 transition-all duration-500 dark:text-white">No logs at the moment.</p>
                 </div> 
             </div>
@@ -76,9 +80,8 @@ const Dashboard = () => {
 export const DashboardLinks = ({icon, text}) =>{
     const navigate = useNavigate();
 
-    return (
-    
-        <div className='flex flex-row items-center text-neutral-800 border-1 border-neutral-400 rounded-3xl h-20 p-4 m-1 relative shadow-xl cursor-pointer transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-[#19181A]'>
+    return ( 
+        <div className='flex flex-row items-center text-neutral-800 border-1 border-neutral-400 rounded-3xl h-20 p-4 m-1 relative shadow-xl cursor-pointer transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-gray-900'>
             <div className='flex items-center justify-center p-2 w-12 h-12 bg-[#5ADF9C] rounded-full mr-3'>
                 <FontAwesomeIcon icon={icon}  className="text-2xl text-center text-neutral-800" />
             </div>

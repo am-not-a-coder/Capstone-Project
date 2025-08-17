@@ -4,46 +4,37 @@ import ProgramCard from "../components/ProgramCard";
 import CreateCard from "../components/CreateCard";
 import CreateForm from "../components/CreateForm";
 import { useState, useEffect } from "react";
-import axios from 'axios';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { apiGet, apiPost, apiPut, apiDelete } from '../utils/api_utils';
+import { getCurrentUser } from '../utils/auth_utils';
 
-const Programs = () => {
-  const token = localStorage.getItem('token');
-    
-  useEffect(() => {
-    const fetchProgram = async () =>{
-      if(!token){
-        alert("Token not found!");
-        return;
-      }
 
-      try{
-        const response = await axios.get('http://localhost:5000/api/program', 
-          { headers: {'Authorization' : `Bearer ${token}`},
-            withCredentials: true
+
+
+
+   
+
+  const Programs = () => {
+    // Get user info using our centralized utility
+    const currentUser = getCurrentUser();
+
+    useEffect(() => {
+      const fetchProgram = async () => {
+        try {
+          // Use our centralized API utility - no manual token handling!
+          const response = await apiGet('/api/program');
+
+          if (response.success) {
+            Array.isArray(response.data.programs) ? setPrograms(response.data.programs) : setPrograms([]);
+          } else {
+            console.error('Failed to fetch programs:', response.error);
+            setPrograms([]); // Set empty array on error
           }
-        );
-        Array.isArray(response.data.programs) ? setPrograms(response.data.programs) : setPrograms([]);
-      }
-
-      catch (err){
-        console.error("Error occurred when fetching program", err)
-      }
-    } 
-    fetchProgram()
-
+          
     const fetchArea = async () => {
-      if(!token){
-        alert("Token not found!");
-        return;
-      }
-
+     
       try{
-        const response = await axios.get('http://localhost:5000/api/area', 
-          { headers: {'Authorization' : `Bearer ${token}`},
-            withCredentials: true
-          }
-        );
+        const response = await apiGet('/api/area', {withCredentials: true});
+        
         Array.isArray(response.data.areas) ? setAreas(response.data.areas) : setAreas([]);
       }
 
@@ -53,18 +44,9 @@ const Programs = () => {
     } 
     fetchArea()
 
-    const fetchSubarea = async()=> {
-      if(!token){
-        alert("Token not found");
-        return;
-      }
-
+    const fetchSubarea = async()=> {     
       try {
-        const response = await axios.get('http://localhost:5000/api/subarea',
-        { headers: {'Authorization': `Bearer ${token}`},
-          withCredentials: true
-        }
-      );
+        const response = await axios.get('/api/subarea', {withCredentials: true});
       Array.isArray(response.data.subareas ? setSubareas(response.data.subareas) : setSubareas([]))
       }
       catch (err){
@@ -73,18 +55,9 @@ const Programs = () => {
     }
     fetchSubarea()
 
-    const fetchCriteria = async()=> {
-      if(!token){
-        alert("Token not found")
-        return
-      }
-
+    const fetchCriteria = async()=> {   
       try {
-        const response = await axios.get('http://localhost:5000/api/criteria',
-          { headers: {'Authorization': `Bearer${token}`},
-            withCredentials:true
-          }
-        )
+        const response = await axios.get('/api/criteria',{withCredentials:true})
         Array.isArray(response.data.criterias ? setCriterias(response.data.criterias) : setCriterias([]))
       }
       catch(err){
@@ -95,21 +68,39 @@ const Programs = () => {
 
   }, [])
 
-  {/*use state function*/}
+    useEffect(() => {
+      const fetchEmployees = async () => {
+        try {
+         
+          const response = await apiGet('/api/users');
+          
+          if (response.success) {
+            Array.isArray(response.data.users) ? setEmployees(response.data.users) : setEmployees([]);
+          } else {
+            console.error("Error fetching employees:", response.error);
+            setEmployees([]);
+          }
+        } catch (err) {
+          console.error("Unexpected error fetching employees", err);
+          setEmployees([]);
+        }
+      };
+      fetchEmployees();
+    }, []); // No more token dependency!
+
+    {/*use state function*/}
   const [programs, setPrograms] = useState([]);
-  const [areas, setAreas] = useState([]);
-  const [subareas, setSubareas] = useState([]);
-  const [criterias, setCriterias] = useState([]);
-    
+  const [employees, setEmployees] = useState([]);    
   const [showForm, setShowForm] = useState(false);
   const [activeModify, setActiveModify] = useState(null);
   const [editIndex, setEditIndex] = useState(null);
 
-  function handleModify(mode) {
+    function handleModify(mode) {
+
       setActiveModify((prev) => (prev === mode ? null : mode));
       if (mode !== "edit") {
         setEditIndex(null);
-        setForm({ code: "", name: "", color: "", programDean: "" });
+        setForm({ programCode: "", programName: "", programColor: "", employeeID: null });
       }
   }
 
@@ -117,54 +108,96 @@ const Programs = () => {
       const idx = e.target.value;
       setEditIndex(idx);
       const prog = programs[idx];
-      setForm({ ...prog });
-  }
+
+      setForm({
+        programCode: prog.programCode,
+        programName: prog.programName,
+        programColor: prog.programColor,
+        employeeID: prog.employeeID || null  // Use employeeID from program object
+      });
+    }
+
 
   function handleDeleteSelect(e) {
       setEditIndex(e.target.value);
   }
 
-  function handleDelete(e) {
+    const handleDelete = async (e) => {
       e.preventDefault();
       if (editIndex !== null) {
-        setPrograms(programs.filter((_, idx) => idx != editIndex));
-        setShowForm(false);
-        setEditIndex(null);
-        setActiveModify(null);
+        try {
+          const programToDelete = programs[editIndex];
+          
+          // Call DELETE API
+          await axios.delete(`http://localhost:5000/api/program/${programToDelete.programID}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          
+          // Remove from local state only if API call succeeds
+          setPrograms(programs.filter((_, idx) => idx != editIndex));
+          setShowForm(false);
+          setEditIndex(null);
+          setActiveModify(null);
+          
+        } catch (error) {
+          console.error('Error deleting program:', error);
+          
+          // Show detailed error message if available
+          if (error.response && error.response.data) {
+            const errorData = error.response.data;
+            if (errorData.reason && errorData.suggestion) {
+              alert(`${errorData.error}\n\n${errorData.reason}\n\n${errorData.suggestion}`);
+            } else {
+              alert(errorData.error || 'Failed to delete program. Please try again.');
+            }
+          } else {
+            alert('Failed to delete program. Please try again.');
+          }
+        }
       }
   }
 
-  const handleSubmit = (e) => {
-      e.preventDefault();
-      if (activeModify === "edit" && editIndex !== null) {
-        // Edit mode
-        const updated = [...programs];
-        updated[editIndex] = { ...form };
-        setPrograms(updated);
-      } else {
-        // Add mode
-        setPrograms([
-          ...programs,
-          {
-            code: form.code,
-            name: form.name,
-            color: form.color,
-            programDean: form.programDean,
-          },
-        ]);
-      }
-      setShowForm(false);
-      setForm({ code: "", name: "", color: "", programDean: "" });
-      setEditIndex(null);
-      setActiveModify(null);
-  };
 
-  const [form, setForm] = useState({
-      code: "",
-      name: "",
-      color: "",
-      programDean: "",
-  });
+    const handleSubmit = async (e) => {
+      e.preventDefault();
+      try {
+        if (activeModify === "edit" && editIndex !== null) {
+          // Edit mode
+          const response = await axios.put(`
+            http://localhost:5000/api/program/${programs[editIndex].programID}`, form,
+            { headers: {'Authorization': `Bearer ${token}`}}
+          )
+          //update localstate with response
+          const updated = [...programs];
+          updated[editIndex] = response.data.updated_program
+          setPrograms(updated)
+
+        } else {
+          // Add mode
+          const response = await axios.post('http://localhost:5000/api/program', form,
+            { headers: {'Authorization': `Bearer ${token}`} }
+          );
+          //add data to localstate
+          setPrograms([...programs, response.data])
+        }
+        //Success: Reset form
+        setShowForm(false);
+        setForm({ programCode: "", programName: "", programColor: "", employeeID: null });
+        setEditIndex(null);
+        setActiveModify(null);
+      } catch(error){
+        console.error('Error saving program', error);
+        alert('Failed to save program. Please try again.')
+      }
+    };
+
+    const [form, setForm] = useState({
+      programCode: "",
+      programName: "",
+      programColor: "",
+      employeeID: null,
+    });
+
 
   const handleChange = (e) => {
       setForm({...form, [e.target.name]: e.target.value});
@@ -228,9 +261,7 @@ const Programs = () => {
                           setSelectedSubarea(null)
                           return newArea
                         })}  className={`${selectedArea && selectedArea.areaID === area.areaID ? 'border-zuccini-700 border-2' : 'border-gray-400'} w-full relative bg-gray-300 h-10 flex items-center p-3 mb-2 text-xs lg:text-xl text-shadow-xs hover:bg-gray-400 cursor-pointer rounded-md shadow-md border`} >
-                        <p>{area.areaNum}:
-                          <span> {area.areaName}</span>
-                        </p>
+                        <p>{area.areaName}</p>
                         <FontAwesomeIcon icon={faAngleRight} className={`${selectedArea && selectedArea.areaID === area.areaID ? 'rotate-90' : ''} text-md lg:text-lg right-2 absolute`} />
                       </div>
                     
@@ -272,6 +303,7 @@ const Programs = () => {
             <CreateForm 
               title="Program"
               data={programs}
+              employees={employees}
               onSubmit={handleSubmit}
               onClose={() => setShowForm(false)}
               onEditSelect={handleEditSelect}

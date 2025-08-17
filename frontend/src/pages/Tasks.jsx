@@ -11,6 +11,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import EventModal from '../components/modals/EventModal';
 import StatusModal from '../components/modals/StatusModal';
 import DeadlineModal from '../components/modals/DeadlineModal';
+import { apiGet, apiPost } from '../utils/api_utils';
 // the progress bar is currently static  
 
 const Tasks = () => {
@@ -41,24 +42,16 @@ const Tasks = () => {
 
 
 
-    const token = localStorage.getItem('token'); //gets the token
-
+   
 
     // FETCH PROGRAM
     useEffect(() => {
-        if(!token){
-            console.error("No token found!");
-            return;
-        }
 
         const fetchProgram = async () => {
             
             try{
 
-                const res = await axios.get('http://localhost:5000/api/program', 
-                    {headers: {'Authorization': `Bearer${token}`}},
-                    {withCredentials: true}
-                )
+                const res = await apiGet('/api/program', {withCredentials: true})
 
                 Array.isArray(res.data.programs) ? setProgramOption(res.data.programs) : setProgramOption([]);
 
@@ -71,16 +64,11 @@ const Tasks = () => {
 
     // FETCH AREA
     useEffect(() => {
-        if(!token){
-            console.error("No token found!");
-            return;
-        }
 
         const fetchArea = async () => {
             
             try{
-                const res = await axios.get('http://localhost:5000/api/area', 
-                    {headers: {'Authorization': `Bearer ${token}`}}, {withCredentials: true})
+                const res = await apiGet('/api/area', {withCredentials: true})
 
                 Array.isArray(res.data.area) ? setAreaOption(res.data.area) : setAreaOption([]);
                 Array.isArray(res.data.area) ? setAreaProgressList(res.data.area) : setAreaProgressList([]);
@@ -95,17 +83,11 @@ const Tasks = () => {
     // FETCH DEADLINES
     useEffect(() => {
         
-        if(!token){
-            console.error("No token found!");
-            return;
-        }
-
         const fetchDeadline = async () => {
 
             try{
 
-            const res = await axios.get("http://localhost:5000/api/deadlines", 
-                {headers:{'Authorization': `Bearer${token}`}}, {withCredentials: true})
+            const res = await apiGet("/api/deadlines", {withCredentials: true})
 
                 Array.isArray(res.data.deadline) ? setDeadLines(res.data.deadline) : setDeadLines([]);   
                 
@@ -120,18 +102,12 @@ const Tasks = () => {
 
     // FETCH EVENTS (FOR CALENDAR)
     useEffect(() => {
-        
-        if(!token){
-            console.error("No token found!");
-            return;
-        }
 
         const fetchEvents = async () => {
 
             try{
 
-            const res = await axios.get("http://localhost:5000/api/events", 
-                {headers:{'Authorization': `Bearer${token}`}}, {withCredentials: true})
+            const res = await apiGet("/api/events", {withCredentials: true})
 
                 Array.isArray(res.data) ? setEvent(res.data) : setEvent([]);   
                 
@@ -156,8 +132,8 @@ const Tasks = () => {
 
         try{
             //create deadline api
-            const res = await axios.post('http://localhost:5000/api/deadline', formData, 
-                {headers: {'Authorization': `Bearer ${token}`}}, {withCredentials: true}) 
+            const res = await apiPost('/api/deadline', formData, 
+             {withCredentials: true}) 
 
                 setStatusMessage(res.data.message);
                 setShowStatusModal(true);
@@ -169,14 +145,13 @@ const Tasks = () => {
                 setDueDate("");
 
             // refetch deadline data
-            const deadlineRes = await axios.get("http://localhost:5000/api/deadlines", 
-                {headers:{'Authorization': `Bearer${token}`}}, {withCredentials: true})
+            const deadlineRes = await apiGet("api/deadlines", {withCredentials: true})
 
                 Array.isArray(deadlineRes.data.deadline) ? setDeadLines(deadlineRes.data.deadline) : setDeadLines([]);   
             
             // refetch event data
-            const eventRes = await axios.get("http://localhost:5000/api/events", 
-                {headers:{'Authorization': `Bearer${token}`}}, {withCredentials: true})
+            const eventRes = await apiGet("/api/events", 
+                 {withCredentials: true})
 
                 Array.isArray(eventRes.data) ? setEvent(eventRes.data) : setEvent([]);   
             
@@ -235,22 +210,26 @@ const Tasks = () => {
     <>    
     {/* shows status when creating deadline */}
     {showStatusModal && (
-        <StatusModal message={statusMessage} type={statusType} onClick={()=>setShowStatusModal(false)} />
+        <StatusModal message={statusMessage} type={statusType} showModal={showStatusModal} onClick={()=>setShowStatusModal(false)} />
     )}
 
 
+    {/* Container */}
+    <div className="relative w-full p-5 border bg-neutral-200 border-neutral-700 text-neutral-800 rounded-2xl dark:border-none dark:bg-gray-900 dark:inset-shadow-sm dark:inset-shadow-zuccini-900">
+
         {/* Area Progress */}
-        <h1 className="mx-3 mb-3 mt-20 lg:mt-8 text-xl font-semibold transition-all duration-500 text-gray-800">Area Progress</h1>
-        <section className="relative mb-8 mt-2 grid grid-cols-3 gap-2 p-3 min-h-[220px] text-neutral-800 border-1 border-neutral-400 rounded-lg shadow-xl overflow-hidden dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-900">
+        <h1 className="mx-3 mb-3 text-xl font-semibold transition-all duration-500 dark:text-white">Area Progress</h1>
+        <section className="relative grid grid-cols-3 gap-2 p-3 min-h-[220px] text-neutral-800 border-1 border-neutral-900 rounded-lg shadow-2xl overflow-hidden dark:bg-gray-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-900">
+
             {/* Areas */}
 
         {areaProgressList && areaProgressList.length > 0 ? (
         <>
         
-        {areaProgressList.map((area) => (                
-            <Area key={area} areaTitle={area.areaNum} desc={area.areaName} program={area.programCode} progress={area.progress}/>)
+        {areaProgressList.slice(0,3).map((area) => (                
+            <Area key={area.areaID} areaTitle={area.areaNum} desc={area.areaName} program={area.programCode} progress={area.progress}/>)
         )}
-            <div className='absolute right-0 col-start-3 flex items-center justify-center min-w-[275px] h-full overflow-hidden opacity-90 transition-all duration-500 hover:min-w-[278px] hover:opacity-95 hover:scale-110 bg-gradient-to-r from-transparent via-neutral-800 to-neutral-900 cursor-pointer'>
+            <div className='absolute right-0 col-start-3 flex items-center justify-center min-w-[275px] h-full overflow-hidden opacity-90 transition-all duration-500 hover:min-w-[278px] hover:opacity-95 hover:scale-110 bg-gradient-to-r from-transparent via-neutral-800 to-neutral-900 dark:bg-gradient-to-r dark:from-transparent dark:via-gray-800 dark:to-gray-900 cursor-pointer'>
                     <h1 className='z-10 text-xl font-semibold text-neutral-200'>View All</h1>
                 </div>
         </>        
@@ -262,94 +241,124 @@ const Tasks = () => {
         </section>
 
 {/* Reports */}
-<h1 className="mx-3 mb-2 text-xl font-semibold text-gray-800">Reports</h1>
-    <section className="grid w-full grid-cols-1 lg:grid-cols-2 grid-rows-3 lg:grid-rows-2 relative p-3 gap-5 text-neutral-800 rounded-lg shadow-xl transition-all duration-500 dark:inset-shadow-zuccini-900 dark:bg-woodsmoke-950">
 
-        {/* Create Deadlines */}
-        {/* <div className="col-span-2 transition-all duration-500 dark:text-white"> */}
-            {/* <h1 className="mx-3 mb-1 font-medium text-md">Create Submission Deadlines</h1> */}
-                <div className="col-span-2 min-h-[100px] border border-gray-400 rounded-xl shadow-xl transition-all duration-500 dark:border-none dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-[#19181A]">
-                    <form onSubmit={handleCreateDeadline}
-                    className='grid grid-rows-8 lg:grid-rows-3 grid-cols-1 lg:grid-cols-4  gap-x-2 w-full h-190 lg:h-100 relative'>
-
-
-                        {/* Select Department */}
-                        <div className="p-3 flex flex-col justify-center">
-                        <label htmlFor ="program"
-                        className='mb-1 `text-lg font-extralight'>Program</label>
-
-                        <select name="program" id="program"
-                            value={program}
-                            onChange={(e)=> {setProgram(e.target.value)}}
-                            className='p-2 font-semibold transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-woodsmoke-950'
-                            required>
-                            <option value="">Select a Program</option>
-
-                            {programOption.map((program) => {
-                                return(
-                                    <option key={program.programID} value={program.programID}>{program.programName}</option>
-                                )
-                            })}
-                        </select>
-                        </div>
+<h1 className="mx-3 mt-5 mb-3 text-xl font-semibold dark:text-white">Reports</h1>
+    <section className="grid grid-cols-2 grid-rows-[auto_1fr] relative p-3 gap-5 text-neutral-800 border-1 border-neutral-900 rounded-lg shadow-xl transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-gray-950">
+    {/* Create Deadlines */}
+    <div className="col-span-2 transition-all duration-500 dark:text-white">
+        <h1 className="mx-3 mb-1 font-medium text-md">Create Submission Deadlines</h1>
+            <div className="col-span-2 min-h-[100px] border rounded-md transition-all duration-500 dark:border-none dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-gray-900">
+                <form onSubmit={handleCreateDeadline}
+                className='grid grid-cols-4 gap-x-2'>
 
 
-                        {/* Select Area */}
-                        <div className=" p-3 flex flex-col justify-center">
-                        <label htmlFor="area"
-                            className='mb-1 text-lg font-extralight'>Area</label>
-                        <select name="area" id="area"
-                            value={selectedArea}
-                            onChange={(e)=> {setSelectedArea(e.target.value)}}
-                            className='p-2 font-semibold transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-woodsmoke-950'
-                            required>
-                            <option value="">Select an Area</option>
-                            {areaOption.map((area) => {
-                                return(
-                                    <option key={area.areaID} value={area.areaID}>{area.areaNum}</option>
-                                )
-                            }
-                            )}
-                        </select>
-                        </div>
+                    {/* Select Department */}
+                    <div className="min-h-[100px] p-3 flex flex-col justify-center">
+                    <label htmlFor ="program"
+                    className='mb-1 `text-lg font-extralight'>Program</label>
+
+                    <select name="program" id="program"
+                        value={program}
+                        onChange={(e)=> {setProgram(e.target.value)}}
+                        className='p-2 font-semibold transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-950'
+                        required>
+                        <option value="">Select a Program</option>
+
+                        {programOption.map((program) => {
+                            return(
+                                <option key={program.programID} value={program.programID}>{program.programName}</option>
+                            )
+                        })}
+                    </select>
+                    </div>
 
 
-                        {/* Select Deadline */}
-                        <div className=" p-3 flex flex-col justify-center">
-                            <label htmlFor="due_date"
-                            className='mb-1 text-lg font-extralight'>Deadline</label>
-                            <input type="date" name="due_date" id="due_date"
-                                value={dueDate}
-                                onChange={(e)=> {setDueDate(e.target.value)}}
-                                className='p-2 font-semibold transition-all duration-500 border cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-woodsmoke-950' 
-                                required/>  
-                        </div>
+                    {/* Select Area */}
+                    <div className="min-h-[100px] p-3 flex flex-col justify-center">
+                    <label htmlFor="area"
+                        className='mb-1 text-lg font-extralight'>Area</label>
+                    <select name="area" id="area"
+                        value={selectedArea}
+                        onChange={(e)=> {setSelectedArea(e.target.value)}}
+                        className='p-2 font-semibold transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-950'
+                        required>
+                        <option value="">Select an Area</option>
+                        {areaOption.map((area) => {
+                            return(
+                                <option key={area.areaID} value={area.areaID}>{area.areaNum}</option>
+                            )
+                        }
+                        )}
+                    </select>
+                    </div>
 
 
-                        {/* Create Deadline Btn*/}
-                        <input 
-                        type="submit" 
-                        value="Create Deadline"
-                        className='px-6 w-45 h-15 place-self-center py-4 font-semibold transition-all duration-300 cursor-pointer rounded-xl bg-zuccini-600 hover:bg-zuccini-800 active:bg-zuccini-700 text-neutral-100'
+                    {/* Select Deadline */}
+                    <div className="min-h-[100px] p-3 flex flex-col justify-center">
+                        <label htmlFor="due_date"
+                        className='mb-1 text-lg font-extralight'>Deadline</label>
+                        <input type="date" name="due_date" id="due_date"
+                            value={dueDate}
+                            onChange={(e)=> {setDueDate(e.target.value)}}
+                            className='p-2 font-semibold transition-all duration-500 border cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-950' 
+                            required/>  
+                    </div>
+
+
+                    {/* Create Deadline Btn*/}
+                    <input 
+                    type="submit" 
+                    value="Create Deadline"
+                    className='px-6 py-4 font-semibold transition-all duration-300 cursor-pointer place-self-center rounded-xl bg-zuccini-600 hover:bg-zuccini-800 active:bg-zuccini-700 text-neutral-100'
+                    />
+                    <div className='flex flex-col col-span-4 px-3 py-3 '>
+                        <label htmlFor="content"
+                        className='mb-1 text-lg font-extralight'
+                        >Description</label>
+                        <textarea name="content" 
+                        value={content}
+                        id="content"                    
+                        placeholder={"Input the deadline description"}
+                        onChange={(e)=> {setContent(e.target.value)}}
+                        required
+                        className='scrollbar-hide placeholder-neutral-500 whitespace-pre-line resize-y w-full min-h-[200px] px-4 py-3 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none'       
                         />
+                    </div>
+                
+                </form>
+            </div>
+    </div>
+        
+    {/* Deadlines */}
+        <div className="relative flex flex-col items-center row-start-2 p-3 border rounded-md dark:bg-gray-900 dark:inset-shadow-sm dark:inset-shadow-zuccini-900">                    
+            <div className='grid w-full grid-cols-3 font-medium text-center dark:text-white '>
+                <h2>Program</h2>
+                <h2>Task</h2>
+                <h2>Deadline</h2>
+            </div>
+            {/* Deadline container */}
+            <div className='flex flex-col items-center mt-2 min-h-[500px] min-w-full p-1 bg-neutral-300 rounded-md border relative dark:bg-gray-950 ' >
+                {deadLines && deadLines.length > 0 ? deadLines.map((deadline) => (
+                    <Deadline key={deadline.deadlineID} data={deadline} program={deadline.programCode} areaTitle={deadline.areaName} date={deadline.due_date} onClick={() => handleViewDeadline(deadline)}/>
+                )) : (
+                        <p className="m-auto text-lg text-center text-gray-500 font-extralight">No deadlines ahead.</p>
+                )
+                }            
+            </div>
 
-                        <div className='flex flex-col px-3 py-3 row-span-4 lg:col-span-4'>
-                            <label htmlFor="content"
-                            className='mb-1 text-lg font-extralight'
-                            >Description</label>
-                            <textarea name="content" 
-                            value={content}
-                            id="content"                    
-                            placeholder={"Input the deadline description"}
-                            onChange={(e)=> {setContent(e.target.value)}}
-                            required
-                            className='scrollbar-hide placeholder-neutral-500 whitespace-pre-line resize-y w-full min-h-[200px] h-full px-4 py-3 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-woodsmoke-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none'       
-                            />
-                        </div>
-                    
-                    </form>
-                </div>
-        {/* </div> */}
+            {showDeadline && selectedDeadline && (
+                <DeadlineModal 
+                    programName={selectedDeadline.programName} 
+                    programCode={selectedDeadline.programCode} 
+                    area={selectedDeadline.areaName} 
+                    date={selectedDeadline.date} 
+                    color={selectedDeadline.color} 
+                    content={selectedDeadline.content || 'No description'} 
+                    id={selectedDeadline.id}
+                    onClick={handleCloseDeadline}
+                    showModal={showDeadline}
+                    />
+            )}
             
         {/* Deadlines */}
             <div className="flex w-full h-full items-center flex-col p-3 border border-gray-400 shadow-xl rounded-md dark:bg-[#19181A] dark:border-black dark:inset-shadow-sm dark:inset-shadow-zuccini-900">                    
@@ -368,6 +377,7 @@ const Tasks = () => {
                     }            
                 </div>
 
+
                 {showDeadline && selectedDeadline && (
                     <DeadlineModal 
                         programName={selectedDeadline.programName} 
@@ -381,28 +391,27 @@ const Tasks = () => {
                 )}
                 
             </div>
+    
+    {/* Calendar */}
+        <div className="relative col-start-2 row-start-2 p-5 transition-all duration-500 bg-transparent border rounded-md dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:text-white dark:bg-gray-900 dark:border-none">
+            <FullCalendar 
+            plugins={[dayGridPlugin]}
+            initialView='dayGridMonth'
+            headerToolbar={{
+                start: 'title',
+                center: '',
+                end: 'today prev next'
+            }}
+            events={event}        
+            eventClick={handleEventClick}
+            height={'500px'}                    
+            expandRows={true}
+            />
 
-        
-        {/* Calendar */}
-            <div className=" bg-transparent border border-gray-400 shadow-xl rounded-md p-5 transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:text-white dark:bg-[#19181A] dark:border-none">
-                <FullCalendar 
-                plugins={[dayGridPlugin]}
-                initialView='dayGridMonth'
-                headerToolbar={{
-                    start: 'title',
-                    center: '',
-                    end: 'today prev next'
-                }}
-                events={event}        
-                eventClick={handleEventClick}
-                height={'500px'}                    
-                expandRows={true}
-                />
-
-                {/* EventModal */}
-                {showEventModal && selectedEvent && (
-                <EventModal title={selectedEvent.title} date={selectedEvent.date} content={selectedEvent.content || 'N/A'} onClick={handleCloseModal} />
-                )}
+            {/* EventModal */}
+            {showEventModal && selectedEvent && (
+              <EventModal title={selectedEvent.title} showModal={showEventModal} date={selectedEvent.date} content={selectedEvent.content || 'N/A'} onClick={handleCloseModal} />
+            )}
 
             </div>
 
@@ -419,11 +428,11 @@ export const Area = ({program, areaTitle, desc, progress}) =>{
     return(
         <div className="relative mr-4 min-w-[300px] h-[210px] border-black border rounded-lg shadow-lg overflow-hidden transition-all duration-500 hover:scale-105 cursor-pointer">
             <div className='h-[50%] bg-zuccini-600'> 
-                <div className='absolute top-2 right-2 px-5 bg-neutral-200 border-black border rounded-xl font-light dark:bg-[#19181A] dark:text-white'>{program}</div>
+                <div className='absolute px-5 font-light border border-black top-2 right-2 bg-neutral-200 rounded-xl dark:bg-gray-900 dark:text-white'>{program}</div>
                 <CircularProgressBar progress={progress} circleWidth="75"/>           
             </div>      
 
-            <div className='text-right h-[50%] p-3 bg-neutral-200 border-t-1 transition-all duration-500  dark:bg-[#19181A] dark:text-white dark:border-t-neutral-600'>
+            <div className='text-right h-[50%] p-3 bg-neutral-200 border-t-1 transition-all duration-500  dark:bg-gray-900 dark:text-white dark:border-t-neutral-600'>
                 <h1 className='mb-4 text-2xl font-semibold text-wrap'>{areaTitle}</h1>
                 <h2 className='text-lg truncate'>{desc}</h2>
                 
@@ -438,7 +447,7 @@ export const Area = ({program, areaTitle, desc, progress}) =>{
 export const Deadline = ({program, areaTitle, date, onClick}) => {
     return (
         <div 
-            className='relative grid grid-cols-3 justify-center mt-2 border p-2  rounded-lg bg-neutral-200 transition-all duration-500 dark:bg-[#19181A] hover:bg-neutral-300 dark:hover:bg-[#232228] cursor-pointer'
+            className='relative grid grid-cols-3 justify-center mt-2 border p-2  rounded-lg bg-neutral-200 transition-all duration-500 dark:bg-gray-900 hover:bg-neutral-300 dark:hover:bg-[#232228] cursor-pointer'
             onClick={onClick}
         >
             <div className='flex items-center px-2'>
