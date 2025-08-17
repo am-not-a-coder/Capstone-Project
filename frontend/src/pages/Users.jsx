@@ -256,13 +256,13 @@ const Users = () => {
 
             {/* navigation bar */}
             <section className="flex relative mt-20 lg:mt-0 items-center h-[7%] text-xl text-neutral-800 dark:text-white">
-                <button className={`${visible == "list" ? 'border border-gray-300 shadow-sm rounded-xl font-semibold' : 'border-0 font-normal'} w-15 lg:w-30 h-full`} onClick={() => makeVisible("list")}>List</button>
-                <button className={`${visible == "add" ? 'border border-gray-300 shadow-sm rounded-xl font-semibold' : 'border-0 font-normal'} w-15 lg:w-30 h-full`} onClick={() => makeVisible("add")}>Add</button>
+                <button className={`${visible == "list" ? 'border border-gray-400 shadow-sm rounded-xl font-semibold' : 'border-0 font-normal'} w-15 lg:w-30 h-full`} onClick={() => makeVisible("list")}>List</button>
+                <button className={`${visible == "add" ? 'border border-gray-400 shadow-sm rounded-xl font-semibold' : 'border-0 font-normal'} w-15 lg:w-30 h-full`} onClick={() => makeVisible("add")}>Add</button>
                 <input type="text" className='rounded-lg right-[2%] w-46 lg:w-1/4 bg-neutral-200 p-1 text-base absolute border border-gray-400 dark:placeholder-neutral-600 dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:border-none' onChange={handleQuery} value={searchQuery} placeholder='Search user' />
             </section>
             
             {/* section for adding users */}
-                <form onSubmit={handleCreateUser} action="" method='POST' className={`${visible == "add" ? "block" : "hidden"} flex mt-5 mb-5 flex-col-reverse lg:flex-row flex-wrap w-full gap-8 p-5 border border-gray-300 shadow-xl rounded-2xl`}>
+                <form onSubmit={handleCreateUser} action="" method='POST' className={`${visible == "add" ? "block" : "hidden"} flex mt-5 mb-5 flex-col-reverse lg:flex-row flex-wrap w-full gap-8 p-5 rounded-2xl`}>
                     {/* detais form */}
                     <div className='flex flex-col w-full lg:w-1/4 gap-6 '>
                         <div className='relative'>

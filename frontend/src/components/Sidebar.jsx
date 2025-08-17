@@ -27,9 +27,9 @@ export const SidebarContext = createContext();
     
         <>
             
-            <aside className={`absolute lg:relative row-span-5 h-screen mt-0 lg:mt-3 ml-0 lg:ml-3 transition-all duration-500 ${ expanded ? 'w-70' : 'hidden lg:block w-12'} z-40`}>
+            <aside className={`absolute lg:relative row-span-5 h-screen lg:h-[96%] mt-0 lg:mt-3 ml-0 lg:ml-3 transition-all duration-500 ${ expanded ? 'w-70' : 'hidden lg:block w-12'} z-40`}>
                 
-                <nav className={`${expanded ? '' : 'hidden lg:block'} relative flex flex-col bg-woodsmoke-200 border-1 border-black rounded-lg shadow-neutral-500 shadow-lg transition-all duration-500 dark:bg-[#19181A] dark:shadow-none dark:border-none`}>
+                <nav className={` h-full ${expanded ? '' : 'hidden lg:block'} relative flex flex-col bg-woodsmoke-200 border-1 border-black rounded-lg shadow-neutral-500 shadow-lg transition-all duration-500 dark:bg-[#19181A] dark:shadow-none dark:border-none`}>
 
                 {/* Title and Logo */}
                 <div className="flex items-center justify-between pt-3 pb-2 pl-2 pr-10 transition-all duration-500">

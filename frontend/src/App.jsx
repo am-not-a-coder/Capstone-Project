@@ -15,26 +15,26 @@ import Profile from './pages/Profile';
 
 function App() {
 
-  //Checks if the token is not expired and directs the user to login if it is
-  // axios.interceptors.response.use(
-  //   response => response,
-  //   error => {
-  //     if (error.response?.status === 401){
-  //       console.log("Your token is expired!")
-  //       localStorage.removeItem('token');
-  //       window.location.href = '/login'
-  //     }
-  //     return Promise.reject(error);
-  //   }
-  // )
+  // Checks if the token is not expired and directs the user to login if it is
+  axios.interceptors.response.use(
+    response => response,
+    error => {
+      if (error.response?.status === 401){
+        console.log("Your token is expired!")
+        localStorage.removeItem('token');
+        window.location.href = '/login'
+      }
+      return Promise.reject(error);
+    }
+  )
 
 
 
   // If the user is not logged in it will redirect to login page
-    // const ProtectedRoute = ({children}) => {
-    //   const isAuthenticated = localStorage.getItem('token') // checks if the jwt auth token from the backend is present
-    //   return isAuthenticated ? children : <Navigate to="/Login" />
-    // }
+    const ProtectedRoute = ({children}) => {
+      const isAuthenticated = localStorage.getItem('token') // checks if the jwt auth token from the backend is present
+      return isAuthenticated ? children : <Navigate to="/Login" />
+    }
   
   return (
     <Router>
@@ -48,9 +48,9 @@ function App() {
         {/* These are the routes that needs authentication */}
         {/* MainLayout wraps other pages */}
         <Route path="/" element={
-          // <ProtectedRoute>
+          <ProtectedRoute>
             <MainLayout />
-          // </ProtectedRoute>
+          </ProtectedRoute>
           }>
           <Route path="/Dashboard" element={<Dashboard />} />
           <Route path="/Institutes" element={<Institutes />} />

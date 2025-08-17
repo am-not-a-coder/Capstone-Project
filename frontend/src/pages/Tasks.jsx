@@ -238,12 +238,10 @@ const Tasks = () => {
         <StatusModal message={statusMessage} type={statusType} onClick={()=>setShowStatusModal(false)} />
     )}
 
-    {/* Container */}
-    <div className="relative w-full bg-neutral-100 p-5 border-2 border-neutral-700 text-neutral-800 rounded-2xl dark:border-none dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-900">
 
         {/* Area Progress */}
-        <h1 className="mx-3 mb-3 text-xl font-semibold transition-all duration-500 dark:text-white">Area Progress</h1>
-        <section className="relative grid grid-cols-3 gap-2 p-3 min-h-[220px] text-neutral-800 border-1 border-neutral-900 rounded-lg shadow-2xl overflow-hidden dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-900">
+        <h1 className="mx-3 mb-3 mt-20 lg:mt-8 text-xl font-semibold transition-all duration-500 text-gray-800">Area Progress</h1>
+        <section className="relative mb-8 mt-2 grid grid-cols-3 gap-2 p-3 min-h-[220px] text-neutral-800 border-1 border-neutral-400 rounded-lg shadow-xl overflow-hidden dark:bg-woodsmoke-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-900">
             {/* Areas */}
 
         {areaProgressList && areaProgressList.length > 0 ? (
@@ -264,150 +262,151 @@ const Tasks = () => {
         </section>
 
 {/* Reports */}
-<h1 className="mx-3 mt-5 mb-3 text-xl font-semibold dark:text-white">Reports</h1>
-    <section className="grid grid-cols-2 grid-rows-[auto_1fr] relative p-3 gap-5 text-neutral-800 border-1 border-neutral-900 rounded-lg shadow-xl transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-woodsmoke-950">
-    {/* Create Deadlines */}
-    <div className="col-span-2 transition-all duration-500 dark:text-white">
-        <h1 className="mx-3 mb-1 font-medium text-md">Create Submission Deadlines</h1>
-            <div className="col-span-2 min-h-[100px] border rounded-md transition-all duration-500 dark:border-none dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-[#19181A]">
-                <form onSubmit={handleCreateDeadline}
-                className='grid grid-cols-4 gap-x-2'>
+<h1 className="mx-3 mb-2 text-xl font-semibold text-gray-800">Reports</h1>
+    <section className="grid w-full grid-cols-1 lg:grid-cols-2 grid-rows-3 lg:grid-rows-2 relative p-3 gap-5 text-neutral-800 rounded-lg shadow-xl transition-all duration-500 dark:inset-shadow-zuccini-900 dark:bg-woodsmoke-950">
+
+        {/* Create Deadlines */}
+        {/* <div className="col-span-2 transition-all duration-500 dark:text-white"> */}
+            {/* <h1 className="mx-3 mb-1 font-medium text-md">Create Submission Deadlines</h1> */}
+                <div className="col-span-2 min-h-[100px] border border-gray-400 rounded-xl shadow-xl transition-all duration-500 dark:border-none dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-[#19181A]">
+                    <form onSubmit={handleCreateDeadline}
+                    className='grid grid-rows-8 lg:grid-rows-3 grid-cols-1 lg:grid-cols-4  gap-x-2 w-full h-190 lg:h-100 relative'>
 
 
-                    {/* Select Department */}
-                    <div className="min-h-[100px] p-3 flex flex-col justify-center">
-                    <label htmlFor ="program"
-                    className='mb-1 `text-lg font-extralight'>Program</label>
+                        {/* Select Department */}
+                        <div className="p-3 flex flex-col justify-center">
+                        <label htmlFor ="program"
+                        className='mb-1 `text-lg font-extralight'>Program</label>
 
-                    <select name="program" id="program"
-                        value={program}
-                        onChange={(e)=> {setProgram(e.target.value)}}
-                        className='p-2 font-semibold transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-woodsmoke-950'
-                        required>
-                        <option value="">Select a Program</option>
+                        <select name="program" id="program"
+                            value={program}
+                            onChange={(e)=> {setProgram(e.target.value)}}
+                            className='p-2 font-semibold transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-woodsmoke-950'
+                            required>
+                            <option value="">Select a Program</option>
 
-                        {programOption.map((program) => {
-                            return(
-                                <option key={program.programID} value={program.programID}>{program.programName}</option>
-                            )
-                        })}
-                    </select>
-                    </div>
-
-
-                    {/* Select Area */}
-                    <div className="min-h-[100px] p-3 flex flex-col justify-center">
-                    <label htmlFor="area"
-                        className='mb-1 text-lg font-extralight'>Area</label>
-                    <select name="area" id="area"
-                        value={selectedArea}
-                        onChange={(e)=> {setSelectedArea(e.target.value)}}
-                        className='p-2 font-semibold transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-woodsmoke-950'
-                        required>
-                        <option value="">Select an Area</option>
-                        {areaOption.map((area) => {
-                            return(
-                                <option key={area.areaID} value={area.areaID}>{area.areaNum}</option>
-                            )
-                        }
-                        )}
-                    </select>
-                    </div>
+                            {programOption.map((program) => {
+                                return(
+                                    <option key={program.programID} value={program.programID}>{program.programName}</option>
+                                )
+                            })}
+                        </select>
+                        </div>
 
 
-                    {/* Select Deadline */}
-                    <div className="min-h-[100px] p-3 flex flex-col justify-center">
-                        <label htmlFor="due_date"
-                        className='mb-1 text-lg font-extralight'>Deadline</label>
-                        <input type="date" name="due_date" id="due_date"
-                            value={dueDate}
-                            onChange={(e)=> {setDueDate(e.target.value)}}
-                            className='p-2 font-semibold transition-all duration-500 border cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-woodsmoke-950' 
-                            required/>  
-                    </div>
+                        {/* Select Area */}
+                        <div className=" p-3 flex flex-col justify-center">
+                        <label htmlFor="area"
+                            className='mb-1 text-lg font-extralight'>Area</label>
+                        <select name="area" id="area"
+                            value={selectedArea}
+                            onChange={(e)=> {setSelectedArea(e.target.value)}}
+                            className='p-2 font-semibold transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-woodsmoke-950'
+                            required>
+                            <option value="">Select an Area</option>
+                            {areaOption.map((area) => {
+                                return(
+                                    <option key={area.areaID} value={area.areaID}>{area.areaNum}</option>
+                                )
+                            }
+                            )}
+                        </select>
+                        </div>
 
 
-                    {/* Create Deadline Btn*/}
-                    <input 
-                    type="submit" 
-                    value="Create Deadline"
-                    className='px-6 py-4 font-semibold transition-all duration-300 cursor-pointer place-self-center rounded-xl bg-zuccini-600 hover:bg-zuccini-800 active:bg-zuccini-700 text-neutral-100'
-                    />
-                    <div className='flex flex-col col-span-4 px-3 py-3 '>
-                        <label htmlFor="content"
-                        className='mb-1 text-lg font-extralight'
-                        >Description</label>
-                        <textarea name="content" 
-                        value={content}
-                        id="content"                    
-                        placeholder={"Input the deadline description"}
-                        onChange={(e)=> {setContent(e.target.value)}}
-                        required
-                        className='scrollbar-hide placeholder-neutral-500 whitespace-pre-line resize-y w-full min-h-[200px] px-4 py-3 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-woodsmoke-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none'       
+                        {/* Select Deadline */}
+                        <div className=" p-3 flex flex-col justify-center">
+                            <label htmlFor="due_date"
+                            className='mb-1 text-lg font-extralight'>Deadline</label>
+                            <input type="date" name="due_date" id="due_date"
+                                value={dueDate}
+                                onChange={(e)=> {setDueDate(e.target.value)}}
+                                className='p-2 font-semibold transition-all duration-500 border cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-woodsmoke-950' 
+                                required/>  
+                        </div>
+
+
+                        {/* Create Deadline Btn*/}
+                        <input 
+                        type="submit" 
+                        value="Create Deadline"
+                        className='px-6 w-45 h-15 place-self-center py-4 font-semibold transition-all duration-300 cursor-pointer rounded-xl bg-zuccini-600 hover:bg-zuccini-800 active:bg-zuccini-700 text-neutral-100'
                         />
-                    </div>
-                
-                </form>
-            </div>
-    </div>
-        
-    {/* Deadlines */}
-        <div className="flex items-center flex-col row-start-2 p-3 border rounded-md relative dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-900">                    
-            <div className='grid w-full grid-cols-3 font-medium text-center dark:text-white '>
-                <h2>Program</h2>
-                <h2>Task</h2>
-                <h2>Deadline</h2>
-            </div>
-            {/* Deadline container */}
-            <div className='flex flex-col items-center mt-2 min-h-[500px] min-w-full p-1 bg-neutral-300 rounded-md border relative dark:bg-woodsmoke-950 ' >
-                {deadLines && deadLines.length > 0 ? deadLines.map((deadline) => (
-                    <Deadline key={deadline.deadlineID} data={deadline} program={deadline.programCode} areaTitle={deadline.areaName} date={deadline.due_date} onClick={() => handleViewDeadline(deadline)}/>
-                )) : (
-                        <p className="m-auto text-lg text-center text-gray-500 font-extralight">No deadlines ahead.</p>
-                )
-                }            
-            </div>
 
-            {showDeadline && selectedDeadline && (
-                <DeadlineModal 
-                    programName={selectedDeadline.programName} 
-                    programCode={selectedDeadline.programCode} 
-                    area={selectedDeadline.areaName} 
-                    date={selectedDeadline.date} 
-                    color={selectedDeadline.color} 
-                    content={selectedDeadline.content || 'No description'} 
-                    id={selectedDeadline.id}
-                    onClick={handleCloseDeadline} />
-            )}
+                        <div className='flex flex-col px-3 py-3 row-span-4 lg:col-span-4'>
+                            <label htmlFor="content"
+                            className='mb-1 text-lg font-extralight'
+                            >Description</label>
+                            <textarea name="content" 
+                            value={content}
+                            id="content"                    
+                            placeholder={"Input the deadline description"}
+                            onChange={(e)=> {setContent(e.target.value)}}
+                            required
+                            className='scrollbar-hide placeholder-neutral-500 whitespace-pre-line resize-y w-full min-h-[200px] h-full px-4 py-3 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-woodsmoke-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none'       
+                            />
+                        </div>
+                    
+                    </form>
+                </div>
+        {/* </div> */}
             
-        </div>
+        {/* Deadlines */}
+            <div className="flex w-full h-full items-center flex-col p-3 border border-gray-400 shadow-xl rounded-md dark:bg-[#19181A] dark:border-black dark:inset-shadow-sm dark:inset-shadow-zuccini-900">                    
+                <div className='grid w-full grid-cols-3 font-medium text-center dark:text-white '>
+                    <h2>Program</h2>
+                    <h2>Task</h2>
+                    <h2>Deadline</h2>
+                </div>
+                {/* Deadline container */}
+                <div className='flex flex-col items-center mt-2 h-full w-full p-1 bg-neutral-300 rounded-md relative dark:bg-woodsmoke-950 ' >
+                    {deadLines && deadLines.length > 0 ? deadLines.map((deadline) => (
+                        <Deadline key={deadline.deadlineID} data={deadline} program={deadline.programCode} areaTitle={deadline.areaName} date={deadline.due_date} onClick={() => handleViewDeadline(deadline)}/>
+                    )) : (
+                            <p className="m-auto text-lg text-center text-gray-500 font-extralight">No deadlines ahead.</p>
+                    )
+                    }            
+                </div>
 
-    
-    {/* Calendar */}
-        <div className="relative row-start-2 col-start-2 bg-transparent border rounded-md p-5 transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:text-white dark:bg-[#19181A] dark:border-none">
-            <FullCalendar 
-            plugins={[dayGridPlugin]}
-            initialView='dayGridMonth'
-            headerToolbar={{
-                start: 'title',
-                center: '',
-                end: 'today prev next'
-            }}
-            events={event}        
-            eventClick={handleEventClick}
-            height={'500px'}                    
-            expandRows={true}
-            />
+                {showDeadline && selectedDeadline && (
+                    <DeadlineModal 
+                        programName={selectedDeadline.programName} 
+                        programCode={selectedDeadline.programCode} 
+                        area={selectedDeadline.areaName} 
+                        date={selectedDeadline.date} 
+                        color={selectedDeadline.color} 
+                        content={selectedDeadline.content || 'No description'} 
+                        id={selectedDeadline.id}
+                        onClick={handleCloseDeadline} />
+                )}
+                
+            </div>
 
-            {/* EventModal */}
-            {showEventModal && selectedEvent && (
-              <EventModal title={selectedEvent.title} date={selectedEvent.date} content={selectedEvent.content || 'N/A'} onClick={handleCloseModal} />
-            )}
+        
+        {/* Calendar */}
+            <div className=" bg-transparent border border-gray-400 shadow-xl rounded-md p-5 transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:text-white dark:bg-[#19181A] dark:border-none">
+                <FullCalendar 
+                plugins={[dayGridPlugin]}
+                initialView='dayGridMonth'
+                headerToolbar={{
+                    start: 'title',
+                    center: '',
+                    end: 'today prev next'
+                }}
+                events={event}        
+                eventClick={handleEventClick}
+                height={'500px'}                    
+                expandRows={true}
+                />
 
-        </div>
+                {/* EventModal */}
+                {showEventModal && selectedEvent && (
+                <EventModal title={selectedEvent.title} date={selectedEvent.date} content={selectedEvent.content || 'N/A'} onClick={handleCloseModal} />
+                )}
+
+            </div>
 
     </section>
-    </div>            
     </>
     )
 };
