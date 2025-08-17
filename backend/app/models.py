@@ -56,6 +56,7 @@ class Criteria(db.Model):
     docID = db.Column(db.Integer)
     subareaID = db.Column(db.Integer, db.ForeignKey('subarea.subareaID'))
 
+# Andito po ang institute
 class Institute(db.Model):
     __tablename__ = 'institute'
 
