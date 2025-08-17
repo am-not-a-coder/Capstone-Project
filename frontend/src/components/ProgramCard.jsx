@@ -1,11 +1,11 @@
-export default function ProgramCard({ program, onClick, className="" }) {
+export default function ProgramCard({ program }) {
 
     
     return (
-
-          <div className={`${className} flex flex-col w-full cursor-pointer h-48 overflow-hidden border rounded-lg shadow sm:w-1/2 md:w-1/3 lg:w-1/5 border-neutral-400 dark:bg-woodsmoke-950 dark:inset-shadow-lg dark:inset-shadow-zuccini-800`} onClick={onClick}>
-            <div key={program.code}>
-
+            <div
+              key={program.code}
+              className="flex flex-col min-w-[25%] h-48 overflow-hidden border max-w-[25%] xl:max-w-[10%] rounded-lg shadow sm:w-1/2 md:w-1/3 lg:w-1/5 border-neutral-800 dark:bg-gray-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800"
+            >
               <div className="flex items-center justify-center h-2/5">
                 {program.img ? 
                 // DISPLAYS INSTITUTE CARDS
@@ -33,6 +33,5 @@ export default function ProgramCard({ program, onClick, className="" }) {
                 </div>
               </div>
             </div>
-          </div>
     )
 }

@@ -244,43 +244,39 @@ const Users = () => {
             user.email.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-   return (
-  <div className="min-h-screen p-6 border border-neutral-800 rounded-xl bg-neutral-200 dark:bg-gray-900">
-    {showStatusModal && (
-      <StatusModal 
-        message={statusMessage} 
-        type={statusType} 
-        showModal={showStatusModal} 
-        onClick={() => setShowStatusModal(false)} 
-      />
-    )}
+    return (
+        <div className="min-h-screen p-6 border border-neutral-800 rounded-xl bg-neutral-200 dark:bg-gray-900">
+            {showStatusModal && (
+                <StatusModal message={statusMessage} type={statusType} showModal={showStatusModal} onClick={()=>setShowStatusModal(false)} />
+            )}
 
-    {/* Navigation and Search */}
-    <div className="flex flex-col items-center justify-between gap-4 mb-8 lg:flex-row">
-      <div className="flex p-1 border border-gray-200 shadow-lg bg-neutral-100/90 dark:bg-gray-800 rounded-xl dark:border-gray-700">
-        <button 
-          className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
-            visible === "list" 
-              ? 'bg-green-500 text-white shadow-md transform scale-105' 
-              : 'text-gray-600 dark:text-gray-300 hover:bg-neutral-200 dark:hover:bg-gray-700'
-          }`} 
-          onClick={() => makeVisible("list")}
-        >
-          <FontAwesomeIcon icon={faUser} className="mr-2" />
-          Users List
-        </button>
-        <button 
-          className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
-            visible === "add" 
-              ? 'bg-green-500 text-white shadow-md transform scale-105' 
-              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-          }`} 
-          onClick={() => makeVisible("add")}
-        >
-          <FontAwesomeIcon icon={faPlus} className="mr-2" />
-          Add User
-        </button>
-      </div>
+           
+            {/* Navigation and Search */}
+            <div className="flex flex-col items-center justify-between gap-4 mb-8 lg:flex-row">
+                <div className="flex p-1 border border-gray-200 shadow-lg bg-neutral-100/90 dark:bg-gray-800 rounded-xl dark:border-gray-700"   >
+                    <button 
+                        className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
+                            visible === "list" 
+                                ? 'bg-green-500 text-white shadow-md transform scale-105' 
+                                : 'text-gray-600 dark:text-gray-300 hover:bg-neutral-200 dark:hover:bg-gray-700'
+                        }`} 
+                        onClick={() => makeVisible("list")}
+                    >
+                        <FontAwesomeIcon icon={faUser} className="mr-2" />
+                        Users List
+                    </button>
+                    <button 
+                        className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
+                            visible === "add" 
+                                ? 'bg-green-500 text-white shadow-md transform scale-105' 
+                                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`} 
+                        onClick={() => makeVisible("add")}
+                    >
+                        <FontAwesomeIcon icon={faPlus} className="mr-2" />
+                        Add User
+                    </button>
+                </div>
 
       <div className="relative">
         <FontAwesomeIcon 
