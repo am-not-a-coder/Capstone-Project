@@ -1,3 +1,5 @@
+const { keyframes } = require('styled-components');
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
@@ -6,6 +8,47 @@ module.exports = {
   ],
   theme: {
     extend: {
+      keyframes:{
+        fadeIn: {
+          '0%': {opacity: '0', transform: 'scale(0.95)'},
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        }
+      },
+      color:{
+        'woodsmoke': {
+            '50': '#f7f7f8',
+            '100': '#ededf1',
+            '200': '#d7d8e0',
+            '300': '#b5b6c4',
+            '400': '#8c8ea4',
+            '500': '#6e7189',
+            '600': '#595a70',
+            '700': '#48495c',
+            '800': '#3e3e4e',
+            '900': '#373843',
+            '950': '#0e0e11',
+        },
+        'zuccini': {
+            '50': '#eefff5',
+            '100': '#d8ffeb',
+            '200': '#b4fed8',
+            '300': '#79fcba',
+            '400': '#38f094',
+            '500': '#0ed975',
+            '600': '#05b45d',
+            '700': '#088d4c',
+            '800': '#0c6f3f',
+            '900': '#0c5b36',
+            '950': '#004526',
+        },
+
+
+
+      
+      animation:{
+        'fadeIn': 'fadeIn 0.3s ease-out forwards'
+      },
+
         transitionDuration:{
             500: '500ms'
         },
@@ -18,4 +61,4 @@ module.exports = {
   },
   plugins: [],
   darkMode: 'class',
-};
+} ;

@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import axios  from 'axios';
 import Carousel from '../components/Carousel';
+import { apiPost } from '../utils/api_utils';
+import { storeToken } from '../utils/auth_utils';
 import udmsLogo from '../assets/udms-logo.png';
 import UDMLogo from '../assets/UDM-logo.png';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -22,27 +23,47 @@ const Login = () => {
 
     const navigate = useNavigate()
 
-    const handleLogin = async (e) =>{
+    const handleLogin = async (e) => {
         e.preventDefault();
 
-        if(!employeeID.trim() || !password.trim()){
+        // Client-side validation
+        if (!employeeID.trim() || !password.trim()) {
             setError('Please enter a valid employee ID and password')
             return;
         }
 
         try {
-            const response = await axios.post('http://localhost:5000/api/login', {employeeID, password}, {withCredentials: true});
-            if (response.data.success) {
+            // Use our centralized API utility instead of direct axios
+            // This automatically handles headers, error formatting, etc.
+            const response = await apiPost('/api/login', {
+                employeeID: employeeID.trim(),
+                password: password.trim()
+            });
+
+            if (response.success && response.data.success) {
+                // Clear any previous errors
                 setError(null);
+                
+                // Store all authentication data using our utility
+                // This includes access_token, refresh_token, and user info
+                storeToken({
+                    access_token: response.data.access_token,
+                    refresh_token: response.data.refresh_token,
+                    user: response.data.user
+                });
+                
+                // Navigate to dashboard after successful login
                 navigate('/Dashboard');
-                localStorage.setItem('token', response.data.access_token);
-               
+                
             } else {
-                setError(response.data.message);
+                // Display backend error message to user
+                setError(response.error || response.data?.message || 'Login failed');
             }
-        } catch (err) {
-            alert('Server error. Please try again.');
             
+        } catch (err) {
+            // Handle unexpected errors (network issues, etc.)
+            console.error('Login error:', err);
+            setError('Server error. Please try again.');
         }
     }
 
@@ -53,7 +74,7 @@ const Login = () => {
             <div className={`flex flex-row h-screen w-full lg:w-screen overflow-hidden bg-linear-to-br from-[#4c7a57] to-[#0e3844] relative`}>
 
             {/* Left-Side Container*/}
-            <div className="flex flex-col items-center justify-center w-3/4 h-screen  hidden lg:block" >
+            <div className="flex flex-col items-center justify-center w-3/4 h-screen hidden lg:block" >
             {/* UDM logo */}
             <img src={UDMLogo} alt="Universidad de Manila Logo" className='absolute top-5 left-5 h-18'/>
 

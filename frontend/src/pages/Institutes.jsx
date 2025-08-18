@@ -100,7 +100,7 @@ const Institutes = () => {
         
     return(
         <>
-            <div className="p-6 border border-neutral-800 rounded-xl bg-neutral-200 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:bg-[#19181A]">
+            <div className="p-6 border border-neutral-800 rounded-xl bg-neutral-200 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:bg-gray-900">
                 <div className="flex flex-wrap gap-16 mb-8">
                   <CreateCard setShowForm={setShowForm}/>
                 {institutes.map(institute => (
