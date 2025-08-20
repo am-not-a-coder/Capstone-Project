@@ -14,29 +14,29 @@ import Tasks from './pages/Tasks';
 import Profile from './pages/Profile';
 import Notification from './pages/Notification';
 import Messages from './pages/Messages';
-
+import { fetchCurrentUser, getCurrentUser } from './utils/auth_utils';
+import { useEffect, useState } from 'react';
 
 function App() {
 
-  //Checks if the token is not expired and directs the user to login if it is
-  // axios.interceptors.response.use(
-  //   response => response,
-  //   error => {
-  //     if (error.response?.status === 401){
-  //       console.log("Your token is expired!")
-  //       localStorage.removeItem('token');
-  //       window.location.href = '/login'
-  //     }
-  //     return Promise.reject(error);
-  //   }
-  // )
+  const [authReady, setAuthReady] = useState(false)
 
+  useEffect(() => {
+    
+    fetchCurrentUser().finally(() => {
+      setAuthReady(true)
+    })
+  }, [authReady])
 
 
   // If the user is not logged in it will redirect to login page
     const ProtectedRoute = ({children}) => {
-      // Use   authentication check instead of direct localStorage access
-      return isLoggedIn() ? children : <Navigate to="/Login" />
+      
+      if (!authReady) {
+        return null
+      } else {
+        return isLoggedIn() ? children : <Navigate to="/Login" />
+      }
     }
   
   return (

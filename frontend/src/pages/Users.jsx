@@ -99,7 +99,7 @@ const Users = () => {
             setStatusMessage(res.data.message);
             setShowStatusModal(true);
             setStatusType("success");
-
+        
             const selectedProgram = programOption.find(program => program.programID == programID);
             const selectedProgramName = selectedProgram ? selectedProgram.programName: "";
 
@@ -130,7 +130,7 @@ const Users = () => {
             setProgramID("")
             setAreaID("")
             setProfilePic(null)
-            
+        
         } catch(err){
             console.log("Full error object:", err);
             console.log("Error response:", err.response);
@@ -197,7 +197,7 @@ const Users = () => {
     }
     fetchArea();
     }, [])
-
+    
     function removeAndClose() {
         setRemoveUser(true); 
         setRemoveUser(false); 
@@ -249,7 +249,7 @@ const Users = () => {
 
     return (
         <div className="min-h-screen p-6 border border-neutral-800 rounded-xl bg-neutral-200 dark:bg-gray-900">
-            {showStatusModal && (
+        {showStatusModal && (
                 <StatusModal message={statusMessage} type={statusType} showModal={showStatusModal} onClick={()=>setShowStatusModal(false)} />
             )}
 
@@ -352,7 +352,7 @@ const Users = () => {
 
                         {/* Form Fields */}
                         <div className='grid grid-cols-1 gap-6 lg:w-2/3 md:grid-cols-2'>
-                            <div className='relative'>
+                        <div className='relative'>
                                 <input 
                                     type="text" 
                                     value={employeeID} 
@@ -365,9 +365,9 @@ const Users = () => {
                                 <label className="absolute text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-gray-50 dark:bg-gray-700 px-2 peer-focus:px-2 peer-focus:text-blue-600 dark:peer-focus:text-blue-400 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3">
                                     Employee ID
                                 </label>
-                            </div>
+                        </div>
 
-                            <div className='relative'>
+                        <div className='relative'>
                                 <input 
                                     type="text" 
                                     value={fName} 
@@ -380,9 +380,9 @@ const Users = () => {
                                 <label className="absolute text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-gray-50 dark:bg-gray-700 px-2 peer-focus:px-2 peer-focus:text-blue-600 dark:peer-focus:text-blue-400 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3">
                                     First Name
                                 </label>
-                            </div>
+                        </div>
 
-                            <div className='relative'>
+                        <div className='relative'>
                                 <input 
                                     type="text" 
                                     value={lName} 
@@ -395,9 +395,9 @@ const Users = () => {
                                 <label className="absolute text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-gray-50 dark:bg-gray-700 px-2 peer-focus:px-2 peer-focus:text-blue-600 dark:peer-focus:text-blue-400 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3">
                                     Last Name
                                 </label>
-                            </div>
+                        </div>
 
-                            <div className='relative'>
+                        <div className='relative'>
                                 <input 
                                     type="text" 
                                     value={suffix} 
@@ -409,9 +409,9 @@ const Users = () => {
                                 <label className="absolute text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-gray-50 dark:bg-gray-700 px-2 peer-focus:px-2 peer-focus:text-blue-600 dark:peer-focus:text-blue-400 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3">
                                     Suffix (Optional)
                                 </label>
-                            </div>
+                        </div>
 
-                            <div className='relative'>
+                        <div className='relative'>
                                 <input 
                                     type={!hidePassword ? "password" : "text"} 
                                     value={password} 
@@ -431,9 +431,9 @@ const Users = () => {
                                 >
                                     <FontAwesomeIcon icon={!hidePassword ? faEye : faEyeSlash} />
                                 </button>
-                            </div>
+                        </div>
 
-                            <div className='relative'>
+                        <div className='relative'>
                                 <input 
                                     type="email" 
                                     required 
@@ -446,7 +446,7 @@ const Users = () => {
                                 <label className="absolute text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-3 text-gray-500 dark:text-gray-400 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-gray-50 dark:bg-gray-700 px-2 peer-focus:px-2 peer-focus:text-blue-600 dark:peer-focus:text-blue-400 peer-placeholder-shown:scale-100">
                                     Email Address
                                 </label>
-                            </div>
+                        </div>
 
                             <div className='relative'>
                                 <input 
@@ -462,8 +462,8 @@ const Users = () => {
                                     Contact Number
                                 </label>
                             </div>
-
-                            <div className='relative'>
+                    
+                        <div className='relative'>
                                 <select 
                                     name="programID" 
                                     value={programID}  
@@ -471,16 +471,16 @@ const Users = () => {
                                     onChange={(e) => setProgramID(e.target.value)} 
                                     className='w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white'
                                 >
-                                    <option value="">Select Program</option>
+                                <option value="">Select Program</option>
                                     {programOption.map((program) => (
                                         <option key={program.programID} value={program.programID}>
                                             {program.programName}
                                         </option>
                                     ))}
-                                </select>
-                            </div>
+                            </select>
+                        </div>
 
-                            <div className='relative'>
+                        <div className='relative'>
                                 <select 
                                     name="areaID" 
                                     value={areaID} 
@@ -488,14 +488,14 @@ const Users = () => {
                                     onChange={(e) => setAreaID(e.target.value)} 
                                     className='w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white'
                                 >
-                                    <option value="">Select Area</option>
+                                <option value="">Select Area</option>
                                     {areaOption.map((area) => (
                                         <option key={area.areaID} value={area.areaID}>
                                             {area.areaNum}
                                         </option>
                                     ))}
-                                </select>
-                            </div>
+                            </select>
+                        </div>
 
                             <div className="flex justify-center mt-6 md:col-span-2">
                                 <button 
@@ -509,7 +509,7 @@ const Users = () => {
                         </div>
                     </form>
                 </div>
-            </div>
+                </div>
 
             {/* Users List */}
             <div className={`${visible === "list" ? "block" : "hidden"}`}>
@@ -577,8 +577,8 @@ const Users = () => {
                                         />
                                     </button>
                                     
-                                </div>
-                                
+                            </div>
+
                                 <div className="my-auto">
                                     {selectedUser.profilePic ? 
                                         <div className="relative w-40 h-40 mx-auto group">
@@ -654,8 +654,8 @@ const Users = () => {
 
 
                     </div>
-                )}
-            </div>
+                    )}
+                </div>
         </div>
     );
 };

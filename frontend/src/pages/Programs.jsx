@@ -8,7 +8,7 @@ import { getCurrentUser } from '../utils/auth_utils';
 
 
   const Programs = () => {
-    {/*use state function*/}
+    // use state function
   const [programs, setPrograms] = useState([]);
   const [employees, setEmployees] = useState([]);    
   const [showForm, setShowForm] = useState(false);
@@ -59,8 +59,6 @@ useEffect(() => {
       };
       fetchEmployees();
     }, []); // No more token dependency!
-
-
 
 
 

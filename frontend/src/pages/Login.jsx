@@ -2,7 +2,6 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import Carousel from '../components/Carousel';
 import { apiPost } from '../utils/api_utils';
-import { storeToken } from '../utils/auth_utils';
 import udmsLogo from '../assets/udms-logo.png';
 import UDMLogo from '../assets/UDM-logo.png';
 import toast , { Toaster } from 'react-hot-toast';
@@ -13,7 +12,7 @@ import {
     faEye,
     faEyeSlash
 } from '@fortawesome/free-solid-svg-icons';
-
+import { cacheUserAfterLogin } from '../utils/auth_utils';
 
 const Login = () => {
 
@@ -54,21 +53,13 @@ const Login = () => {
             if (response.success && response.data.success) {
                 // Clear any previous errors
                 setError(null);
-                
-                // Store all authentication data using our utility
-                // This includes access_token, refresh_token, and user info
-                storeToken({
-                    access_token: response.data.access_token,
-                    refresh_token: response.data.refresh_token,
-                    user: response.data.user
-                });
-                
+                await cacheUserAfterLogin()
                 // Navigate to dashboard after successful login
                 sessionStorage.setItem('LoggedIn', 'true')
                 toast.dismiss(toastId)
                 navigate('/Dashboard');
                 
-            } else {
+            } else { 
                 // Display backend error message to user
                 setError(response.error || response.data?.message || 'Login failed');
                 toast.error('Login Failed')

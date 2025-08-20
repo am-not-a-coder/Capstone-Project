@@ -1,6 +1,5 @@
 import { useState, useEffect} from 'react';
 import { useLocation, Outlet, useNavigate } from 'react-router-dom';
-import { clearTokens } from './utils/auth_utils';
 
 //Importing Components
 import './App.css'
@@ -20,6 +19,7 @@ import{
     faIdCardClip,
     faArrowRightFromBracket
 } from '@fortawesome/free-solid-svg-icons';
+import { logoutAcc } from './utils/auth_utils';
 
 const MainLayout = () => {
   //sets the active pages' path in the link
@@ -53,7 +53,7 @@ const MainLayout = () => {
   useEffect(() => {
     if (logout){
       // removes access_token, refresh_token, and user info
-      clearTokens()
+      logoutAcc()
       navigate('/login')
     }
   }, [logout])

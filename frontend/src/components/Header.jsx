@@ -13,6 +13,7 @@ import avatar2 from '../assets/avatar2.png';
 import avatar3 from '../assets/avatar3.png';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useNavigate } from 'react-router-dom';
+import { getCurrentUser } from '../utils/auth_utils';
 
 
 
@@ -27,7 +28,8 @@ const Header = ({title}) => {
     const notifRef = useRef(null);
     const messageRef = useRef(null);
     const iconContainerRef = useRef(null)
-
+    const user = getCurrentUser()
+    
     useEffect( () => {
         const handleOutsideClick = (e) => {
             if (
@@ -179,8 +181,8 @@ const Header = ({title}) => {
                                 icon={faCircleUser} 
                                 className='mb-5 text-6xl dark:text-white' 
                         />
-                            <h1 className='mb-2 text-xl font-semibold text-center dark:text-white'>John Doe</h1>
-                            <h2 className='text-center text-md font-extralight dark:text-white'>johndoe123@gmail.com</h2>
+                            <h1 className='mb-2 text-xl font-semibold text-center dark:text-white'>{user.firstName} {user.lastName}</h1>
+                            <h2 className='text-center text-md font-extralight dark:text-white'>{user.email}</h2>
                         </div>
                         {/* View Profile */}
                         <Link to='/Profile' className='flex items-center w-full p-3 mb-5 text-xl transition-all duration-300 bg-neutral-300 border-neutral-900 dark:border-gray-800 rounded-xl inset-shadow-xs inset-shadow-neutral-400 hover:text-white hover:bg-zuccini-700 dark:bg-gray-950 dark:text-white dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>

@@ -3,7 +3,7 @@ import avatar1 from '../assets/avatar1.png';
 import MessagesItem from '../components/MessagesItem';
 import { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
-import { getAccessToken, getCurrentUser } from '../utils/auth_utils';
+import { getCurrentUser } from '../utils/auth_utils';
 import { apiGet, apiPost } from '../utils/api_utils';
 
 const Messages = () => {
@@ -194,20 +194,11 @@ const Messages = () => {
 
   // WebSocket Connection
   useEffect(() => {
-    const token = getAccessToken();
     const currentUser = getCurrentUser();
-
-    if (!token || !currentUser) {
-      console.log('No token or user found');
-      return;
-    }
 
     // Create connection
     console.log('🔌 Connecting to WebSocket... Current user:', currentUser.employeeID);
     socketRef.current = io('http://localhost:5000', {
-      auth: {
-        token: token
-      },
       transports: ['websocket', 'polling']
     });
 

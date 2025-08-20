@@ -4,6 +4,7 @@ from app import db
 from werkzeug.security import check_password_hash, generate_password_hash, _hash_internal
 from werkzeug.utils import secure_filename
 from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, get_jwt
+from flask_jwt_extended import set_access_cookies, set_refresh_cookies, unset_jwt_cookies
 from flask_jwt_extended.exceptions import JWTExtendedException
 from datetime import datetime, timedelta
 import os
@@ -13,7 +14,7 @@ from app.models import Employee, Program, Area, Subarea, Institute, Document, De
 
 def register_routes(app):
                                         #AUTHENTICATION(LOGIN/LOGOUT) PAGE ROUTES 
-
+    
     # JWT Exception Handler
     @app.errorhandler(JWTExtendedException)
     def handle_jwt_exception(e):
@@ -51,6 +52,8 @@ def register_routes(app):
                 db.session.commit()      
                 try:
                     # Create both access token (15 minutes) and refresh token (7 days)
+
+
                     access_token = create_access_token(
                         identity=empID,
                         expires_delta=timedelta(minutes=15),  # Short-lived for security
@@ -80,13 +83,15 @@ def register_routes(app):
                         'role': 'admin' if user.isAdmin else 'user'
                     }
                     
-                    return jsonify({
-                        'success': True, 
-                        'message': f'Welcome!, {user_data["lastName"]}',
-                        'access_token': access_token,
-                        'refresh_token': refresh_token,
+                    resp = jsonify({
+                        'success': True,
+                        'message': f"Welcome!, {user_data['lastName']}",
                         'user': user_data
                     })
+                    set_access_cookies(resp, access_token)
+                    set_refresh_cookies(resp, refresh_token)
+                    return resp
+                
                 except Exception as jwt_error:
                     current_app.logger.error(f"JWT Error: {jwt_error}")
                     return jsonify({'success': False, 'message': 'Token generation failed'}), 500
@@ -97,6 +102,27 @@ def register_routes(app):
             current_app.logger.error(f"Login error: {e}")
             return jsonify({'success': False, 'message': 'Internal server error'}), 500
         
+    @app.route('/api/me', methods=['GET'])
+    @jwt_required()
+    def me():
+        emp_id = get_jwt_identity()
+        user = Employee.query.filter_by(employeeID=emp_id).first()
+        if not user:
+            return jsonify({'success': False, 'message': 'User not found'})
+        return jsonify({
+            'success': True,
+            'user': {
+                'employeeID': user.employeeID,
+                'firstName': user.fName,
+                'lastName': user.lName,
+                'suffix' : user.suffix,
+                'email': user.email,
+                'contactNum': user.contactNum,
+                'profilePic': user.profilePic,
+                'isAdmin': user.isAdmin,
+                'role': 'admin' if user.isAdmin else 'user'
+            }
+        }), 200
 
         
     @app.route('/api/protected', methods=["GET"])
@@ -176,10 +202,9 @@ def register_routes(app):
     #LOGOUT API
     @app.route('/api/logout', methods=["POST"])
     def logout():
-        session["isOnline"] = False
-        session.clear()
-        return jsonify({"message":"You have logged out the system"})
-    
+        resp = jsonify({'success': True})
+        unset_jwt_cookies(resp)
+        return resp
 
                                         #USER PAGE ROUTES
 
@@ -237,8 +262,8 @@ def register_routes(app):
                 file.save(file_path)
                 profilePic = f"/uploads/{filename}"
             except Exception as e:
-                print(f"File Upload Error: {e}")
-                return jsonify({'success': False, 'message': 'Failed to upload profile picture'}), 400
+                    print(f"File Upload Error: {e}")
+                    return jsonify({'success': False, 'message': 'Failed to upload profile picture'}), 400
 
 
 
@@ -262,7 +287,7 @@ def register_routes(app):
             db.session.add(new_user)
             db.session.commit()
             return jsonify({'success': True, "message": "Employee created successfully"}), 201  
-        
+
 
     #Reset user password (for fixing invalid password hashes)
     @app.route('/api/user/<string:employeeID>/reset-password', methods=["POST"])
@@ -453,7 +478,7 @@ def register_routes(app):
                 'success': False, 
                 'message': 'Failed to fetch profile'
             }), 500
-
+                                                            
     #Get the users 
     @app.route('/api/users', methods=["GET"])
     @jwt_required()
@@ -1028,7 +1053,7 @@ def register_routes(app):
         try:
             # Create upload directory
             os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-            
+
             # Save file
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             print("Saving file to:", file_path)
@@ -1075,7 +1100,7 @@ def register_routes(app):
     def preview_file(filename):   
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-    
+            
     #                                   MESSAGING API ROUTES
     
     # Get all conversations for current user
