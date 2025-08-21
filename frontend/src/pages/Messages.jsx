@@ -6,6 +6,7 @@ import MessagesItem from '../components/MessagesItem';
 import { useState, useRef, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSquareXmark, faPaperPlane } from '@fortawesome/free-solid-svg-icons';
+import { useLocation, useSearchParams } from 'react-router-dom';
 
 //static message data with id to track converstaion
 const messagesData = [
@@ -37,6 +38,10 @@ const messagesData = [
 
 
 const Messages = () => {
+  //Parameter handling
+  const [searchParams] = useSearchParams();
+  const openConversationId = searchParams.get('openConversation');
+
   //state to hold messages
   const [messages, setMessages] = useState(messagesData);
 
@@ -55,6 +60,19 @@ const Messages = () => {
 
   //state for input field
   const [newMessage, setNewMessage] = useState("");
+
+  //Effect for auto open convo from URL
+  useEffect(() => {
+    if (openConversationId) {
+      const messageToOpen = messages.find(msg => msg.id === parseInt(openConversationId));
+
+      if (messageToOpen) {
+        handleOpenConversation(messageToOpen); //auto open convo
+
+        window.history.replaceState({}, '', '/Messages'); //Clears URL
+      }
+    }
+  }, [openConversationId, messages]);
 
   //Reference to the messg container
   const messageEndRef = useRef(null);

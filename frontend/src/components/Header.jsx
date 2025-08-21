@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react';    
 import {
     faBell,
@@ -17,9 +17,15 @@ import { useNavigate } from 'react-router-dom';
 
 
 const Header = ({title}) => {
+    //location detection
+    const location = useLocation();
+
     const [showProfile , setShowProfile] = useState(false);
     const [showNotification, setShowNotification] = useState(false);
     const [showMessages, setShowMessages] = useState(false);
+
+    //state for message read status
+    const [messageReadStatus, setMessageReadStatus] = useState({});
 
     //closes tab when clicked outside
 
@@ -104,20 +110,23 @@ const Header = ({title}) => {
     //static message data
     const messages = [
         {
+            id: 1,
             profilePic: avatar1,
             user: 'Miguel Derick Pangindian',
             message: 'WHY DID YOU REDEEM IT?!?!?',
             time: '3m',
-            alert: true
+            alert: !messageReadStatus[1] //check if read
         },
         {
+            id: 2,
             profilePic: avatar2,
             user: 'Jayson Permejo',
             message: "Hello? How are you, I'm under the water, I'm so much drowning, bulululul",
             time: '5h',
-            alert: false
+            alert: !messageReadStatus[2]
         },
         {
+            id: 3,
             profilePic: avatar3,
             user: 'Rafael Caparic',
             message: "Nothing beats a jet2 holiday!",
@@ -239,7 +248,7 @@ const Header = ({title}) => {
                     <div className='flex flex-col p-3 min-h-[300px] bg-neutral-300 w-full rounded-xl dark:text-white dark:bg-gray-950 dark:inset-shadow-xs dark:inset-shadow-zuccini-800'>
                         {messages && messages.length > 0 ? (
                             messages.map((message, index) => (
-                                <Messages key={index} picture={message.profilePic} userName={message.user} message={message.message} time={message.time} alert={message.alert}/>
+                                <Messages key={index} picture={message.profilePic} userName={message.user} message={message.message} time={message.time} alert={message.alert} messagesId={message.id} onMarkAsRead={(id) => setMessageReadStatus(prev => ({...prev, [id]: true}))} onClose={() => setShowMessages(false)}/>
                             ))
                         ) : (
                             <h1 className='text-xl text-center text-neutral-600'>No new messages</h1>
@@ -300,10 +309,22 @@ export const Notifications = ({notifTitle, content, date, alert, picture, link})
 
 //generates the message div
 
-export const Messages = ({picture, userName, message, time, alert}) => {
+export const Messages = ({picture, userName, message, time, alert, messagesId, onMarkAsRead, onClose}) => {
+    const navigate = useNavigate();
+    const location = useLocation(); //get current location
+
+    //handles click navigation to messgs page with specfiic convo
+    const handleMessageClick = () => {
+        onMarkAsRead(messagesId); //mark as read
+        onClose(); //auto close dropdown
+        navigate(`/Messages?openConversation=${messagesId}`);
+        
+    }
 
     return (
-        <div className='relative flex items-center w-full min-h-[50px] p-3 border mb-2 rounded-xl bg-neutral-200 shadow-md transition-transform duration-200 cursor-pointer hover:shadow-lg hover:scale-101 dark:border-none dark:bg-gray-900 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm '>
+        <div 
+        onClick={handleMessageClick}
+        className='relative flex items-center w-full min-h-[50px] p-3 border mb-2 rounded-xl bg-neutral-200 shadow-md transition-transform duration-200 cursor-pointer hover:shadow-lg hover:scale-101 dark:border-none dark:bg-gray-900 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm '>
             <img 
             src={picture} 
             alt="profile picture"
