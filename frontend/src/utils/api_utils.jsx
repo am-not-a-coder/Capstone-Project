@@ -10,7 +10,6 @@ export const MakeApiCalls = async (endpoint, options = {}) => {
     // Get current access token for authentication
     const accessToken = getAccessToken()
 
-
     // Default headers (don't set Content-Type for FormData)
     const defaultHeaders = {}
 
@@ -34,6 +33,60 @@ export const MakeApiCalls = async (endpoint, options = {}) => {
 
     try {
         const response = await fetch(fullUrl, finalOptions)
+        
+        // Handle blob responses (for file downloads)
+        if (options.responseType === 'blob') {
+            if (response.ok) {
+                const blob = await response.blob()
+                return {
+                    success: true,
+                    data: blob,
+                    status: response.status,
+                    headers: response.headers
+                }
+            }
+            
+            // For error responses with blob type, try to parse as JSON first
+            let errorData
+            try {
+                errorData = await response.json()
+            } catch {
+                errorData = { message: `HTTP ${response.status}: ${response.statusText}` }
+            }
+            
+            // Handle authentication failures for blob requests
+            if (response.status === 401) {
+                const refreshToken = getRefreshToken()
+                if (refreshToken && endpoint !== '/api/refresh-token') {
+                    try {
+                        const refreshResult = await refreshAccessToken()
+                        if (refreshResult.success) {
+                            // Retry original request with new token
+                            return MakeApiCalls(endpoint, options)
+                        }
+                    } catch (refreshError) {
+                        console.error('Token refresh failed:', refreshError)
+                    }
+                }
+
+                clearTokens()
+                window.location.href = '/login'
+                return {
+                    success: false,
+                    error: 'Authentication expired. Please login again.',
+                    status: 401
+                }
+            }
+            
+            return {
+                success: false,
+                error: errorData.message || errorData.error || 'Request failed',
+                data: errorData,
+                status: response.status
+            }
+        }
+
+        // Regular JSON response handling
         const data = await response.json()
 
         if (response.ok) {
@@ -147,13 +200,20 @@ export const apiDelete = (endpoint, additionalOptions = {}) => {
     return MakeApiCalls(endpoint, { method: 'DELETE', ...additionalOptions })
 }
 
-
 // POST request with FormData (e.g. file uploads)
-
 export const apiPostForm = (endpoint, formData, additionalOptions = {}) => {
     return MakeApiCalls(endpoint, {
         method: 'POST',
         body: formData,
         ...additionalOptions
+    })
+}
+
+// GET request for blob/file downloads
+export const apiGetBlob = (endpoint, additionalOptions = {}) => {
+    return MakeApiCalls(endpoint, { 
+        method: 'GET', 
+        responseType: 'blob',
+        ...additionalOptions 
     })
 }

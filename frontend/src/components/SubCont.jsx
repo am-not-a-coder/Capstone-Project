@@ -39,7 +39,7 @@ const SubCont = ({title, criteria, onClick, onRefresh, onFilePreview}) => {
         {/* CriteriaGroup div */}
         <div 
         onClick={() => setCriteriaExpand(isOpen ? null : index)}
-        className='flex flex-row justify-between p-3 mb-2 ml-5 border shadow-md cursor-pointer rounded-2xl text-neutral-800 dark:text-white dark:border-none dark:bg-gray-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800'>
+        className='flex flex-row justify-between p-3 mb-2 ml-5 transition-all duration-300 border shadow-md cursor-pointer rounded-2xl text-neutral-800 hover:scale-101 dark:text-white hover:border-neutral-800 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600 hover:shadow-xl'>
             <h2 className='font-semibold'>{groupName}</h2>
              <div className='mr-3'>
                     <FontAwesomeIcon 
@@ -53,8 +53,9 @@ const SubCont = ({title, criteria, onClick, onRefresh, onFilePreview}) => {
         <div className={`flex flex-col ml-5 overflow-hidden transition-all duration-400 ease-in-out ${
             isOpen ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0' 
         }`}>
+            {/* Criteria Rendering */}
             {items.length > 0 ? items.map((item, index) => (
-                <div key={index} className='flex flex-row justify-between gap-3 p-3 mb-2 ml-5 border shadow-md cursor-default rounded-2xl text-neutral-800 dark:border-none dark:text-white dark:bg-gray-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800'>
+                <div key={index} className='flex flex-row justify-between gap-3 p-3 mb-2 ml-5 transition-all duration-300 border shadow-md cursor-default rounded-2xl text-neutral-800 dark:text-white hover:border-neutral-800 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600'>
                     <span className='break-words text-[15px] max-w-[65%] whitespace-pre-wrap'>{item.content}</span>
 
                     <div className='flex flex-col items-center justify-center'>
@@ -62,7 +63,7 @@ const SubCont = ({title, criteria, onClick, onRefresh, onFilePreview}) => {
                         {item.docName ? (
                             <button
                             onClick={() =>{onFilePreview(item.docName, item.docPath)}}
-                            className='font-light text-center cursor-pointer text-sm hover:underline'>{item.docName}</button>
+                            className='text-sm font-light text-center cursor-pointer hover:underline'>{item.docName}</button>
 
                         ) : (
                             <span className='text-sm text-gray-500'>No file attached</span>
@@ -106,7 +107,7 @@ const SubCont = ({title, criteria, onClick, onRefresh, onFilePreview}) => {
         <li className='flex flex-col list-inside'>
             <button 
                 onClick={() => setExpanded(prev => !prev)}
-                className='flex flex-row justify-between p-3 mb-2 ml-5 border shadow-md cursor-pointer rounded-2xl text-neutral-800 dark:border-none dark:text-white dark:bg-gray-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800'>   
+                className='flex flex-row justify-between p-3 mb-2 ml-5 transition-all duration-300 border shadow-md cursor-pointer rounded-2xl text-neutral-800 hover:scale-101 dark:text-white hover:border-neutral-800 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600 hover:shadow-xl'>   
                 <h1 className='font-semibold text-md'>{title}</h1>
                 <div className='mr-3'>
                     <FontAwesomeIcon 

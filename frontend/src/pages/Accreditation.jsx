@@ -8,11 +8,12 @@
   import AreaCont from '../components/AreaCont';
   import SubCont from '../components/SubCont';
   import CreateModal from '../components/modals/CreateModal';
-  import { apiGet } from '../utils/api_utils';
+  import { apiGet, apiGetBlob } from '../utils/api_utils';
 
   import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer";
   import "@cyntler/react-doc-viewer/dist/index.css";
   import "../../index.css"
+
   
   const Accreditation = () => {
     const [expandedAreaIndex, setExpandedAreaIndex] = useState(null);
@@ -58,14 +59,17 @@
         setIsLoading(true);
         setError(null);
         setDocs([]); // Clear previous documents
-        setShowPreview(false); // Hide preview temporarily
-        
-        // Construct the full URL
-        const fullURL = docPath.startsWith('http') || docPath.startsWith('https')
-          ? docPath
-          : `http://localhost:5000/api/accreditation/preview/${encodeURIComponent(docName)}`;
-            
+        setShowPreview(true); 
 
+        const response = await apiGetBlob(`/api/accreditation/preview/${encodeURIComponent(docName)}`)
+        if(!response.success) {
+          throw new Error(response.error || "Failed to download the file")
+        }
+
+        // Construct the full URL
+        const fileURL = URL.createObjectURL(response.data);
+      
+        
         // Helper function to determine file type from filename
         const getFileType = (fileName) => {
           const extension = fileName.split('.').pop()?.toLowerCase();
@@ -88,7 +92,7 @@
         };
 
         const newDocument = {
-          uri: fullURL,
+          uri: fileURL,
           fileName: docName,
           fileType: getFileType(docName)
         };
@@ -116,10 +120,10 @@
 
     return(
     <>
-        <div className="relative flex flex-row justify-around border border-neutral-800 rounded-[20px] min-w-[950px] min-h-[90%] shadow-md p-3 bg-neutral-200 dark:bg-gray-900 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
+        <div className="relative flex flex-row justify-around border border-neutral-300 rounded-[20px] min-w-[950px] min-h-[90%] shadow-md inset-shadow-sm inset-shadow-gray-400 p-3 bg-neutral-200 dark:bg-gray-900 dark:inset-shadow-zuccini-800">
           <div className='flex flex-col w-full p-3 overflow-auto'>
             <div className='flex flex-row gap-5 mb-5'>
-                <button onClick={() => {setShowCreateModal(true)}}  className='flex flex-row items-center justify-around px-3 font-semibold transition-all duration-300 border border-black shadow-lg cursor-pointer rounded-2xl text-neutral-800 hover:scale-105 hover:shadow-2xl hover:bg-zuccini-600 hover:text-white dark:border-none dark:text-white dark:bg-gray-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800'>
+                <button onClick={() => {setShowCreateModal(true)}}  className='flex flex-row items-center justify-around px-3 font-semibold transition-all duration-300 border border-neutral-300 shadow-md cursor-pointer rounded-2xl text-neutral-800 hover:scale-101 hover:shadow-xl hover:bg-zuccini-500 hover:text-white inset-shadow-sm inset-shadow-gray-400 dark:text-white dark:bg-gray-950/50 dark:shadow-md dark:hover:shadow-lg dark:hover:bg-zuccini-500/70 dark:shadow-zuccini-800'>
                     Create
                     <FontAwesomeIcon icon={faPlus} className='ml-3'/>
                 </button>
@@ -133,14 +137,14 @@
                 )}
 
                 {/* Breadcrumbs */}
-                <div className='p-3 bg-neutral-300 rounded-xl w-[89%] text-neutral-800 font-semibold dark:text-white dark:bg-gray-950/50'>
+                <div className='p-3 bg-neutral-300/90 rounded-xl w-[89%] border-neutral-300 text-neutral-800 font-semibold dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50'>
                     <h1 className='text-md'>Home / BSIT / Level 1 Phase 1 / Area I</h1>   
                 </div>
             </div>
 
             {/* Area Containers */}
             {area.map((area) => (
-              <div key={area.areaID} className='flex flex-col '>
+              <div key={area.areaID} className='flex flex-col'>
                 <AreaCont 
                   title={area.areaName} 
                   onClick={() => handleDropDown(area.areaID)}
@@ -173,7 +177,7 @@
           {/* Document Viewer Section */}
           <div className={`relative transition-all duration-500 ease-in-out overflow-hidden ${showPreview ? 'w-full opacity-100 fade-in-right' : 'w-0 opacity-0 fade-in-right'}`} style={{ height: '100vh' }}>
             {showPreview && (
-              <div className='w-full h-full relative' style={{ minHeight: '600px', minWidth: '400px' }}>
+              <div className='relative w-full h-full' style={{ minHeight: '600px', minWidth: '400px' }}>
                 
                 {/* Loading State */}
                 {isLoading && (
@@ -185,11 +189,11 @@
                 {/* Error State */}
                 {error && (
                   <div className="flex flex-col items-center justify-center h-full p-4">
-                    <div className="text-red-500 text-lg mb-2">Error Loading Document</div>
-                    <div className="text-sm text-gray-600 text-center">{error}</div>
+                    <div className="mb-2 text-lg text-red-500">Error Loading Document</div>
+                    <div className="text-sm text-center text-gray-600">{error}</div>
                     <button 
                       onClick={() => {setShowPreview(false); setError(null);}}
-                      className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                      className="px-4 py-2 mt-4 text-white bg-blue-500 rounded hover:bg-blue-600"
                     >
                       Close
                     </button>
@@ -199,7 +203,7 @@
                 {/* Document Viewer */}
                 {!isLoading && !error && docs.length > 0 && (
                   <>
-                    <div className="w-full h-full absolute inset-0">
+                    <div className="absolute inset-0 w-full h-full">
                       <DocViewer 
                         key={docViewerKey} // Force re-render when key changes
                         pluginRenderers={DocViewerRenderers}
@@ -243,7 +247,7 @@
                         setDocs([]);
                         setError(null);
                       }}
-                      className="z-10 absolute text-2xl text-white/50 rounded-full border-1 border-black top-3 right-4 cursor-pointer hover:text-red-400 transition-all duration-300"
+                      className="absolute z-10 text-2xl transition-all duration-300 border-black rounded-full cursor-pointer text-white/50 border-1 top-3 right-4 hover:text-red-400"
                     /> 
                     
                     {/* View Full Document Button */}
@@ -253,7 +257,7 @@
                           window.open(docs[0].uri, '_blank');
                         }
                       }}
-                      className="absolute bottom-4 right-4 z-10 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-300 font-medium shadow-lg"
+                      className="absolute z-10 px-4 py-2 font-medium text-white transition-all duration-300 bg-green-600 rounded-lg shadow-lg bottom-4 right-4 hover:bg-green-700"
                     >
                       View Full Document
                     </button>

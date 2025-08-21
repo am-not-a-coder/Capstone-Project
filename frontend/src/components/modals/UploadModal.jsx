@@ -270,9 +270,9 @@ const UploadModal = ({ onClose, showModal, criteriaID, onUploadSuccess}) => {
                       <span className="text-gray-600 dark:text-gray-400">Uploading...</span>
                       <span className="text-gray-600 dark:text-gray-400">{Math.round(uploadProgress)}%</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+                    <div className="w-full h-2 bg-gray-200 rounded-full dark:bg-gray-700">
                       <div 
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+                        className="h-2 transition-all duration-300 ease-out bg-blue-600 rounded-full"
                         style={{ width: `${uploadProgress}%` }}
                       ></div>
                     </div>

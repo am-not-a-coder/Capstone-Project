@@ -27,13 +27,13 @@ export const SidebarContext = createContext();
     
         <>
             
-            <aside className={`absolute lg:relative row-span-5 h-screen mt-0 lg:mt-3 ml-0 lg:ml-3 transition-all duration-500 ${ expanded ? 'w-70' : 'hidden lg:block w-12'} z-40`}>
+            <aside className={`absolute lg:relative row-span-5 h-screen mt-0 lg:mt-3 ml-0 lg:ml-3 transition-all duration-500 ${ expanded ? 'w-70' : 'hidden lg:block w-13'} z-40`}>
                 
-                <nav className={`${expanded ? '' : 'hidden lg:block'} relative flex flex-col bg-gray-200 border-1 border-black rounded-lg shadow-neutral-500 shadow-lg transition-all duration-500 dark:bg-gray-900 dark:shadow-none dark:border-none`}>
+                <nav className={`${expanded ? '' : 'hidden lg:block'} min-h-[625px] relative flex flex-col bg-gray-200 border-1 border-neutral-600 dark:border-neutral-500 rounded-lg shadow-lg transition-all duration-500 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-800 dark:bg-gray-900`}>
 
                 {/* Title and Logo */}
-                <div className="flex items-center justify-between pt-3 pb-2 pl-2 pr-10 transition-all duration-500">
-                    <img src={udmsLogo} alt="UDMS Logo" className={`m-2 h-10 rounded-full w-10 transition-all duration-500 ${expanded ? 'opacity-100 w-10' : 'opacity-0 w-0'}`}/>
+                <div className={`flex items-center justify-between pt-3 pb-2 ${expanded ? 'pr-10 pl-2' : 'pl-1'}  transition-all duration-500`}>
+                    <img src={udmsLogo} alt="UDMS Logo" className={`${expanded ? 'm-2' : ''} h-10 rounded-full w-10 transition-all duration-500`}/>
                     <h4 className={`overflow-hidden transition-all m-1 line-clamp-2 font-semibold text-neutral-950 ${expanded ? 'w-42 opacity-100 ml-2' : 'w-0 opacity-0 ml-0'} dark:text-white transition-all duration-500`}>University Document Management System</h4>
                     
                 </div>
@@ -45,7 +45,7 @@ export const SidebarContext = createContext();
                     <input
                         type="text" 
                         placeholder="Search..." 
-                        className={`min-w-65 p-2 pl-10 text-black placeholder-neutral-200 rounded-xl bg-gray-300 border dark:bg-gray-950 dark:border-gray-800 border-gray-900 transition-colors duration-500 focus:outline-none focus:ring-2 focus:ring-zuccini-900 ${expanded ? '' : 'cursor-pointer'} dark:border-neutral-800 dark:bg-[#242424]`}
+                        className={`min-w-65 p-2 pl-10 text-black placeholder-neutral-400 rounded-xl bg-gray-300 border dark:bg-gray-950 dark:border-gray-800 border-gray-900 transition-colors duration-500 focus:outline-none focus:ring-2 focus:ring-zuccini-900 ${expanded ? '' : 'cursor-pointer'} dark:border-neutral-800 dark:bg-[#242424]`}
                     />
                 </div>
 
@@ -60,7 +60,7 @@ export const SidebarContext = createContext();
                 
             </aside>
 
-            <button onClick={() => setExpanded(current => !current)} className={`${expanded ? 'left-65 lg:left-67 lg:top-8' : 'left-2 lg:left-4'} z-50 top-4 absolute p-2 px-4 transition-none lg:transition-all duration-500 rounded-lg bg-zuccini-900`}>
+            <button onClick={() => setExpanded(current => !current)} className={`${expanded ? 'left-65 lg:left-67 lg:top-8 z-50 ' : 'left-2 lg:top-8 lg:left-8 z-10 hover:left-12'} top-4 absolute p-2 px-4 transition-none lg:transition-all duration-500 rounded-lg bg-zuccini-900`}>
                 { expanded ? <FontAwesomeIcon icon={faAngleLeft} /> : <FontAwesomeIcon icon={faAngleRight} /> }
             </button>
         </>
@@ -96,7 +96,7 @@ export const SidebarLinks = ({children, icon, text, active, alert, onClick, isBu
             <li className="relative flex items-center text-neutral-800 text-shadow-lg transition-all duration-500 min-h-[42px] group cursor-pointer">
             <div  
                 onClick={onClick}
-                 className={`flex items-center mb-0.5 py-2 px-0.5 text-xl rounded-l-xl font-semibold hover:bg-gray-400 dark:hover:bg-gray-900 ease-in-out transition-all duration-500 ${expanded ? 'w-65' : 'w-12'}`}>
+                 className={`flex items-center mb-0.5 py-2 px-0.5 text-xl rounded-l-xl font-semibold hover:bg-gray-400 dark:hover:bg-gray-950 ease-in-out transition-all duration-500 ${expanded ? 'w-65' : 'w-12'}`}>
                  {content}
             </div>
             </li>

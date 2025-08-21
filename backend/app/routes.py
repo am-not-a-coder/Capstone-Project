@@ -1,11 +1,12 @@
-from flask import jsonify, request, session, send_from_directory, current_app
+from flask import jsonify, request, session, send_from_directory, current_app, Response
 from app.models import Employee
 from app import db
 from werkzeug.security import check_password_hash, generate_password_hash, _hash_internal
 from werkzeug.utils import secure_filename
-from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, get_jwt
+from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, decode_token, exceptions, verify_jwt_in_request
 from flask_jwt_extended.exceptions import JWTExtendedException
 from datetime import datetime, timedelta
+from app.nextcloud_service import upload_to_nextcloud, download_from_nextcloud
 import os
 import re
 from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria
@@ -686,10 +687,13 @@ def register_routes(app):
                  .outerjoin(Subarea, Area.areaID == Subarea.areaID)
                  .add_columns(
                     Area.areaID,
+                    Area.programID,
+                    Area.subareaID,
                     Program.programCode,
                     Area.areaName,
                     Area.areaNum,
                     Area.progress,
+                    Subarea.subareaName
                 )
             ).all()
 
@@ -698,11 +702,12 @@ def register_routes(app):
         for area in areas:
             area_data = {
                 'areaID' : area.areaID,
+                'programID': area.programID,
+                'subareaID': area.subareaID,    
                 'programCode': area.programCode,
                 'areaName': f"{area.areaNum}: {area.areaName}",
                 'progress': area.progress,
-                
-                'areaNum': area.areaNum
+                'subareaName': area.subareaName            
             }
             area_list.append(area_data)
         
@@ -805,7 +810,7 @@ def register_routes(app):
     # Accreditation page
     @app.route('/api/accreditation', methods=["GET"])
     def get_areas():
-        program_code = request.args.get('programCode', "BSIT")
+        program_code = request.args.get('programCode')
 
         data = (
             db.session.query(
@@ -1022,20 +1027,22 @@ def register_routes(app):
         # Generate secure filename
         filename = secure_filename(file.filename)
 
-        
         if not filename:
             return jsonify({'success': False, 'message': 'Invalid filename'}), 400
         
         try:
-            # Create upload directory
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            # saves the file into repository (Nextcloud)
+            response = upload_to_nextcloud(file)
+            if response.status_code not in (200,201,204):
+                return jsonify({
+                    'success': False,
+                    'message': 'Nexcloud upload failed.',
+                    'status': response.status_code,
+                    'details': response.text
+                }), 400
             
-            # Save file
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            print("Saving file to:", file_path)
-            file.save(file_path)
-            
-            file_url = f"/uploads/{filename}"
+            #Gets the file url
+            file_url = f"{os.getenv('NEXTCLOUD_URL')}{filename}"
             
             # ==== Create document record ====
 
@@ -1064,7 +1071,8 @@ def register_routes(app):
             return jsonify({
                 'success': True, 
                 'message': 'File uploaded successfully!', 
-                'filePath': file_url
+                'filePath': file_url,
+                'status': response.status_code, 
             }), 200
             
         except Exception as e:
@@ -1073,9 +1081,50 @@ def register_routes(app):
         
 
 
-    @app.route('/api/accreditation/preview/<filename>')   
+    @app.route('/api/accreditation/preview/<filename>', methods=["GET"])   
+    @jwt_required()   
     def preview_file(filename):   
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+        token = request.args.get("token")
+
+        if token:
+            try:
+                decoded = decode_token(token) # validate the token manually
+            except exceptions.JWTDecodeError:
+                return jsonify({"success": False, "message": "Invalid token"}), 401
+            
+        else:
+            verify_jwt_in_request()  # fallback to Authorization header
+
+        NEXTCLOUD_URL = os.getenv("NEXTCLOUD_URL")
+        NEXTCLOUD_USER = os.getenv("NEXTCLOUD_USER")
+        NEXTCLOUD_PASSWORD = os.getenv("NEXTCLOUD_PASSWORD")
+        
+
+        if not all([NEXTCLOUD_URL, NEXTCLOUD_USER, NEXTCLOUD_PASSWORD]):
+            return jsonify({
+                'success': False,
+                'message': 'Nextcloud Configuration missing'
+            }), 500
+
+        response = download_from_nextcloud(filename)
+
+          # Debug: Log the actual response from Nextcloud
+        print(f"Nextcloud response status: {response.status_code}")
+
+        if response.status_code == 200:
+            return Response(
+                response.iter_content(chunk_size=8192),
+                content_type = response.headers.get("Content-Type", "application/octet-stream"),
+                headers={
+                    "Content-Disposition": f'inline; filename="{filename}"'
+                }
+            ) 
+        else:
+            return jsonify({
+                'success': False,
+                'status': response.status_code,
+                'detail': response.text 
+            }), response.status_code
 
             
            
