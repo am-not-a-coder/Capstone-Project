@@ -35,8 +35,6 @@ const NotificationItem = ({ notifTitle, content, date, alert, picture, link, onD
           {alert && (
             <span className='w-2 h-2 ml-2 bg-blue-500 rounded-full'></span>
           )}
-
-          
         </h1>
 
         <p className='ml-5 truncate text-md'>{content}</p>

@@ -20,14 +20,14 @@ const MessagesItem = ({picture, userName, message, time, alert, onDelete, onOpen
         : 'bg-neutral-200 dark:bg-gray-950' //normal appearance
         }`}>
             <img 
-            src={picture} 
-            alt="profile picture"
-            className='w-10 h-10 mr-3 rounded-full'
+              src={picture} 
+              alt="profile picture"
+              className='w-10 h-10 mr-3 rounded-full'
             />
 
             {/* Message content */}
             <div className="flex flex-col w-[50%]">
-             <h1 className='flex items-center font-bold text-md'>
+             <h1 className='flex items-center font-bold text-md truncate'>
                 {userName}
                 {alert && (
                 <span className='h-2.5 w-2.5 bg-blue-500 rounded-full ml-2'>{alert}</span>)}
