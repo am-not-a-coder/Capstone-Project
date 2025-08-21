@@ -2,7 +2,8 @@
 import CircularProgressBar from '../components/CircularProgressBar'
 import {useState, useEffect} from 'react';
 import {
-    faAngleRight
+    faAngleRight,
+    faCalendarPlus
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import axios from 'axios';
@@ -214,11 +215,11 @@ const Tasks = () => {
     )}
 
     {/* Container */}
-    <div className="relative w-full p-5 border bg-neutral-200 border-neutral-700 text-neutral-800 rounded-2xl dark:border-none dark:bg-gray-900 dark:inset-shadow-sm dark:inset-shadow-zuccini-900">
+    <div className="relative w-full p-5 border bg-neutral-200 border-neutral-300 text-neutral-800 rounded-[20px] inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-900 dark:shadow-sm dark:shadow-zuccini-900">
 
         {/* Area Progress */}
         <h1 className="mx-3 mb-3 text-xl font-semibold transition-all duration-500 dark:text-white">Area Progress</h1>
-        <section className="relative grid grid-cols-3 gap-2 p-3 min-h-[220px] text-neutral-800 border-1 border-neutral-900 rounded-lg shadow-2xl overflow-hidden dark:bg-gray-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-900">
+        <section className="relative grid grid-cols-3 gap-2 p-3 min-h-[220px] text-neutral-800 border-1 border-gray-400 rounded-lg shadow-2xl overflow-hidden dark:bg-gray-950/50 dark:shadow-md dark:shadow-zuccini-900">
             {/* Areas */}
 
         {areaProgressList && areaProgressList.length > 0 ? (
@@ -240,11 +241,15 @@ const Tasks = () => {
 
 {/* Reports */}
 <h1 className="mx-3 mt-5 mb-3 text-xl font-semibold dark:text-white">Reports</h1>
-    <section className="grid grid-cols-2 grid-rows-[auto_1fr] relative p-3 gap-5 text-neutral-800 border-1 border-neutral-900 rounded-lg shadow-xl transition-all duration-500 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-gray-950">
+    <section className="grid grid-cols-2 grid-rows-[auto_1fr] relative p-3 gap-5 text-neutral-800 border-1 border-neutral-300 rounded-lg shadow-xl transition-all duration-500 dark:shadow-sm dark:shadow-zuccini-800">
     {/* Create Deadlines */}
     <div className="col-span-2 transition-all duration-500 dark:text-white">
-        <h1 className="mx-3 mb-1 font-medium text-md">Create Submission Deadlines</h1>
-            <div className="col-span-2 min-h-[100px] border rounded-md transition-all duration-500 dark:border-none dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:bg-gray-900">
+        
+            <div className="col-span-2 pt-3 min-h-[100px] border border-neutral-300 rounded-md transition-all duration-500 inset-shadow-sm inset-shadow-gray-400 dark:shadow-sm dark:shadow-zuccini-900 dark:bg-gray-900">
+                <h1 className="mx-3 my-1 font-medium text-md">
+                    <FontAwesomeIcon icon={faCalendarPlus} className="mr-2" />
+                    Create Submission Deadlines
+                </h1>
                 <form onSubmit={handleCreateDeadline}
                 className='grid grid-cols-4 gap-x-2'>
 
@@ -257,7 +262,7 @@ const Tasks = () => {
                     <select name="program" id="program"
                         value={program}
                         onChange={(e)=> {setProgram(e.target.value)}}
-                        className='p-2 font-semibold transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-950'
+                        className='p-2 font-semibold transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-950/50'
                         required>
                         <option value="">Select a Program</option>
 
@@ -277,7 +282,7 @@ const Tasks = () => {
                     <select name="area" id="area"
                         value={selectedArea}
                         onChange={(e)=> {setSelectedArea(e.target.value)}}
-                        className='p-2 font-semibold transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-950'
+                        className='p-2 font-semibold transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-950/50'
                         required>
                         <option value="">Select an Area</option>
                         {areaOption.map((area) => {
@@ -297,7 +302,7 @@ const Tasks = () => {
                         <input type="date" name="due_date" id="due_date"
                             value={dueDate}
                             onChange={(e)=> {setDueDate(e.target.value)}}
-                            className='p-2 font-semibold transition-all duration-500 border cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-950' 
+                            className='p-2 font-semibold transition-all duration-500 border cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-950/50' 
                             required/>  
                     </div>
 
@@ -318,7 +323,7 @@ const Tasks = () => {
                         placeholder={"Input the deadline description"}
                         onChange={(e)=> {setContent(e.target.value)}}
                         required
-                        className='scrollbar-hide placeholder-neutral-500 whitespace-pre-line resize-y w-full min-h-[200px] px-4 py-3 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none'       
+                        className='scrollbar-hide placeholder-neutral-500 whitespace-pre-line resize-y w-full min-h-[200px] px-4 py-3 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-950/50 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none'       
                         />
                     </div>
                 
@@ -327,14 +332,14 @@ const Tasks = () => {
     </div>
         
     {/* Deadlines */}
-        <div className="relative flex flex-col items-center row-start-2 p-3 border rounded-md dark:bg-gray-900 dark:inset-shadow-sm dark:inset-shadow-zuccini-900">                    
+        <div className="relative flex flex-col items-center row-start-2 p-3 border rounded-md inset-shadow-sm border-neutral-300 inset-shadow-gray-400 dark:bg-gray-900 dark:shadow-sm dark:shadow-zuccini-900">                    
             <div className='grid w-full grid-cols-3 font-medium text-center dark:text-white '>
                 <h2>Program</h2>
                 <h2>Task</h2>
                 <h2>Deadline</h2>
             </div>
             {/* Deadline container */}
-            <div className='flex flex-col items-center mt-2 min-h-[500px] min-w-full p-1 bg-neutral-300 rounded-md border relative dark:bg-gray-950 ' >
+            <div className='flex flex-col items-center mt-2 min-h-[500px] border-neutral-400 min-w-full p-1 bg-neutral-300 rounded-md border relative dark:bg-gray-950/50 ' >
                 {deadLines && deadLines.length > 0 ? deadLines.map((deadline) => (
                     <Deadline key={deadline.deadlineID} data={deadline} program={deadline.programCode} areaTitle={deadline.areaName} date={deadline.due_date} onClick={() => handleViewDeadline(deadline)}/>
                 )) : (
@@ -361,7 +366,7 @@ const Tasks = () => {
 
     
     {/* Calendar */}
-        <div className="relative col-start-2 row-start-2 p-5 transition-all duration-500 bg-transparent border rounded-md dark:inset-shadow-sm dark:inset-shadow-zuccini-900 dark:text-white dark:bg-gray-900 dark:border-none">
+        <div className="relative col-start-2 row-start-2 p-5 transition-all duration-500 bg-transparent border border-neutral-300 rounded-md inset-shadow-sm inset-shadow-gray-400 dark:shadow-sm dark:shadow-zuccini-900 dark:text-white dark:bg-gray-900 ">
             <FullCalendar 
             plugins={[dayGridPlugin]}
             initialView='dayGridMonth'
