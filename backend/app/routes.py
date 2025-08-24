@@ -6,7 +6,7 @@ from werkzeug.utils import secure_filename
 from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, decode_token, exceptions, verify_jwt_in_request
 from flask_jwt_extended.exceptions import JWTExtendedException
 from datetime import datetime, timedelta
-from app.nextcloud_service import upload_to_nextcloud, download_from_nextcloud
+from app.nextcloud_service import upload_to_nextcloud, download_from_nextcloud, check_directory
 import os
 import re
 from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria
@@ -689,7 +689,7 @@ def register_routes(app):
                     Area.areaID,
                     Area.programID,
                     Area.subareaID,
-                    Program.programCode,
+                    Program.programCode,                
                     Area.areaName,
                     Area.areaNum,
                     Area.progress,
@@ -847,6 +847,7 @@ def register_routes(app):
                 result[area_id] = {                    
                 'areaID': row.areaID,
                 'programCode': row.programCode,
+                'areaNum': row.areaNum,
                 'areaName': row.areaNum + ": " + row.areaName, 
                 'subareas': {}                  
             }
@@ -873,7 +874,7 @@ def register_routes(app):
                 }
 
             match row.criteriaType:
-                case "Input/s":
+                case "Inputs":
                     result[area_id]['subareas'][subarea_id]['criteria']['inputs'].append(criteria_data)
                 case "Processes":
                     result[area_id]['subareas'][subarea_id]['criteria']['processes'].append(criteria_data)
@@ -886,39 +887,6 @@ def register_routes(app):
 
         return jsonify(list(result.values())) 
     
-
-    @app.route('/api/subarea', methods=["GET"])
-    def get_subarea():
-        # Query all subareas with their criteria
-        results = (
-            db.session.query(
-                Subarea.subareaID,
-                Subarea.subareaName,
-                Area.areaID,
-                Criteria.criteriaID
-            )
-            .join(Area, Subarea.areaID == Area.areaID)
-            .outerjoin(Criteria, Subarea.subareaID == Criteria.subareaID)
-            .all()
-        )
-
-        subarea_dict = {}
-
-        for sa in results:
-            if sa.subareaID not in subarea_dict:
-                subarea_dict[sa.subareaID] = {
-                    'subareaID': sa.subareaID,
-                    'subareaName': sa.subareaName,
-                    'areaID': sa.areaID,
-                    'criteria': []  # group criteria here
-                }
-            if sa.criteriaID:
-                subarea_dict[sa.subareaID]['criteria'].append({
-                    'criteriaID': sa.criteriaID
-                })
-
-        return jsonify({'subarea': list(subarea_dict.values())}), 200
-
     @app.route('/api/accreditation/create_area', methods=["POST"])
     def create_area():
         data = request.form
@@ -992,16 +960,20 @@ def register_routes(app):
     def upload_file():
        # ==== Get and Validate Form Data ====
         # Get form data
+        data = request.form
         file = request.files.get("uploadedFile")
-        file_type = request.form.get("fileType")
-        file_name = request.form.get("fileName")
-        criteria_id = request.form.get("criteriaID")
+        file_type = data.get("fileType")
+        file_name = data.get("fileName")
+        criteria_id = data.get("criteriaID")
+        program_code = data.get("programCode")
+        area_name = data.get("areaName")
+        subarea_name = data.get("subareaName")
+        criteria_type = data.get("criteriaType")
         
-    
+        # === Validate the Data ===   
         # Check if file exists
         if not file:
             return jsonify({'success': False, 'message': 'No file provided'}), 400
-        
         
         # Check if file has a valid name and extension
         if not file.filename or '.' not in file.filename:        
@@ -1024,7 +996,18 @@ def register_routes(app):
             return jsonify({'success': False, 'message': 'Authentication error'}), 400
         
         # ==== Save File ====
-        # Generate secure filename
+
+        # Gets the file url
+        path = f"UDMS_Repository/Accreditation/Programs/{program_code}/{area_name}/{subarea_name}/{criteria_type}/{criteria_id}"
+        path = path.strip('/')
+
+        parts = path.split('/')
+        current = ""
+        for p in parts:
+            current = f'{current}/{p}'.strip('/')
+            check_directory(current)             
+
+        # Generates a secure filename
         filename = secure_filename(file.filename)
 
         if not filename:
@@ -1032,25 +1015,22 @@ def register_routes(app):
         
         try:
             # saves the file into repository (Nextcloud)
-            response = upload_to_nextcloud(file)
-            if response.status_code not in (200,201,204):
+            response = upload_to_nextcloud(file, path)
+            if response.status_code not in (200, 201, 204):
                 return jsonify({
                     'success': False,
-                    'message': 'Nexcloud upload failed.',
+                    'message': 'Nextcloud upload failed.',
                     'status': response.status_code,
                     'details': response.text
                 }), 400
-            
-            #Gets the file url
-            file_url = f"{os.getenv('NEXTCLOUD_URL')}{filename}"
-            
+                                   
             # ==== Create document record ====
 
             # Create database record
             new_document = Document(
                 docName=file_name,
                 docType=file_type,
-                docPath=file_url,
+                docPath=f"{path}/{filename}",
                 employeeID=uploader.employeeID  
             )
             
@@ -1071,7 +1051,7 @@ def register_routes(app):
             return jsonify({
                 'success': True, 
                 'message': 'File uploaded successfully!', 
-                'filePath': file_url,
+                'filePath': f"{path}/{filename}",
                 'status': response.status_code, 
             }), 200
             
@@ -1106,11 +1086,13 @@ def register_routes(app):
                 'message': 'Nextcloud Configuration missing'
             }), 500
 
-        response = download_from_nextcloud(filename)
+        doc = Document.query.filter_by(docName=filename).first()
+        if not doc:
+            return jsonify({'success': False, 'message': 'File not found.'}), 404    
 
-          # Debug: Log the actual response from Nextcloud
-        print(f"Nextcloud response status: {response.status_code}")
-
+        # Get the file
+        response = download_from_nextcloud(doc.docPath)
+        
         if response.status_code == 200:
             return Response(
                 response.iter_content(chunk_size=8192),

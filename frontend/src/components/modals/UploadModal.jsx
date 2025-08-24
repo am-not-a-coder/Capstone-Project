@@ -10,7 +10,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import StatusModal from './StatusModal';
 import { apiPostForm } from '../../utils/api_utils';
 
-const UploadModal = ({ onClose, showModal, criteriaID, onUploadSuccess}) => {
+const UploadModal = ({ onClose, showModal, programCode, areaName, subareaName, criteriaType, criteriaID, onUploadSuccess}) => {
 
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
@@ -139,6 +139,10 @@ const UploadModal = ({ onClose, showModal, criteriaID, onUploadSuccess}) => {
     formData.append('fileType', fileType);
     formData.append('fileName', fileName);
     formData.append('criteriaID', criteriaID);
+    formData.append('programCode', programCode);
+    formData.append('areaName', areaName);
+    formData.append('subareaName', subareaName);
+    formData.append('criteriaType', criteriaType);
 
     try{
       const response = await apiPostForm('/api/accreditation/upload', formData,{withCredentials: true});
@@ -163,7 +167,7 @@ const UploadModal = ({ onClose, showModal, criteriaID, onUploadSuccess}) => {
       }
 
     }catch(err){
-      clearInterval(progressInterval); // Add this line
+      clearInterval(progressInterval);
       setStatusMessage('File upload failed. Please try again.');
       setStatusType('error');
       setIsUploading(false);

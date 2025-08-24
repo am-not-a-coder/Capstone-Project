@@ -1,28 +1,31 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
 import StatusModal from './StatusModal';
-
+import { apiGet, apiPostForm } from '../../utils/api_utils';
 
 
 const CreateModal = ({onClick, onCreate, setShowCreateModal}) => {
 
-const [programID, setProgramID] = useState();
+const [programID, setProgramID] = useState('');
 const [areaNum, setAreaNum] = useState('');
 const [areaName, setAreaName] = useState('');
 
 const [subAreaName, setSubAreaName] = useState('');
 const [criteria, setCriteria] = useState('');
-const [criteriaType, setCriteriaType] = useState('Input/s'); // input, process, outcome
+const [criteriaType, setCriteriaType] = useState('Inputs'); // input, process, outcome
 
-const [selectedAreaID, setSelectedAreaID] = useState()
+
+const [programCode, setProgramCode] = useState('');
+const [selectedAreaID, setSelectedAreaID] = useState();
 const [selectedSubAreaID, setSelectedSubAreaID] = useState()
 
 const [activeForm, setActiveForm] = useState("Area")
+
+// options
 const [programOption, setProgramOption] = useState([]);
 const [areaOption, setAreaOption] = useState([]);
 const [subAreaOption, setSubAreaOption] = useState([]);
+const [allSubareas, setAllSubareas] = useState([]);
 
-const token = localStorage.getItem("token");
 
 const [showStatusModal, setShowStatusModal] = useState(false); // shows the status modal
 const [statusMessage, setStatusMessage] = useState(null); // status message
@@ -31,67 +34,61 @@ const [statusType, setStatusType] = useState("success"); // status type (success
 
     //fetch Program
     useEffect(() => {
-    const fetchProgram = async () => {
-        if (!token){
-            alert("No token found!");
-            return;
+        const fetchProgram = async () => {
+            try{
+                const res = await apiGet('/api/program', {withCredentials: true})
+                Array.isArray(res.data.programs) ? setProgramOption(res.data.programs) : setProgramOption([]);
+                console.log(res.data.programs)
+            } catch (err){
+                console.error("Error occurred when fetching program", err)
+            }
         }
-
-        try{
-        const res = await axios.get('http://localhost:5000/api/program', 
-                        {headers: {'Authorization': `Bearer${token}`}},
-                        {withCredentials: true}
-                    )
-            Array.isArray(res.data.programs) ? setProgramOption(res.data.programs) : setProgramOption([]);
-            console.log(res.data.programs)
-        } catch (err){
-            console.error("Error occurred when fetching program", err)
-        }
-    }
-    fetchProgram();
+        fetchProgram();
 
     }, [])
-    //fetch Area
-    useEffect(() => {
-            if(!token){
-                console.error("No token found!");
-                return;
-            }
     
-            const fetchArea = async () => {
-                
-                try{
-                    const res = await axios.get('http://localhost:5000/api/accreditation', 
-                        {headers: {'Authorization': `Bearer ${token}`}}, {withCredentials: true})
-    
-                    Array.isArray(res.data) ? setAreaOption(res.data) : setAreaOption([]);
-                    
-                } catch(err){
-    
-                }
-            }
-            fetchArea();
-        }, []);
     //fetch Sub-area
+    
+    const fetchSubAreas = async (programCode) =>{
+        try{
+            const res = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`,{withCredentials: true})
 
-    useEffect(() => {
-         if (!token){
-            alert("No token found!");
-            return;
-        }
-
-        const fetchSubArea = async () =>{
-            try{
-                const res = await axios.get('http://localhost:5000/api/subarea', 
-                    {headers: {'Authorization': `Bearer ${token}`}}, {withCredentials: true})
-
-                Array.isArray(res.data.subarea) ? setSubAreaOption(res.data.subarea) : setSubAreaOption([]);
-            } catch(err){
-                console.error("Error occurred when fetching sub-area", err)
+            // Extract all subareas from all areas
+            const allSubareas = [];
+                if (Array.isArray(res.data)) {res.data.forEach(area => {
+                    if (Array.isArray(area.subareas)) {
+                        // Add areaID to each subarea for filtering later
+                        area.subareas.forEach(subarea => {
+                            allSubareas.push({
+                                ...subarea,
+                                areaID: area.areaID
+                            });
+                        });
+                    }
+                });
             }
+            setAllSubareas(allSubareas);
+            setSubAreaOption(allSubareas);
+        } catch(err){
+            console.error("Error occurred when fetching sub-area", err)
         }
-    fetchSubArea();
-    }, []);
+    };
+
+    //fetch Area
+    
+    const fetchAreas = async (programCode) => {
+        
+        try{
+            const res = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`, {withCredentials: true})
+
+            Array.isArray(res.data) ? setAreaOption(res.data) : setAreaOption([]);
+            
+        } catch(err){
+            console.error("Error occurred when fetching area", err)
+        }
+    }
+    
+    
 
     const handleCreateArea = async (e) => {
         e.preventDefault();
@@ -101,22 +98,14 @@ const [statusType, setStatusType] = useState("success"); // status type (success
             formData.append("areaNum", areaNum)
             formData.append("areaName", areaName)
 
+
         try{
-            const response = await axios.post('http://localhost:5000/api/accreditation/create_area', formData,
-                {headers: {'Authorization': `Bearer ${token}`}}, {withCredentials: true});
+            const response = await apiPostForm('/api/accreditation/create_area', formData, {withCredentials: true});
 
             //shows the status of creation
             setShowStatusModal(true)
             setStatusMessage(response.data.message)
-            setStatusType("success")
-
-            // Clear inputs and refresh areas after success    
-            setProgramID('')
-            setAreaNum('');
-            setAreaName('');    
-            if (onCreate) onCreate(); // refreshes the areas
-
-            
+            setStatusType("success")    
 
         } catch(err){
             setShowStatusModal(true)
@@ -135,15 +124,8 @@ const [statusType, setStatusType] = useState("success"); // status type (success
             
         try{
             
-            const response = await axios.post('http://localhost:5000/api/accreditation/create_subarea', formData,
-                {headers: {'Authorization': `Bearer ${token}`}}, {withCredentials: true});
-
-            
-            // Clear inputs and refresh areas after success    
-            setSelectedAreaID('')
-            setSubAreaName('');
-            if (onCreate) onCreate(); // refreshes the areas
-
+            const response = await apiPostForm('/api/accreditation/create_subarea', formData, {withCredentials: true});                   
+    
             //shows the status of creation
             setShowStatusModal(true)
             setStatusMessage(response.data.message)
@@ -163,20 +145,12 @@ const [statusType, setStatusType] = useState("success"); // status type (success
         e.preventDefault();
 
         const formData = new FormData()
-        formData.append("selectedSubAreaID", selectedAreaID)
+        formData.append("selectedSubAreaID", selectedSubAreaID)
         formData.append("criteriaType", criteriaType)
         formData.append("criteria", criteria)
 
         try{
-            const response = await axios.post('http://localhost:5000/api/accreditation/create_criteria', formData,
-                {headers: {'Authorization': `Bearer ${token}`}}, {withCredentials: true});
-
-            // Clear inputs and refresh areas after success    
-            setSelectedAreaID('')
-            setSelectedSubAreaID('')
-            setCriteriaType('Input/s')
-            setCriteria('')
-            if (onCreate) onCreate(); // refreshes the areas
+            const response = await apiPostForm('/api/accreditation/create_criteria', formData, {withCredentials: true});
 
             //shows the status of creation
             setShowStatusModal(true)
@@ -192,9 +166,61 @@ const [statusType, setStatusType] = useState("success"); // status type (success
 
     }
 
+    // trigger api calls when programCode Changes
+    useEffect(() => {
+        if (programCode){
+            fetchAreas(programCode);
+            fetchSubAreas(programCode);
+        } else{
+            setAreaOption([]);
+            setSubAreaOption([]);
+        }
+
+    }, [programCode])
+
+    useEffect(() => {
+        if(selectedAreaID){
+            const filteredSubAreas = allSubareas.filter(
+                (sub) => sub.areaID === parseInt(selectedAreaID)
+            );
+            setSubAreaOption(filteredSubAreas);
+        } else{
+            setSubAreaOption(allSubareas);
+        }
+            setSelectedSubAreaID(''); // Reset selected subarea when area changes
+        }, [selectedAreaID, allSubareas])
+
+        // handles the passing of programID and programCode
+    const handleChange = (e) =>{
+        setProgramID(e.target.value);
+                        
+        const selectedProgram = programOption.find(p => p.programID === parseInt(e.target.value))
+
+        if (selectedProgram){
+            setProgramCode(selectedProgram.programCode);
+        } else{
+            setProgramCode('');
+        }
+
+    }
+
     const handleCloseModal = () => {
-        setShowStatusModal(false)
-        setShowCreateModal(false)
+        setShowStatusModal(false);
+        setShowCreateModal(false);
+        
+    // Clear inputs and refresh areas after success    
+        setSelectedAreaID('')
+        setSelectedSubAreaID('')
+        setCriteriaType('Inputs')
+        setCriteria('')
+
+        // Clear inputs and refresh areas after success    
+        setSelectedAreaID('');
+        setSubAreaName('');
+
+        setCriteria('');
+        setCriteriaType('');
+        if (onCreate) onCreate(); // refreshes the areas
 
     }
 
@@ -204,20 +230,19 @@ return(
 <div className="fixed inset-0 z-50 flex items-center justify-center transition-all duration-300 transform scale-100 bg-black/60 backdrop-blur-sm">
 
     {showStatusModal && (
-        <StatusModal message={statusMessage} type={statusType} onClick={handleCloseModal}  />
+        <StatusModal message={statusMessage} type={statusType} showModal={showStatusModal} onClick={handleCloseModal}  />
 
     )}
 
-    <div className={`flex flex-col relative px-5 py-3 min-w-[700px] text-black bg-neutral-200 border-t-10 border-zuccini-400 shadow-2xl rounded-xl dark:bg-[#19181A] dark:inset-shadow-sm dark:inset-shadow-zuccini-900 transition`}>
+    <div className={`flex flex-col relative px-5 py-3 min-w-[700px] text-black bg-neutral-200 border-t-10 border-zuccini-400 shadow-2xl rounded-xl inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-900 dark:shadow-sm dark:shadow-zuccini-900 transition`}>
         <h1 className="mb-3 text-3xl text-black text-shadow-sm dark:text-white">Create {activeForm} </h1>
         <div>
-            <button className={`${activeForm == "Area" ? 'border-b-2 border-zuccini-600 font-semibold bg-neutral-300 dark:bg-neutral-800 dark:text-white' : 'border-0 font-normal'} dark:text-white rounded-t-lg text-lg py-2 px-5 mb-2`} onClick={() => setActiveForm("Area")}>Area</button>
-            <button className={`${activeForm == "Sub-Area" ? 'border-b-2 font-semibold border-zuccini-600 bg-neutral-300 dark:bg-neutral-800 dark:text-white' : 'border-0 font-normal'} dark:text-white rounded-t-lg text-lg py-2 px-5 mb-2`} onClick={() => setActiveForm("Sub-Area")}>Sub-Area</button>
-            <button className={`${activeForm == "Criteria" ? 'border-b-2 border-zuccini-600 font-semibold bg-neutral-300 dark:bg-neutral-800 dark:text-white' : 'border-0 font-normal'} dark:text-white rounded-t-lg text-lg py-2 px-5 mb-2`} onClick={() => setActiveForm("Criteria")}>Criteria</button>
+            <button className={`${activeForm == "Area" ? 'border-b-2 border-zuccini-600 font-semibold bg-neutral-300 dark:bg-gray-800 dark:text-white' : 'border-0 font-normal'} cursor-pointer dark:text-white rounded-t-lg text-lg py-2 px-5 mb-2`} onClick={() => setActiveForm("Area")}>Area</button>
+            <button className={`${activeForm == "Sub-Area" ? 'border-b-2 font-semibold border-zuccini-600 bg-neutral-300 dark:bg-gray-800 dark:text-white' : 'border-0 font-normal'} cursor-pointer dark:text-white rounded-t-lg text-lg py-2 px-5 mb-2`} onClick={() => setActiveForm("Sub-Area")}>Sub-Area</button>
+            <button className={`${activeForm == "Criteria" ? 'border-b-2 border-zuccini-600 font-semibold bg-neutral-300 dark:bg-gray-800 dark:text-white' : 'border-0 font-normal'} cursor-pointer dark:text-white rounded-t-lg text-lg py-2 px-5 mb-2`} onClick={() => setActiveForm("Criteria")}>Criteria</button>
         </div>
 
-        <div className="px-3 pt-3 mb-5 dark:text-white bg-neutral-300 rounded-xl min-h-[325px] border-2 border-zuccini-900 dark:border-none focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:bg-woodsmoke-950">
-        
+        <div className="px-3 pt-3 mb-5 dark:text-white bg-neutral-300 rounded-xl min-h-[325px] border border-neutral-400 inset-shadow-sm inset-shadow-gray-400 focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:shadow-zuccini-900 dark:shadow-md dark:bg-gray-950/50">        
             {activeForm === "Area" && ( 
                 <form action=""
                 onSubmit={handleCreateArea}
@@ -227,13 +252,13 @@ return(
 
                     <select name="programID" id="programID"
                         value={programID}
-                        onChange={(e)=> {setProgramID(e.target.value)}}
-                        className='p-2 mb-3 transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none dark:bg-[#19181A] bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 '
+                        onChange={handleChange}
+                        className='p-2 mb-3 transition-all duration-500 cursor-pointer inset-shadow-sm inset-shadow-gray-400 dark:shadow-zuccini-900 dark:shadow-md dark:bg-gray-900 bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 '
                         required>
                         <option value="">Select a Program</option>
 
                         {programOption.map((program) => {
-                            return(
+                            return(                            
                                 <option key={program.programID} value={program.programID}>{program.programName}</option>
                             )
                         })}
@@ -243,7 +268,7 @@ return(
                     <input name="areaNum" type="text" placeholder="e.g. Area I, Area II, Area III"
                         value={areaNum}
                         onChange= {(e) => {setAreaNum(e.target.value)}}
-                        className='p-2 mb-3 transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-[#19181A]'
+                         className='p-2 mb-3 transition-all duration-500 cursor-pointer inset-shadow-sm inset-shadow-gray-400 dark:shadow-zuccini-900 dark:shadow-md dark:bg-gray-900 bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 ' 
                         required/>
                     
                     <label htmlFor="areaName" className='text-xl font-semibold'>Area Name</label>
@@ -251,7 +276,7 @@ return(
                         placeholder="Enter the area name"
                         value={areaName}
                         onChange={(e) => {setAreaName(e.target.value)}}
-                        className='p-2 mb-3 transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-[#19181A]'
+                         className='p-2 mb-3 transition-all duration-500 cursor-pointer inset-shadow-sm inset-shadow-gray-400 dark:shadow-zuccini-900 dark:shadow-md dark:bg-gray-900 bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 '
                         required
                     />
 
@@ -261,15 +286,31 @@ return(
                 <form action=""
                 className='flex flex-col justify-center'
                 >
+                    <label htmlFor ="programID" className='mb-2 text-xl font-semibold'>Program</label>
+
+                    <select name="programID" id="programID"
+                        value={programID}
+                        onChange={handleChange}
+                        className='p-2 mb-3 transition-all duration-500 cursor-pointer inset-shadow-sm inset-shadow-gray-400 dark:shadow-zuccini-900 dark:shadow-md dark:bg-gray-900 bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 '
+                        required>
+                        <option value="">Select a Program</option>
+
+                        {programOption.map((program) => {
+                            return(                            
+                                <option key={program.programID} value={program.programID}>{program.programName}</option>
+                            )
+                        })}
+                    </select>
+
                     <label htmlFor="selectedAreaID" className='mb-2 text-xl font-semibold'>Assign Area</label>
 
                     <select name="selectedAreaID" id="selectedAreaID"           
                         value={selectedAreaID}             
                         onChange={(e)=> {setSelectedAreaID(e.target.value)}}
-                        className='p-2 mb-3 transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-[#19181A]'
+                         className='p-2 mb-3 transition-all duration-500 cursor-pointer inset-shadow-sm inset-shadow-gray-400 dark:shadow-zuccini-900 dark:shadow-md dark:bg-gray-900 bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 '
                         required>
                         <option value="" >Select Designated Area</option>
-                        {areaOption.map((area) => {
+                        {areaOption.map((area) => {                            
                             return(
                                 <option key={area.areaID} value={area.areaID}>{area.areaName}</option>
                             )
@@ -279,7 +320,7 @@ return(
                     <label htmlFor="subAreaName" className='mb-2 text-xl font-semibold'>Sub-Area Name</label>
                     <input name="subAreaName" type="text" placeholder="e.g. A. Administration, B. Finance"
                         onChange={(e) => {setSubAreaName(e.target.value)}}   
-                        className='p-2 mb-3 transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-woodsmoke-950'
+                         className='p-2 mb-3 transition-all duration-500 cursor-pointer inset-shadow-sm inset-shadow-gray-400 dark:shadow-zuccini-900 dark:shadow-md dark:bg-gray-900 bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 '
                         required/>
                     
                 </form>
@@ -289,12 +330,27 @@ return(
                 <form action=""
                 className='flex flex-col justify-center'
                 >
+                    <label htmlFor="programID" className='mb-2 text-xl font-semibold'>Program</label>
+
+                    <select name="programID" id="programID"           
+                        value={programID}             
+                        onChange={handleChange}
+                         className='p-2 mb-3 transition-all duration-500 cursor-pointer inset-shadow-sm inset-shadow-gray-400 dark:shadow-zuccini-900 dark:shadow-md dark:bg-gray-900 bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 '
+                        required>
+                        <option value="" >Select a Program</option>
+                        {programOption.map((program) => {
+                            return(
+                                <option key={program.programID} value={program.programID}>{program.programName}</option>
+                            )
+                        })}
+                    </select>
+
                     <label htmlFor="selectedAreaID" className='mb-2 text-xl font-semibold'>Area</label>
 
                     <select name="selectedAreaID" id="selectedAreaID"           
                         value={selectedAreaID}             
                         onChange={(e)=> {setSelectedAreaID(e.target.value)}}
-                        className='p-2 mb-3 transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-[#19181A]'
+                         className='p-2 mb-3 transition-all duration-500 cursor-pointer inset-shadow-sm inset-shadow-gray-400 dark:shadow-zuccini-900 dark:shadow-md dark:bg-gray-900 bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 '
                         required>
                         <option value="" >Select Designated Area</option>
                         {areaOption.map((area) => {
@@ -303,20 +359,20 @@ return(
                             )
                         })}
                     </select>
+                  
 
                 <div className='flex flex-row items-center justify-between gap-5 py-1'>
                     <div className='flex gap-2'>
                     <label htmlFor="subareaID" className='mt-1 text-xl font-semibold'>Sub-Area</label>
-                    <select name="subareaID" type="text" 
-                        placeholder="Enter the sub-area name"
+                    <select name="subareaID" type="text"                         
                         value={selectedSubAreaID}
                         onChange={(e) => {setSelectedSubAreaID(e.target.value)}}
-                        className='p-2 transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-[#19181A]'
+                         className='p-2 mb-3 transition-all duration-500 cursor-pointer inset-shadow-sm inset-shadow-gray-400 dark:shadow-zuccini-900 dark:shadow-md dark:bg-gray-900 bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 '
                         required>
                         
                         <option value="">Select Designated Sub-Area</option>
-                        {subAreaOption.map((subarea) => (
-                            <option key={subarea.subareaID} value={subarea.subareaID}>{subarea.subareaName}</option>
+                        {subAreaOption.map((subareas) => (
+                            <option key={subareas.subareaID} value={subareas.subareaID}>{subareas.subareaName}</option>
                         ))}
 
                     </select>
@@ -327,10 +383,10 @@ return(
                     <select name="criteriaType" id="criteriaType"
                         value={criteriaType}
                         onChange={(e) => {setCriteriaType(e.target.value)}}
-                        className='p-2 transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-[#19181A]'
+                         className='p-2 mb-3 transition-all duration-500 cursor-pointer inset-shadow-sm inset-shadow-gray-400 dark:shadow-zuccini-900 dark:shadow-md dark:bg-gray-900 bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 '
                         required>
                         <option value="">Select Criteria Type</option>
-                        <option value="Input/s">Input/s</option>
+                        <option value="Inputs">Inputs</option>
                         <option value="Processes">Processes</option>
                         <option value="Outcomes">Outcomes</option>
                     </select>
@@ -342,7 +398,7 @@ return(
                         placeholder="Enter the criteria"
                         value={criteria}
                         onChange={(e) => {setCriteria(e.target.value)}}
-                        className='whitespace-pre p-2 mb-3 transition-all min-h-[100px] duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-[#19181A]'
+                         className='p-2 mb-3 transition-all duration-500 cursor-pointer inset-shadow-sm inset-shadow-gray-400 dark:shadow-zuccini-900 dark:shadow-md dark:bg-gray-900 bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 '
                         required/>
 
             </form>
