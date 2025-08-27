@@ -8,9 +8,9 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import StatusModal from './StatusModal';
-import { apiPostForm } from '../../utils/api_utils';
+import { apiPostForm, apiGet } from '../../utils/api_utils';
 
-const UploadModal = ({ onClose, showModal, criteriaID, onUploadSuccess}) => {
+const UploadModal = ({ onClose, showModal, programCode, areaName, subareaName, criteriaType, criteriaID, onUploadSuccess}) => {
 
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
@@ -108,6 +108,7 @@ const UploadModal = ({ onClose, showModal, criteriaID, onUploadSuccess}) => {
   };
 
   const closeModal = () => {
+    refreshAreas();
     resetUpload();
     if (onClose) {
       onClose();
@@ -139,9 +140,13 @@ const UploadModal = ({ onClose, showModal, criteriaID, onUploadSuccess}) => {
     formData.append('fileType', fileType);
     formData.append('fileName', fileName);
     formData.append('criteriaID', criteriaID);
+    formData.append('programCode', programCode);
+    formData.append('areaName', areaName);
+    formData.append('subareaName', subareaName);
+    formData.append('criteriaType', criteriaType);
 
     try{
-      const response = await apiPostForm('/api/accreditation/upload', formData,{withCredentials: true});
+      const response = await apiPostForm('/api/accreditation/upload', formData, {withCredentials: true});
       
       // Clear the simulation interval
       clearInterval(progressInterval);
@@ -163,7 +168,7 @@ const UploadModal = ({ onClose, showModal, criteriaID, onUploadSuccess}) => {
       }
 
     }catch(err){
-      clearInterval(progressInterval); // Add this line
+      clearInterval(progressInterval);
       setStatusMessage('File upload failed. Please try again.');
       setStatusType('error');
       setIsUploading(false);
@@ -171,6 +176,15 @@ const UploadModal = ({ onClose, showModal, criteriaID, onUploadSuccess}) => {
       setShowStatusModal(true);
     }
   }
+
+   const refreshAreas = async (programCode) => {
+        try {
+           const response = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`, {withCredentials: true})
+          Array.isArray(response.data) ? setAreas(response.data) : setAreas([]);
+        } catch(err) {
+          console.error('Error refreshing areas:', err);
+        }
+      }
 
   return (
     <div>

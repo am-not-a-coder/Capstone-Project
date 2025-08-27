@@ -1,7 +1,8 @@
 //for imports
 import {
   faHouse,
-  faCircleXmark
+  faCircleXmark,
+  faPlus
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import ProgramCard from "../components/ProgramCard";
@@ -12,6 +13,7 @@ import { apiGet, apiGetBlob } from '../utils/api_utils';
 import { getCurrentUser } from '../utils/auth_utils';
 import AreaCont from "../components/AreaCont";
 import SubCont from "../components/SubCont";
+import CreateModal from '../components/modals/CreateModal';
 // PDF viewer
 import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer";
 import "@cyntler/react-doc-viewer/dist/index.css";
@@ -23,13 +25,15 @@ import "../../index.css"
   const [employees, setEmployees] = useState([]); 
   const [areas, setAreas] = useState([]);
   const [subareas, setSubareas] = useState([]);
-  const [criterias, setCriterias] = useState([]);
 
   const [showForm, setShowForm] = useState(false);
   const [activeModify, setActiveModify] = useState(null);
   const [editIndex, setEditIndex] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
     
   const [expandedAreaIndex, setExpandedAreaIndex] = useState(null);
+  const [showWord, setShowWord] = useState(false);
+
 
   //Preview state functions
   const [docs, setDocs] = useState([]);
@@ -37,8 +41,6 @@ import "../../index.css"
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [docViewerKey, setDocViewerKey] = useState(0); // Force re-render key
-
-  
 
   
     // Get user info using our centralized utility
@@ -100,7 +102,7 @@ useEffect(() => {
         
         
 
-    const refreshAreas = async () => {
+    const refreshAreas = async (programCode) => {
       try {
          const response = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`, {withCredentials: true})
         Array.isArray(response.data) ? setAreas(response.data) : setAreas([]);
@@ -179,25 +181,50 @@ useEffect(() => {
   const [selectedArea, setSelectedArea] = useState(null);
   const [selectedSubarea, setSelectedSubarea] = useState(null);
 
+  
+  const handleDropDown = (area) => {
+    const currentExpandedIndex = expandedAreaIndex === area.areaID;
+    setExpandedAreaIndex(currentExpandedIndex ? null : area.areaID);
+    setShowPreview(false);
+    setSelectedArea(currentExpandedIndex ? null : area);    
+    
+    if(currentExpandedIndex || (selectedArea && selectedArea.areaID !== area.areaID)){
+      setSelectedSubarea(null);
+    }
+  }
+
   // Function to set the visible area to "areas" and set the selected program
-  function visibleArea(program){
+  const visibleArea = (program) => {
     setVisible("areas");
     setSelectedProgram(program);
-    fetchAreasForProgram(program.programCode)
+    fetchAreasForProgram(program.programCode);
+  
   }
 
   // Clear navigation route to programs
-  function backToPrograms(){
+  const backToPrograms = () => {
     setVisible("programs");
     setSelectedProgram(null);
     setSelectedArea(null);
     setSelectedSubarea(null);
+    setShowPreview(false);
   }
 
-  const handleDropDown = (area) => {
-    setExpandedAreaIndex(expandedAreaIndex === area.areaID ? null : area.areaID);
+  const handleAreaBreadcrumbClick = () =>{
+    setSelectedSubarea(null)
     setShowPreview(false);
-    setSelectedArea(area);
+
+    if(selectedArea && expandedAreaIndex === selectedArea.areaID){
+      // Area is already expanded, just clear subarea
+      return;
+    }
+    // If area is not expanded, expand it
+    if(selectedArea){
+      setExpandedAreaIndex(selectedArea.areaID)
+    }
+  }
+  const handleSubareaSelect = (subarea) => {
+    setSelectedSubarea(subarea);
   }
 
   const handleFilePreview = useCallback(async (docName, docPath) => {
@@ -272,27 +299,117 @@ useEffect(() => {
           <div className="relative flex flex-row min-h-screen p-3 px-5 border rounded-[20px] border-neutral-300 dark:bg-gray-900 inset-shadow-sm inset-shadow-gray-400 dark:inset-shadow-gray-500 dark:shadow-md dark:shadow-zuccini-800">
           
             {/* Main Content */}
-            <div className="flex flex-col w-full pt-2">
-              {/* Navigation route - Fixed at top */}
-              <div className='flex flex-row gap-3 mb-5'>
-              <FontAwesomeIcon icon={faHouse}
+            <div className="relative flex flex-col w-full pt-2">
+              {/* Navigation route */}
+              <div className='flex flex-row gap-3 mb-5'>             
+                <FontAwesomeIcon icon={faHouse}
                onClick={() => {backToPrograms()}}
-               className="mt-1 rounded-xl text-xl text-neutral-600 bg-gray-300/90 cursor-pointer hover:text-zuccini-500 dark:hover:text-zuccini-500/70 p-3 inset-shadow-sm inset-shadow-gray-400 dark:text-white dark:bg-gray-950/50 transition-all duration-200"
-               />
-                <div className='p-3 bg-neutral-300/90 rounded-xl  w-full border-neutral-300 text-neutral-800 transition-all duration-300 font-semibold dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50'>   
-                  <p className="flex items-center gap-x-1 overflow-auto font-semibold text-gray-700 cursor-pointer overflow-y-hidden text-md lg:text-lg text-nowrap scrollbar-thin bg-gray-250 dark:text-white">
-                    <span onClick={()=> backToPrograms()} className="cursor-pointer transition-all duration-250 hover:text-zuccini-500">Programs </span> 
-                    <span className="transition-all duration-300 hover:text-zuccini-500">{selectedProgram ? ' / ' + selectedProgram.programName : null}</span>
-                    <span className="transition-all duration-300 hover:text-zuccini-500">{selectedArea ? ' / ' + selectedArea.areaName : null}</span>
-                    <span className="transition-all duration-200 hover:text-zuccini-500">{selectedSubarea ? ' / ' + selectedSubarea.subareaName : null}</span>
-                  </p>
-                </div>
+               className="p-3 mt-1 text-xl transition-all duration-200 cursor-pointer rounded-xl text-neutral-600 bg-gray-300/90 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 inset-shadow-sm inset-shadow-gray-400 dark:text-white dark:bg-gray-950/50"
+               />             
+              
+              {/* Breadcrumbs */}
+              <div className='w-full p-3 font-semibold bg-neutral-300/90 rounded-xl border-neutral-300 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50'>
+                <nav className="flex items-center overflow-hidden font-semibold text-gray-700 gap-x-2 text-md lg:text-lg dark:text-white">
+                  
+                  {/* Programs Breadcrumb */}
+                  <span 
+                    onClick={() => backToPrograms()} 
+                    className="flex items-center flex-shrink-0 transition-all cursor-pointer duration-250 hover:text-zuccini-500"
+                    title="Programs"
+                  >
+                    Programs
+                  </span>
+                  
+                  {/* Program Name Breadcrumb */}
+                  {selectedProgram && (
+                    <>
+                      <span className="flex-shrink-0 text-gray-400 dark:text-gray-500">/</span>
+                      <span 
+                        onClick={() => {
+                          // Stay in areas view but clear area/subarea selections
+                          setSelectedArea(null);
+                          setSelectedSubarea(null);
+                          setExpandedAreaIndex(null);
+                          setShowPreview(false);
+                        }}
+                        className="flex items-center min-w-0 truncate transition-all duration-300 cursor-pointer hover:text-zuccini-500"
+                        title={selectedProgram.programName}
+                      >
+                        <span className="truncate">
+                          {selectedProgram.programName.length > 25 
+                            ? `${selectedProgram.programName.substring(0, 25)}...` 
+                            : selectedProgram.programName
+                          }
+                        </span>
+                      </span>
+                    </>
+                  )}
+                  
+                  {/* Area Name Breadcrumb */}
+                  {selectedArea && (
+                    <>
+                      <span className="flex-shrink-0 text-gray-400 dark:text-gray-500">/</span>
+                      <span 
+                        onClick={() => {        
+                          setSelectedSubarea(null);
+                          setShowPreview(false);            
+                        }}
+                        className="flex items-center min-w-0 truncate transition-all duration-300 cursor-pointer hover:text-zuccini-500"
+                        title={selectedArea.areaName}
+                      >
+                        <span className="truncate">
+                          {selectedArea.areaName.length > 20 
+                            ? `${selectedArea.areaName.substring(0, 20)}...` 
+                            : selectedArea.areaName
+                          }
+                        </span>
+                      </span>
+                    </>
+                  )}
+                  
+                  {/* Subarea Name Breadcrumb */}
+                  {selectedSubarea && (
+                    <>
+                      <span className="flex-shrink-0 text-gray-400 dark:text-gray-500">/</span>
+                      <span 
+                        className="flex items-center min-w-0 truncate transition-all duration-200 hover:text-zuccini-500 text-zuccini-600 dark:text-zuccini-400"
+                        title={selectedSubarea.subareaName}
+                      >
+                        <span className="truncate">
+                          {selectedSubarea.subareaName.length > 20 
+                            ? `${selectedSubarea.subareaName.substring(0, 20)}...` 
+                            : selectedSubarea.subareaName
+                          }
+                        </span>
+                      </span>
+                    </>
+                  )}
+                  
+                </nav>
+              </div>
+              <button onMouseEnter={() => setShowWord(true)}
+                onMouseLeave={() => setShowWord(false)}
+                onClick={() => setShowCreateModal(true)}
+                className={`p-3 px-4 text-xl flex items-center transition-all duration-300 cursor-pointer rounded-xl text-neutral-600 bg-gray-300/90 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 inset-shadow-sm inset-shadow-gray-400 dark:text-white dark:bg-gray-950/50`}>
+                    <span
+                     className={`transition-all duration-500 overflow-hidden whitespace-nowrap ${ showWord ? "opacity-100 max-w-[150px] mr-2" : "opacity-0 max-w-0 mr-0"}`}
+                    >
+                      Create</span>
+                    <FontAwesomeIcon icon={faPlus} className='z-10'/>
+                </button>
+              {showCreateModal && (
+                <CreateModal 
+                  onCreate={refreshAreas} 
+                  setShowCreateModal={setShowCreateModal} 
+                  onClick={() => setShowCreateModal(false)}
+                />
+              )}
               </div>
 
               {/* Content Area */}
               <div className="flex flex-row flex-1 gap-4">
                 
-                {/* Left Panel - Programs/Areas */}
+                {/* Programs/Areas */}
                 <div className={`flex flex-col transition-all duration-500 ${showPreview ? 'w-1/2' : 'w-full'}`}>
                   
                   {/* Program Cards Section */}
@@ -304,7 +421,7 @@ useEffect(() => {
                         program={program} 
                         key={program.programID} 
                         onClick={()=> visibleArea(program)} 
-                        className="hover:border-zuccini-700 shadow-xl"
+                        className="shadow-xl hover:border-zuccini-700"
                       />
                     ))}
                   </div>
@@ -323,13 +440,17 @@ useEffect(() => {
                                   isExpanded={expandedAreaIndex === area.areaID}
                                   
                                 /> 
-                                <div className={`list-upper-alpha list-inside overflow-hidden transition-all duration-500 ease-in-out ${expandedAreaIndex === area.areaID ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'}`}>
+                                <div className={`list-upper-alpha list-inside overflow-hidden transition-all duration-500 ease-in-out ${expandedAreaIndex === area.areaID ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
                                 {Array.isArray(area.subareas) && area.subareas.filter(sa => sa.subareaID != null).length > 0 ? (area.subareas.filter(sa => sa.subareaID != null).map((subarea) => (
                                   <SubCont 
                                     key={subarea.subareaID} 
                                     title={subarea.subareaName} 
-                                    criteria={subarea.criteria}
-                                    onClick={() => {setShowCreateModal(true)}}
+                                    criteria={subarea.criteria}                                  
+                                    programCode={area.programCode}
+                                    areaName={area.areaName}  
+                                    subareaName={subarea.subareaName}
+                                    onClick={() => {handleSubareaSelect(subarea)}}
+                                    onCreate={() => {setShowCreateModal(true)}}
                                     onRefresh={refreshAreas}
                                     onFilePreview={handleFilePreview}
                                   />))
@@ -351,7 +472,7 @@ useEffect(() => {
                 </div>
 
                 {/* Document Viewer */}
-                <div className={`relative transition-all duration-500 ease-in-out overflow-hidden ${showPreview ? 'w-1/2 opacity-100' : 'w-0 opacity-0'}`} 
+                <div className={`sticky top-0 transition-all duration-500 ease-in-out overflow-hidden ${showPreview ? 'w-1/2 opacity-100' : 'w-0 opacity-0'}`} 
                      style={{ height: showPreview ? '100vh' : '0' }}>
                   {showPreview && (
                     <div className='relative w-full h-full bg-white rounded-lg shadow-lg' style={{ minHeight: '100%', minWidth: '400px' }}>
