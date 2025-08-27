@@ -1,14 +1,14 @@
 //for imports
   import {
-  faPlus,
+  faStarHalfStroke,
   faCircleXmark,
   faHouse 
   } from '@fortawesome/free-solid-svg-icons';
   import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
   import {useCallback, useEffect, useState} from 'react'
   import AreaCont from '../components/AreaCont';
-  import SubCont from '../components/SubCont';
-  import CreateModal from '../components/modals/CreateModal';
+  import SubContForm from '../components/SubContForm';
+  import SelfRateModal from '../components/modals/SelfRateModal';
   import { apiGet, apiGetBlob } from '../utils/api_utils';
   import ProgramCard from '../components/ProgramCard'
 
@@ -20,7 +20,7 @@
   const Accreditation = () => {
     const [expandedAreaIndex, setExpandedAreaIndex] = useState(null);
     const [area, setArea] = useState([]);
-    const [showCreateModal, setShowCreateModal] = useState(false);
+    
     const [programs, setPrograms] = useState([]);
     
     const [docs, setDocs] = useState([]);
@@ -28,7 +28,8 @@
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [docViewerKey, setDocViewerKey] = useState(0); // Force re-render key
-
+    const [showSelfRateModal, setShowSelfRateModal] = useState(false);
+    const [showWord, setShowWord] = useState(false); 
     
   const [visible, setVisible] = useState("programs");
   const [selectedProgram, setSelectedProgram] = useState(null);
@@ -68,9 +69,10 @@
           }
         }
         
-    const refreshAreas = async () => {
+    const refreshAreas = async (programCode) => {
       try {
-        const response = await apiGet('/api/accreditation', {withCredentials: true})
+        const response = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`, 
+        {withCredentials: true})
         Array.isArray(response.data) ? setArea(response.data) : setArea([]);
       } catch(err) {
         console.error('Error refreshing areas:', err);
@@ -192,35 +194,19 @@
     return(
     <>
         <div className="relative flex flex-row justify-around border border-neutral-300 rounded-[20px] min-w-[950px] min-h-[90%] shadow-md inset-shadow-sm inset-shadow-gray-400 p-3 bg-neutral-200 dark:bg-gray-900 dark:inset-shadow-zuccini-800">
-          <div className='flex flex-col w-full p-3 overflow-auto'>
+          <div className='relative flex flex-col w-full p-3'>
             <div className='flex flex-row gap-5 mb-5'>
-              {visible == "areas" ? (
-                <button onClick={() => {setShowCreateModal(true)}}  className='flex flex-row items-center justify-around px-3 font-semibold transition-all duration-300 border shadow-md cursor-pointer border-neutral-400 rounded-2xl text-neutral-800 hover:scale-101 hover:shadow-xl hover:bg-zuccini-500 hover:text-white inset-shadow-sm inset-shadow-gray-400 dark:border-gray-900 dark:text-white dark:border-none dark:bg-gray-950/50 dark:shadow-md dark:hover:shadow-lg dark:hover:bg-zuccini-500/70 dark:shadow-zuccini-800'>
-                    Create
-                    <FontAwesomeIcon icon={faPlus} className='ml-3'/>
-                </button>
-              ) : (
-                <FontAwesomeIcon icon={faHouse}
+                         
+              <FontAwesomeIcon icon={faHouse}
                onClick={() => {backToPrograms()}}
                className="p-3 mt-1 text-xl transition-all duration-200 cursor-pointer rounded-xl text-neutral-600 bg-gray-300/90 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 inset-shadow-sm inset-shadow-gray-400 dark:text-white dark:bg-gray-950/50"
-               />
-              )}
-
-                {showCreateModal && (
-                  <CreateModal 
-                    onCreate={refreshAreas} 
-                    setShowCreateModal={setShowCreateModal} 
-                    onClick={() => setShowCreateModal(false)}
-                  />
-                )}
-
-                
+               />                                           
             
               {/* Breadcrumbs */}
               <div className='w-full p-3 font-semibold bg-neutral-300/90 rounded-xl border-neutral-300 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:border-gray-900 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50'>
                 <nav className="flex items-center overflow-hidden font-semibold text-gray-700 gap-x-2 text-md lg:text-lg dark:text-white">
                   
-                  {/* Programs Breadcrumb - Always visible */}
+                  {/* Programs Breadcrumb */}
                   <span 
                     onClick={() => backToPrograms()} 
                     className="flex items-center flex-shrink-0 transition-all cursor-pointer duration-250 hover:text-zuccini-500"
@@ -296,10 +282,32 @@
                   
                 </nav>
               </div>
+               <button
+                onMouseEnter={() => setShowWord(true)}
+                onMouseLeave={() => setShowWord(false)}
+                onClick={() => setShowSelfRateModal(true)}
+                className={`p-3 px-4 text-xl flex items-center transition-all duration-300 cursor-pointer rounded-xl text-neutral-600 bg-gray-300/90 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 inset-shadow-sm inset-shadow-gray-400 dark:text-white dark:bg-gray-950/50`}
+              >
+                <span
+                  className={`transition-all duration-500 overflow-hidden whitespace-nowrap ${ showWord ? "opacity-100 max-w-[150px] mr-2" : "opacity-0 max-w-0 mr-0"}`}
+                >
+                  Self-Rate
+                </span>
+
+                <FontAwesomeIcon icon={faStarHalfStroke} className="z-10" />
+              </button>
+
+                {showSelfRateModal && (
+                  <SelfRateModal 
+                    onCreate={refreshAreas} 
+                    setShowSelfRateModal={setShowSelfRateModal} 
+                    onClick={() => setShowSelfRateModal(false)}
+                  />
+                )}
             </div>
 
             {/* Area Containers */}
-            <div className="flex flex-row flex-1 gap-4">
+            <div className="relative flex flex-row flex-1 gap-4">
                 
                 {/* Programs/Areas */}
                 <div className={`flex flex-col transition-all duration-500 ${showPreview ? 'w-1/2' : 'w-full'}`}>
@@ -331,22 +339,20 @@
                                   isExpanded={expandedAreaIndex === area.areaID}
                                   
                                 /> 
-                                <div className={`list-upper-alpha list-inside overflow-hidden transition-all duration-500 ease-in-out ${expandedAreaIndex === area.areaID ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'}`}>
+                                <div className={`list-upper-alpha list-inside overflow-hidden transition-all duration-500 ease-in-out ${expandedAreaIndex === area.areaID ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
                                 {Array.isArray(area.subareas) && area.subareas.length > 0 ? (area.subareas.filter(sa => sa.subareaID != null).map((subarea) => (
-                                  <SubCont 
+                                  <SubContForm 
                                     key={subarea.subareaID} 
                                     title={subarea.subareaName} 
                                     criteria={subarea.criteria} 
                                     onClick={() => {handleSubareaSelect(subarea)}}                           
-                                    onCreate={() => {setShowCreateModal(true)}}
+                                    onCreate={() => {setShowSelfRateModal(true)}}
                                     onRefresh={refreshAreas}
                                     onFilePreview={handleFilePreview}
                                   />))
                                   ) : (
-                                  <div className='flex flex-col items-center justify-center p-5 mb-3 text-neutral-800 bg-neutral-300/50 dark:bg-gray-800/50 dark:text-white rounded-2xl'>
-                                    <h1 className='text-lg font-semibold'>No Sub-Areas found</h1>
-                                    <p className='mb-1 font-light text-md'>Want to Create one?</p>
-                                    <button onClick={() => {setShowCreateModal(true)}} className='px-10 py-2 transition-all duration-300 cursor-pointer bg-neutral-300 dark:bg-gray-600 hover:text-white hover:bg-zuccini-600/60 rounded-2xl'>Create</button>
+                                  <div className='flex flex-col items-center justify-center min-h-[150px] p-5 mb-3 text-neutral-800 bg-neutral-300/50 dark:bg-gray-800/50 dark:text-white rounded-2xl'>
+                                    <h1 className='text-lg text-gray-500'>No Sub-Areas found</h1>                                    
                                   </div>
                                   )
                                 }
@@ -360,8 +366,9 @@
                 </div>
 
                 {/* Document Viewer */}
-                <div className={`relative transition-all duration-500 ease-in-out overflow-hidden ${showPreview ? 'w-1/2 opacity-100' : 'w-0 opacity-0'}`} 
-                     style={{ height: showPreview ? '100vh' : '0' }}>
+                
+                <div className={`sticky top-0 transition-all duration-500 ease-in-out overflow-hidden ${showPreview ? 'w-1/2 opacity-100' : 'w-0 opacity-0'}`} 
+                     style={{ height: showPreview ? '95vh' : '0' }}>
                   {showPreview && (
                     <div className='relative w-full h-full bg-white rounded-lg shadow-lg' style={{ minHeight: '100%', minWidth: '400px' }}>
                       
@@ -474,71 +481,8 @@
                       Close
                     </button>
                   </div>
-                )}
-                
-                {/* Document Viewer */}
-                {!isLoading && !error && docs.length > 0 && (
-                  <>
-                    <div className="absolute inset-0 w-full h-full">
-                      <DocViewer 
-                        key={docViewerKey} // Force re-render when key changes
-                        pluginRenderers={DocViewerRenderers}
-                        documents={docs}    
-                        className="doc-viewer"
-                        prefetchMethod="GET"
-                        config={{
-                          header: {
-                            disableHeader: false,
-                            disableFileName: false,
-                            retainURLParams: false,
-                          },
-                          pdfZoom: {
-                            defaultZoom: 1.0,
-                            zoomJump: 0.3,
-                          },
-                          pdfVerticalScrollByDefault: false,
-                          loadingRenderer: {
-                            showLoadingTimeout: false,
-                          }
-                        }}
-                        style={{ 
-                          height: '100%',
-                          width: '100%',
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          bottom: 0
-                        }}
-                      />
-                    </div>
-
-                    
-                    
-                    {/* Close Button */}
-                    <FontAwesomeIcon 
-                      icon={faCircleXmark} 
-                      onClick={() => {
-                        setShowPreview(false);
-                        setDocs([]);
-                        setError(null);
-                      }}
-                      className="absolute z-10 text-2xl transition-all duration-300 border-black rounded-full cursor-pointer text-white/50 border-1 top-3 right-4 hover:text-red-400"
-                    /> 
-                    
-                    {/* View Full Document Button */}
-                    <button 
-                      onClick={() => {
-                        if(docs.length > 0) {
-                          window.open(docs[0].uri, '_blank');
-                        }
-                      }}
-                      className="absolute z-10 px-4 py-2 font-medium text-white transition-all duration-300 bg-green-600 rounded-lg shadow-lg bottom-4 right-4 hover:bg-green-700"
-                    >
-                      View Full Document
-                    </button>
-                  </>
-                )}
+                )}                                
+               
               </div>
             )}
           </div>

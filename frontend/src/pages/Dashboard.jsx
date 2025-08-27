@@ -2,26 +2,46 @@ import{
     faUsers,
     faGraduationCap,
     faSchool,
-    faCircleCheck,
     faBullhorn,
     faPlus,
     faGears,
-    faHourglassHalf
+    faHourglassHalf,
+    faCalendarDays 
 } from '@fortawesome/free-solid-svg-icons';
 import {useNavigate} from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { apiGet } from '../utils/api_utils';
 
 const Dashboard = () => {
-
+    
+    const [count, setCount] = useState({
+        employees: 0,
+        programs: 0,
+        institutes: 0,
+        deadlines: 0
+    })
+    
+    useEffect(()=> {
+        const fetchCounts = async () => {
+            try{
+                const response = await apiGet('/api/count');
+                setCount(response.data)                
+            } catch(err){
+                console.error("Failed fetching counts", err)
+            }
+        }
+        fetchCounts();
+    }, [])
+    
     return (
         <>
             {/* Dashboard links */}
             <section className='grid grid-rows-4 gap-1 mt-20 mb-5 lg:mt-8 lg:grid-cols-4 lg:grid-rows-1'>   
-                <DashboardLinks icon={faUsers} text="Users" />            
-                <DashboardLinks icon={faGraduationCap} text="Programs" />            
-                <DashboardLinks icon={faSchool} text="Institutes" />            
-                <DashboardLinks icon={faCircleCheck} text="Approved" />            
+                <DashboardLinks icon={faUsers} text="Users" count={count.employees}/>            
+                <DashboardLinks icon={faGraduationCap} text="Programs" count={count.programs}/>            
+                <DashboardLinks icon={faSchool} text="Institutes" count={count.institutes}/>               
+                <DashboardLinks icon={faCalendarDays} text="Deadlines" count={count.deadlines} />            
             </section>
 
             {/* Announcements */}
@@ -73,17 +93,21 @@ const Dashboard = () => {
     );
 }
 
-export const DashboardLinks = ({icon, text}) =>{
+export const DashboardLinks = ({icon, text, count}) =>{
     const navigate = useNavigate();
 
     return (
     
-        <div className='relative flex flex-row items-center h-20 p-4 m-1 transition-all duration-500 shadow-xl cursor-pointer text-neutral-800 border-1 border-neutral-300 inset-shadow-sm inset-shadow-gray-400 dark:border-gray-800 rounded-3xl dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-900'>
+        <div 
+        onClick={() => navigate(`/${text}`)}
+        className='relative flex flex-row items-center h-20 p-4 m-1 transition-all duration-500 shadow-xl cursor-pointer text-neutral-800 border-1 border-neutral-300 inset-shadow-sm inset-shadow-gray-400 dark:border-gray-800 rounded-3xl dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-900'>
             <div className='flex items-center justify-center p-2 w-12 h-12 bg-[#5ADF9C] rounded-full mr-3'>
                 <FontAwesomeIcon icon={icon}  className="text-2xl text-center text-neutral-800" />
             </div>
             <h1 className="text-xl font-semibold transition-all duration-500 text-shadow-sm dark:text-white">{text}</h1>
-            <span className="absolute text-lg transition-all duration-500 right-6 dark:text-white">0</span>
+            <span className="absolute text-lg transition-all duration-500 right-6 dark:text-white">
+                {count}
+            </span>
         </div>
     
     )

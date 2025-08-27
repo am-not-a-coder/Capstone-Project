@@ -6,7 +6,7 @@ from werkzeug.utils import secure_filename
 from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, decode_token, exceptions, verify_jwt_in_request
 from flask_jwt_extended.exceptions import JWTExtendedException
 from datetime import datetime, timedelta
-from app.nextcloud_service import upload_to_nextcloud, download_from_nextcloud, check_directory
+from app.nextcloud_service import upload_to_nextcloud, download_from_nextcloud, check_directory, safe_path
 import os
 import re
 from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria
@@ -391,7 +391,16 @@ def register_routes(app):
 
 
                                         #DATA FETCHING ROUTES
-                                        
+
+    # Gets the data count for user, programs, and institutes                                        
+    @app.route('/api/count', methods=["GET"])
+    def get_count():
+        employee_count = (Employee.query.count())                                            
+        program_count = (Program.query.count())                                            
+        institute_count = (Institute.query.count())      
+        deadline_count = (Deadline.query.count())      
+
+        return jsonify({'employees' : employee_count, 'programs' : program_count, 'institutes' : institute_count, 'deadlines' : deadline_count  })                                    
                                                             
     # GET USER PROFILE BY EMPLOYEE ID
     @app.route('/api/profile/<string:employeeID>', methods=["GET"])
@@ -684,7 +693,8 @@ def register_routes(app):
     def get_area():
         areas = (Area.query
                  .join(Program, Area.programID == Program.programID)
-                 .outerjoin(Subarea, Area.areaID == Subarea.areaID)
+                 .order_by(Area.areaID.asc())                 
+                 .outerjoin(Subarea, Area.areaID == Subarea.areaID)                 
                  .add_columns(
                     Area.areaID,
                     Area.programID,
@@ -705,6 +715,8 @@ def register_routes(app):
                 'programID': area.programID,
                 'subareaID': area.subareaID,    
                 'programCode': area.programCode,
+                'areaTitle': area.areaName,
+                'areaNum': area.areaNum,
                 'areaName': f"{area.areaNum}: {area.areaName}",
                 'progress': area.progress,
                 'subareaName': area.subareaName            
@@ -833,7 +845,7 @@ def register_routes(app):
             .outerjoin(Subarea, Area.areaID == Subarea.areaID)
             .outerjoin(Criteria, Subarea.subareaID == Criteria.subareaID)
             .outerjoin(Document, Criteria.docID == Document.docID)       
-            .order_by(Area.areaID.asc(), Subarea.subareaID.asc())
+            .order_by(Area.areaID.asc(), Subarea.subareaID.asc(), Criteria.criteriaID.asc())
             .filter(Program.programCode == program_code)
             .all() 
         )
@@ -1001,11 +1013,9 @@ def register_routes(app):
         path = f"UDMS_Repository/Accreditation/Programs/{program_code}/{area_name}/{subarea_name}/{criteria_type}/{criteria_id}"
         path = path.strip('/')
 
-        parts = path.split('/')
-        current = ""
-        for p in parts:
-            current = f'{current}/{p}'.strip('/')
-            check_directory(current)             
+        encoded_path = safe_path(path)
+
+        check_directory(encoded_path)             
 
         # Generates a secure filename
         filename = secure_filename(file.filename)

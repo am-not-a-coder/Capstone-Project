@@ -1,7 +1,8 @@
 //for imports
 import {
   faHouse,
-  faCircleXmark
+  faCircleXmark,
+  faPlus
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import ProgramCard from "../components/ProgramCard";
@@ -12,6 +13,7 @@ import { apiGet, apiGetBlob } from '../utils/api_utils';
 import { getCurrentUser } from '../utils/auth_utils';
 import AreaCont from "../components/AreaCont";
 import SubCont from "../components/SubCont";
+import CreateModal from '../components/modals/CreateModal';
 // PDF viewer
 import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer";
 import "@cyntler/react-doc-viewer/dist/index.css";
@@ -27,8 +29,10 @@ import "../../index.css"
   const [showForm, setShowForm] = useState(false);
   const [activeModify, setActiveModify] = useState(null);
   const [editIndex, setEditIndex] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
     
   const [expandedAreaIndex, setExpandedAreaIndex] = useState(null);
+  const [showWord, setShowWord] = useState(false);
 
 
   //Preview state functions
@@ -98,7 +102,7 @@ useEffect(() => {
         
         
 
-    const refreshAreas = async () => {
+    const refreshAreas = async (programCode) => {
       try {
          const response = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`, {withCredentials: true})
         Array.isArray(response.data) ? setAreas(response.data) : setAreas([]);
@@ -295,13 +299,14 @@ useEffect(() => {
           <div className="relative flex flex-row min-h-screen p-3 px-5 border rounded-[20px] border-neutral-300 dark:bg-gray-900 inset-shadow-sm inset-shadow-gray-400 dark:inset-shadow-gray-500 dark:shadow-md dark:shadow-zuccini-800">
           
             {/* Main Content */}
-            <div className="flex flex-col w-full pt-2">
+            <div className="relative flex flex-col w-full pt-2">
               {/* Navigation route */}
-              <div className='flex flex-row gap-3 mb-5'>
-              <FontAwesomeIcon icon={faHouse}
+              <div className='flex flex-row gap-3 mb-5'>             
+                <FontAwesomeIcon icon={faHouse}
                onClick={() => {backToPrograms()}}
                className="p-3 mt-1 text-xl transition-all duration-200 cursor-pointer rounded-xl text-neutral-600 bg-gray-300/90 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 inset-shadow-sm inset-shadow-gray-400 dark:text-white dark:bg-gray-950/50"
-               />
+               />             
+              
               {/* Breadcrumbs */}
               <div className='w-full p-3 font-semibold bg-neutral-300/90 rounded-xl border-neutral-300 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50'>
                 <nav className="flex items-center overflow-hidden font-semibold text-gray-700 gap-x-2 text-md lg:text-lg dark:text-white">
@@ -382,6 +387,23 @@ useEffect(() => {
                   
                 </nav>
               </div>
+              <button onMouseEnter={() => setShowWord(true)}
+                onMouseLeave={() => setShowWord(false)}
+                onClick={() => setShowCreateModal(true)}
+                className={`p-3 px-4 text-xl flex items-center transition-all duration-300 cursor-pointer rounded-xl text-neutral-600 bg-gray-300/90 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 inset-shadow-sm inset-shadow-gray-400 dark:text-white dark:bg-gray-950/50`}>
+                    <span
+                     className={`transition-all duration-500 overflow-hidden whitespace-nowrap ${ showWord ? "opacity-100 max-w-[150px] mr-2" : "opacity-0 max-w-0 mr-0"}`}
+                    >
+                      Create</span>
+                    <FontAwesomeIcon icon={faPlus} className='z-10'/>
+                </button>
+              {showCreateModal && (
+                <CreateModal 
+                  onCreate={refreshAreas} 
+                  setShowCreateModal={setShowCreateModal} 
+                  onClick={() => setShowCreateModal(false)}
+                />
+              )}
               </div>
 
               {/* Content Area */}
@@ -418,7 +440,7 @@ useEffect(() => {
                                   isExpanded={expandedAreaIndex === area.areaID}
                                   
                                 /> 
-                                <div className={`list-upper-alpha list-inside overflow-hidden transition-all duration-500 ease-in-out ${expandedAreaIndex === area.areaID ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'}`}>
+                                <div className={`list-upper-alpha list-inside overflow-hidden transition-all duration-500 ease-in-out ${expandedAreaIndex === area.areaID ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
                                 {Array.isArray(area.subareas) && area.subareas.filter(sa => sa.subareaID != null).length > 0 ? (area.subareas.filter(sa => sa.subareaID != null).map((subarea) => (
                                   <SubCont 
                                     key={subarea.subareaID} 
@@ -450,7 +472,7 @@ useEffect(() => {
                 </div>
 
                 {/* Document Viewer */}
-                <div className={`relative transition-all duration-500 ease-in-out overflow-hidden ${showPreview ? 'w-1/2 opacity-100' : 'w-0 opacity-0'}`} 
+                <div className={`sticky top-0 transition-all duration-500 ease-in-out overflow-hidden ${showPreview ? 'w-1/2 opacity-100' : 'w-0 opacity-0'}`} 
                      style={{ height: showPreview ? '100vh' : '0' }}>
                   {showPreview && (
                     <div className='relative w-full h-full bg-white rounded-lg shadow-lg' style={{ minHeight: '100%', minWidth: '400px' }}>

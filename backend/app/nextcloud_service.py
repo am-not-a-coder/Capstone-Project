@@ -1,10 +1,15 @@
 import requests
 import os
+from urllib.parse import quote
 from requests.auth import HTTPBasicAuth
 
 NEXTCLOUD_URL = os.getenv('NEXTCLOUD_URL')
 NEXTCLOUD_USER = os.getenv('NEXTCLOUD_USER')
 NEXTCLOUD_PASSWORD = os.getenv('NEXTCLOUD_PASSWORD')
+
+def safe_path(path :str):
+    # Encode each segment separately to keep `/` intact
+    return "/".join(quote(p.strip()) for p in path.split('/'))
 
 # Create folder if it doesn't exists
 def check_directory(path):
@@ -20,20 +25,17 @@ def check_directory(path):
 def upload_to_nextcloud(file, path):
     target_url = f"{NEXTCLOUD_URL}{path.strip('/')}/{file.filename}"
 
-    print(f"Attempting to download from: {target_url}")
-    print(f"Using auth: {NEXTCLOUD_USER}:{'*' * len(NEXTCLOUD_PASSWORD)}")
-
     response = requests.put(target_url, auth=HTTPBasicAuth(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD), data=file.stream)
     return response
 
 
-def download_from_nextcloud(file, path):
+def download_from_nextcloud(doc_path):
     try:
-        target_url = f"{NEXTCLOUD_URL.rstrip('/')}/{path}/{file.filename}"
+        target_url = f"{NEXTCLOUD_URL.rstrip('/')}/{doc_path.strip('/')}"
 
         response = requests.get(
                 target_url, 
-                auth=(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD), 
+                auth=HTTPBasicAuth(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD), 
                 timeout = 30, 
                 stream = True
             )

@@ -8,7 +8,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import StatusModal from './StatusModal';
-import { apiPostForm } from '../../utils/api_utils';
+import { apiPostForm, apiGet } from '../../utils/api_utils';
 
 const UploadModal = ({ onClose, showModal, programCode, areaName, subareaName, criteriaType, criteriaID, onUploadSuccess}) => {
 
@@ -108,6 +108,7 @@ const UploadModal = ({ onClose, showModal, programCode, areaName, subareaName, c
   };
 
   const closeModal = () => {
+    refreshAreas();
     resetUpload();
     if (onClose) {
       onClose();
@@ -145,7 +146,7 @@ const UploadModal = ({ onClose, showModal, programCode, areaName, subareaName, c
     formData.append('criteriaType', criteriaType);
 
     try{
-      const response = await apiPostForm('/api/accreditation/upload', formData,{withCredentials: true});
+      const response = await apiPostForm('/api/accreditation/upload', formData, {withCredentials: true});
       
       // Clear the simulation interval
       clearInterval(progressInterval);
@@ -175,6 +176,15 @@ const UploadModal = ({ onClose, showModal, programCode, areaName, subareaName, c
       setShowStatusModal(true);
     }
   }
+
+   const refreshAreas = async (programCode) => {
+        try {
+           const response = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`, {withCredentials: true})
+          Array.isArray(response.data) ? setAreas(response.data) : setAreas([]);
+        } catch(err) {
+          console.error('Error refreshing areas:', err);
+        }
+      }
 
   return (
     <div>

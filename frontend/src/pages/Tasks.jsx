@@ -1,12 +1,11 @@
 //for imports
 import CircularProgressBar from '../components/CircularProgressBar'
-import {useState, useEffect} from 'react';
+import {useState, useEffect, use} from 'react';
 import {
     faAngleRight,
     faCalendarPlus
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import axios from 'axios';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import EventModal from '../components/modals/EventModal';
@@ -26,9 +25,11 @@ const Tasks = () => {
     const [content, setContent] = useState("");
 
     const [programOption, setProgramOption] = useState([]); // for the form option
+    const [selectedProgram, setSelectedProgram] = useState(null);
 
     const [selectedArea, setSelectedArea] = useState(""); // area use state
-    const [areaOption, setAreaOption] = useState([]); // for the form option
+    const [allAreas, setAllAreas]= useState([]);
+    const [filteredAreaOptions, setFilteredAreaOptions] = useState([]);
     const [areaProgressList, setAreaProgressList] = useState([]); // displays the area in tasks
 
     const [showEventModal, setShowEventModal] = useState(false); // shows the event modal
@@ -71,7 +72,7 @@ const Tasks = () => {
             try{
                 const res = await apiGet('/api/area', {withCredentials: true})
 
-                Array.isArray(res.data.area) ? setAreaOption(res.data.area) : setAreaOption([]);
+                Array.isArray(res.data.area) ? setAllAreas(res.data.area) : setAllAreas([]);
                 Array.isArray(res.data.area) ? setAreaProgressList(res.data.area) : setAreaProgressList([]);
                     
             } catch(err){
@@ -206,6 +207,22 @@ const Tasks = () => {
         setShowDeadline(false);
     }
 
+    const uniqueAreas = areaProgressList.filter((area, index, self) => index === self.findIndex(a => a.areaID === area.areaID))
+    
+    useEffect(()=> {
+        if(program){
+            const filteredAreas = allAreas.filter(
+            (area) => String(area.programID) === String(program)
+            );
+            setFilteredAreaOptions(filteredAreas);
+            setSelectedArea("");
+        } else {
+            setFilteredAreaOptions([]);
+        }
+    }, [program, allAreas]);
+   
+    
+
     return(
         
     <>    
@@ -225,8 +242,15 @@ const Tasks = () => {
         {areaProgressList && areaProgressList.length > 0 ? (
         <>
         
-        {areaProgressList.slice(0,3).map((area) => (                
-            <Area key={area.areaID} areaTitle={area.areaNum} desc={area.areaName} program={area.programCode} progress={area.progress}/>)
+        {uniqueAreas.slice(0,3).map((area) => (                
+            <Area 
+            key={area.areaID} 
+            areaTitle={area.areaNum} 
+            desc={area.areaTitle} 
+            program={area.programCode} 
+            progress={area.progress}
+            />
+        )
         )}
             <div className='absolute right-0 col-start-3 flex items-center justify-center min-w-[275px] h-full overflow-hidden opacity-90 transition-all duration-500 hover:min-w-[278px] hover:opacity-95 hover:scale-110 bg-gradient-to-r from-transparent via-neutral-800 to-neutral-900 dark:bg-gradient-to-r dark:from-transparent dark:via-gray-800 dark:to-gray-900 cursor-pointer'>
                     <h1 className='z-10 text-xl font-semibold text-neutral-200'>View All</h1>
@@ -259,7 +283,8 @@ const Tasks = () => {
                     <label htmlFor ="program"
                     className='mb-1 `text-lg font-extralight'>Program</label>
 
-                    <select name="program" id="program"
+                    <select name="program" 
+                        id="program"
                         value={program}
                         onChange={(e)=> {setProgram(e.target.value)}}
                         className='p-2 font-semibold transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-950/50'
@@ -285,12 +310,13 @@ const Tasks = () => {
                         className='p-2 font-semibold transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-950/50'
                         required>
                         <option value="">Select an Area</option>
-                        {areaOption.map((area) => {
-                            return(
-                                <option key={area.areaID} value={area.areaID}>{area.areaNum}</option>
-                            )
-                        }
-                        )}
+                        {filteredAreaOptions.filter((area, index, self) => 
+                        index === self.findIndex(a => a.areaID === area.areaID))
+                        .map((area) => (
+                            <option key={area.areaID} value={area.areaID}>
+                            {area.areaName}
+                            </option>
+                        ))}
                     </select>
                     </div>
 
