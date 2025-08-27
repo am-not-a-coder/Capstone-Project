@@ -220,13 +220,15 @@ const Header = ({title}) => {
                                 Notifications
                             </h1>
                             <Link className='px-2 ml-2 text-lg font-medium text-blue-500 hover:bg-neutral-300 dark:hover:bg-neutral-800'
-                            to='/Notification'>See All
+                            to='/Notification'
+                            onClick={() => (setShowNotification(false))}
+                            >See All
                             </Link>
                         </div>
                        <div className='flex flex-col min-h-[300px] p-3 bg-neutral-300 w-full rounded-xl inset-shadow-sm inset-shadow-neutral-400 transition-all duration-500 dark:text-white dark:border-gray-800 dark:bg-gray-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
                             {notifications && notifications.length > 0 ? (
                             notifications.map((notification, index) => (
-                                <Notifications key={index} picture={notification.profilePic} notifTitle={notification.title} content={notification.content} date={notification.date} alert={notification.alert} link={notification.link}/>
+                                <Notifications key={index} picture={notification.profilePic} notifTitle={notification.title} content={notification.content} date={notification.date} alert={notification.alert} link={notification.link} onClose={() => setShowNotification(false)}/>
                             )) 
                         ) : ( <h1 className='text-xl text-center text-neutral-600'>No new notifications</h1> 
                         )}
@@ -242,7 +244,9 @@ const Header = ({title}) => {
                             Messages
                         </h1>
                         <Link className='px-2 ml-2 text-lg font-medium text-blue-500 hover:bg-neutral-300 dark:hover:bg-neutral-800'
-                        to='/Messages'>See All
+                        to='/Messages'
+                        onClick={() => setShowMessages(false)}
+                        >See All
                         </Link>
                     </div>    
                     <div className='flex flex-col p-3 min-h-[300px] bg-neutral-300 w-full rounded-xl dark:text-white dark:bg-gray-950 dark:inset-shadow-xs dark:inset-shadow-zuccini-800'>
@@ -273,13 +277,14 @@ export const HeaderTitle = ({title}) => {
 
 //generates the notification div
 
-export const Notifications = ({notifTitle, content, date, alert, picture, link}) => {
+export const Notifications = ({notifTitle, content, date, alert, picture, link, onClose}) => {
     const navigate = useNavigate();
 
     const handleClick = () => {
         if(link) {
             navigate(link); // Navigate to the specified link
         }
+        onClose(); //auto close dropdown
     };
 
     return(

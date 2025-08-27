@@ -8,6 +8,28 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSquareXmark, faPaperPlane } from '@fortawesome/free-solid-svg-icons';
 import { useLocation, useSearchParams } from 'react-router-dom';
 
+//contains static users data, never deleted by "Delete All" button
+const usersData = [
+  {
+    id: 1,
+    profilePic: avatar1,
+    user: 'Miguel Derick Pangindian',
+    isOnline: true
+  },
+  {
+    id: 2,
+    profilePic: avatar2,
+    user: 'Jayson Permejo',
+    isOnline: false
+  },
+  {
+    id: 3,
+    profilePic: avatar3,
+    user: 'Rafael Caparic',
+    isOnline: true
+  }
+];
+
 //static message data with id to track converstaion
 const messagesData = [
     {
@@ -16,7 +38,8 @@ const messagesData = [
       user: 'Miguel Derick Pangindian',
       message: 'WHY DID YOU REDEEM IT?!?!?',
       time: '3m',
-      alert: true
+      alert: true,
+      isOnline: true // online user
     },
     {
       id: 2,
@@ -24,7 +47,8 @@ const messagesData = [
       user: 'Jayson Permejo',
       message: "Hello? How are you, I'm under the water, I'm so much drowning, bulululul",
       time: '5h',
-      alert: true
+      alert: true,
+      isOnline: false // offline
     },
     {
       id: 3,
@@ -32,7 +56,8 @@ const messagesData = [
       user: 'Rafael Caparic',
       message: "Nothing beats a jet2 holiday!",
       time: '4d',
-      alert: false
+      alert: false,
+      isOnline: true
     }
   ];
 
@@ -61,6 +86,9 @@ const Messages = () => {
   //state for input field
   const [newMessage, setNewMessage] = useState("");
 
+  //state for auto open mssg
+  const [autoOpenEnabled, setAutoOpenEnabled] = useState(true);
+
   //Effect for auto open convo from URL
   useEffect(() => {
     if (openConversationId) {
@@ -73,6 +101,14 @@ const Messages = () => {
       }
     }
   }, [openConversationId, messages]);
+
+  // Auto open the recent mssg
+  useEffect(() => {
+    // opens only if there;s no current selected messg and when there's messgs
+    if (autoOpenEnabled && !selectedConversation && messages.length > 0 && view === 'all') {
+      handleOpenConversation(messages[0]); // opens recent 
+    }
+  }, [messages, selectedConversation, autoOpenEnabled, view]);
 
   //Reference to the messg container
   const messageEndRef = useRef(null);
@@ -106,19 +142,23 @@ const Messages = () => {
   };
 
   //handle opening a conversation
-  const handleOpenConversation = (messagesData) => {
-    //Auto switch to 'All' when opening unread mess
-    if (view === 'unread') {
-      //switch to 'all' view first
-      setView('all');
-    }
-    setSelectedConversation(messagesData); //store selected mess. data
+  const handleOpenConversation = (data) => {
+    // if coming from active users, data may not have mssg/time/alert
+    const msgData = messages.find(msg => msg.id === data.id) || {
+      id: data.id,
+      profilePic: data.profilePic,
+      user: data.user,
+      message: "",
+      time: "",
+      alert: false,
+      isOnline: data.isOnline
+    };
+    setSelectedConversation(msgData); //store selected mess. data
 
-    //Mark messg as read when opened
-    if (messagesData.alert) {
-      //uopdate main messg list - remove blue dot
+    //Mark messg as read if alert
+    if (msgData.alert) {
       setMessages(prev => 
-        prev.map(msg => msg.id === messagesData.id ? {...msg, alert: false} //Mark as read
+        prev.map(msg => msg.id === msgData.id ? {...msg, alert: false}
         : msg 
         )
       );
@@ -128,6 +168,7 @@ const Messages = () => {
   //handle closing a converstaion
   const handleCloseConversation = () => {
     setSelectedConversation(null); //clear selecttion
+    setAutoOpenEnabled(false); //disable auto open until view changes
   };
 
   //handle send message function
@@ -150,6 +191,31 @@ const Messages = () => {
       [selectedConversation.id]: [...prev[selectedConversation.id], message]
     }));
 
+    //check if user exists in messgs
+    const userExists = messages.some(msg => msg.id === selectedConversation.id);
+    
+    if (userExists) {
+      // message preview update to latest messg for existing user
+      setMessages((prev => prev.map(msg => msg.id === selectedConversation.id
+        ? {...msg, message: `You: ${newMessage.trim()}`, time: "now", alert: false}
+        : msg
+      )));
+    } else {
+      //restore use to messgs
+      setMessages((prev => [
+        {
+          id: selectedConversation.id,
+          profilePic: selectedConversation.profilePic,
+          user: selectedConversation.user,
+          message: `You: ${newMessage.trim()}`,
+          time: "now",
+          alert: false,
+          isOnline: selectedConversation.isOnline
+        },
+        ...prev
+      ]));
+    }
+
     setNewMessage(""); //clear input
 
     //Scroll to bottom after sending
@@ -166,18 +232,21 @@ const Messages = () => {
   //Converstation area keeps open in 'all' view
   const handleViewAll = () => {
     setView('all');
+    setSelectedConversation(null);
+    setAutoOpenEnabled(true); // enbale auto open again when switchign to 'see all'
   };
 
-  const handleViewUnread = () => {
-    setView('unread');
+  const handleViewActive = () => {
+    setView('active');
     //close convo area when switching view
     setSelectedConversation(null);
+    setAutoOpenEnabled(false); //disable when in active users
   };
 
   //filter mesages based on view type
   const filteredMessages = view === 'all' 
   ? messages
-  : messages.filter(message => message.alert); //only show unread messages
+  : usersData.filter(user => user.isOnline); //show users
     
   return (
     <div className="flex flex-row relative border border-neutral-800 rounded-[20px] min-w-[950px] min-h-[90%] shadow-md p-2 pb-4 bg-neutral-200 text-neutral-900 dark:text-white dark:bg-gray-900 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
@@ -190,44 +259,80 @@ const Messages = () => {
           onClick={handleViewAll}
           className={`px-4 py-1 font-medium transition-colors rounded-full cursor-pointer ${view === 'all' ? 'bg-blue-500 text-white' : 'text-black bg-neutral-300 dark:text-white dark:bg-neutral-800' } `}
         >
-          All
+          See All
         </button>
 
         <button
-          onClick={handleViewUnread}
-          className={`px-4 py-1 font-medium transition-colors rounded-full cursor-pointer ${view === 'unread' ? 'bg-blue-500 text-white' : 'text-black bg-neutral-300 dark:text-white dark:bg-neutral-800' }`}
+          onClick={handleViewActive}
+          className={`px-4 py-1 font-medium transition-colors rounded-full cursor-pointer ${view === 'active' ? 'bg-green-600 text-white' : 'text-black bg-neutral-300 dark:text-white dark:bg-neutral-800' }`}
         >
-          Unread
+          Active Users
         </button>
       </div>
       
-      {/* delete all messages */}
-      <button
+      {/* delete all messages, this only renders in see all */}
+      {view === 'all' && (
+        <button
         onClick={handleDeleteAll}
         className='absolute z-0 px-2 text-base font-bold text-red-500 rounded-full cursor-pointer top-5 right-5 hover:bg-neutral-300 dark:hover:bg-neutral-800'>
         Delete All
       </button>
+      )}
 
       {/* Messages List */}
       <div className='grid gap-1 pt-3'>
-        {filteredMessages.length > 0 ? (
-          filteredMessages.map((message, index) => (
-            <MessagesItem
-              key={message.id}
-              picture={message.profilePic}
-              userName={message.user}
-              message={message.message}
-              time={message.time}
-              alert={message.alert}
+        {view === 'all' ? (
+          filteredMessages.length > 0 ? (
+            filteredMessages.map((item, index) => {
+              //if in 'see all', item is a messg obj, if in 'active users', item is a user obj
+              const messageObj = view === 'all'
+              ? item
+              : messages.find(msg => msg.id === item.id);
 
-              onDelete={() => handleDelete(index)}
-              onOpenConversation={() => handleOpenConversation(message)}
-              isSelected={selectedConversation ?.id === message.id} //check if this messg is selelcted
-            />
-          ))
+              return (
+                <MessagesItem
+                  key={item.id}
+                  picture={item.profilePic}
+                  userName={item.user}
+                  message={messageObj ? messageObj.message : ""}
+                  time={messageObj ? messageObj.time : ""}
+                  alert={messageObj ? messageObj.alert : false}
+                  isOnline={item.isOnline}
+
+                  onDelete={view === 'all' ? () => handleDelete(index) : undefined}
+                  onOpenConversation={() => handleOpenConversation(item)}
+                  isSelected={selectedConversation ?.id === item.id} //check if this messg is selelcted
+                  showMessagePreview={view === 'all'}
+                />
+              )
+            })
         ) : (
           <p className='text-lg italic text-gray-500 text-center'>No new messages</p>
+        )
+        ) : (
+          filteredMessages.length > 0 ? (
+            filteredMessages.map((item, index) => {
+              // in active users view, item is a user obj
+              return (
+                <MessagesItem 
+                  key={item.id}
+                  picture={item.profilePic}
+                  userName={item.user}
+                  message=""
+                  time=""
+                  alert={false}
+                  isOnline={item.isOnline}
+                  onOpenConversation={() => handleOpenConversation(item)}
+                  isSelected={selectedConversation?.id === item.id}
+                  showMessagePreview={false}
+                />
+              );
+            })
+          ) : (
+            <p className='text-lg italic text-gray-500 text-center'>No active users</p>
+          )
         )}
+        
         </div>
       </div>
       

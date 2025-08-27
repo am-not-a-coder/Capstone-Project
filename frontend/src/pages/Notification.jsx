@@ -119,7 +119,7 @@ const Notification = () => {
               />
             ))
           ) : (
-            <p className='text-lg italic text-gray-500'>No new notifications</p>
+            <p className='text-lg italic text-center text-gray-500'>No new notifications</p>
           )}
         </div>
       </div>
