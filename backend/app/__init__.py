@@ -6,10 +6,14 @@ from dotenv import load_dotenv
 from flask_jwt_extended import JWTManager
 from flask_socketio import SocketIO
 import os
+import redis
+
+redis_client = redis.Redis(host='redis', port=6379, db=0)
 
 db = SQLAlchemy()
 migrate = Migrate()
 socketio = SocketIO()
+
 
 
 def create_app():
@@ -32,7 +36,9 @@ def create_app():
 
     db.init_app(app)
     migrate.init_app(app, db)
+    socketio.init_app(app, cors_allowed_origins=["http://localhost:5173"], async_mode='threading', logger=True, engineio_logger=True)
     JWTManager(app)
+
     CORS(app, origins=["http://localhost:5173"], supports_credentials=True)
 
     # Initialize SocketIO with CORS settings

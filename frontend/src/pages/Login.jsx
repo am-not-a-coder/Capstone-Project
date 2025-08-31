@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import Carousel from '../components/Carousel';
 import { apiPost } from '../utils/api_utils';
 import udmsLogo from '../assets/udms-logo.png';
@@ -13,17 +13,19 @@ import {
     faEyeSlash
 } from '@fortawesome/free-solid-svg-icons';
 import { cacheUserAfterLogin } from '../utils/auth_utils';
+import { logoutAcc } from '../utils/auth_utils';
+import { initPresenceListeners, getSocket } from '../utils/websocket_utils'
+
 
 const Login = () => {
+
+    const navigate = useNavigate()
 
     const [employeeID, setEmployeeID] = useState('');
     const [error, setError] = useState(null);
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState();
     const [loading, setLoading] = useState(false);
-
-    const navigate = useNavigate()
-
 
 
     const handleLogin = async (e) => {
@@ -49,15 +51,29 @@ const Login = () => {
                 employeeID: employeeID.trim(),
                 password: password.trim()
             });
+            const ch = new BroadcastChannel('auth')
 
             if (response.success && response.data.success) {
+                const payload = { type: 'login', ts: Date.now()}
+                ch.postMessage(payload)
+                
+                // Store session ID from backend response
+                if (response.data.user.sessionID) {
+                    localStorage.setItem('session_id', response.data.user.sessionID)
+                }
+                
                 // Clear any previous errors
-                setError(null);
+                setError(null)
                 await cacheUserAfterLogin()
                 // Navigate to dashboard after successful login
-                sessionStorage.setItem('LoggedIn', 'true')
                 toast.dismiss(toastId)
-                navigate('/Dashboard');
+                ch.close()
+
+                //call websocket connection
+
+                
+
+                navigate('/Dashboard', {replace: true });
                 
             } else { 
                 // Display backend error message to user

@@ -30,4 +30,15 @@ services:
 
     volumes:
       - ./uploads:/app/uploads
+
+  redis:
+    image: redis:alpine
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+volumes:
+    redis_data:
   

@@ -1,6 +1,6 @@
 from flask import jsonify, request, session, send_from_directory, current_app
 from app.models import Employee
-from app import db
+from app import db, redis_client, socketio
 from werkzeug.security import check_password_hash, generate_password_hash, _hash_internal
 from werkzeug.utils import secure_filename
 from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, get_jwt
@@ -9,11 +9,13 @@ from flask_jwt_extended.exceptions import JWTExtendedException
 from datetime import datetime, timedelta
 import os
 import re
+import time
+import redis
 from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message
 
 
 def register_routes(app):
-                                        #AUTHENTICATION(LOGIN/LOGOUT) PAGE ROUTES 
+                                  #AUTHENTICATION(LOGIN/LOGOUT) PAGE ROUTES 
     
     # JWT Exception Handler
     @app.errorhandler(JWTExtendedException)
@@ -28,6 +30,7 @@ def register_routes(app):
             data = request.get_json()
             empID = data.get("employeeID")
             password = data.get("password")
+
             #Fetches the user from the db using the employeeID
             user = Employee.query.filter_by(employeeID=empID).first()
             #If the user is not found in the db
@@ -45,11 +48,19 @@ def register_routes(app):
                 current_app.logger.error(f"Invalid password hash for user {empID}: {hash_error}")
                 return jsonify({'success': False, 'message': 'User account has invalid password format. Contact administrator.'}), 400
                 
-            if is_valid_password: #checks if the user input hashed password matches the hashed pass in the db 
-                # After login, store the user info in the session
+            if is_valid_password: 
                 
+                #remove this 
                 user.isOnline = True
-                db.session.commit()      
+                db.session.commit()
+
+                session_id = f'{empID}:{int(time.time())}'
+                
+                # Store in Redis
+                redis_client.setex(f'session:{session_id}', 3600, 'active')
+                redis_client.sadd('online_users', empID)
+                redis_client.hset('user_status', empID, 'active')
+                print(f"Session created: session:{session_id}")  # Debug log
                 try:
                     # Create both access token (15 minutes) and refresh token (7 days)
 
@@ -66,10 +77,10 @@ def register_routes(app):
                     
                     refresh_token = create_refresh_token(
                         identity=empID,
-                        expires_delta=timedelta(days=7)  # Longer-lived for convenience
+                        expires_delta=timedelta(days=7)
                     )
                     
-                    # Prepare user data (without sensitive information)
+                    
                     user_data = {
                         'employeeID': user.employeeID,
                         'name': f"{user.fName} {user.lName}{user.suffix or ''}",
@@ -80,7 +91,8 @@ def register_routes(app):
                         'contactNum': user.contactNum,
                         'profilePic': user.profilePic,
                         'isAdmin': user.isAdmin,
-                        'role': 'admin' if user.isAdmin else 'user'
+                        'role': 'admin' if user.isAdmin else 'user',
+                        'sessionID': session_id
                     }
                     
                     resp = jsonify({
@@ -123,6 +135,29 @@ def register_routes(app):
                 'role': 'admin' if user.isAdmin else 'user'
             }
         }), 200
+    
+    @app.route('/api/validate-session', methods=['POST'])
+    def validate_session():
+        try:
+            session_id = request.json.get('session_id')
+            print(f"Validating session: {session_id}")  # Debug log
+            
+            if not session_id:
+                return jsonify({'valid': False, 'error': 'No session ID'}), 400
+            
+            # Check if session exists in Redis
+            redis_key = f'session:{session_id}'
+            exists = redis_client.exists(redis_key)
+            print(f"Redis key {redis_key} exists: {exists}")  # Debug log
+            
+            if not exists:
+                return jsonify({'valid': False}), 401
+            
+            return jsonify({'valid': True}), 200
+            
+        except Exception as e:
+            print(f"Validation error: {e}")
+            return jsonify({'valid': False, 'error': str(e)}), 500
 
         
     @app.route('/api/protected', methods=["GET"])
@@ -137,15 +172,6 @@ def register_routes(app):
     @app.route('/api/refresh-token', methods=["POST"])
     @jwt_required(refresh=True)  # This decorator requires refresh token, not access token
     def refresh():
-        """
-        Endpoint to refresh access token using refresh token
-
-        Frontend sends request with refresh token in Authorization header
-        We verify refresh token is valid and not expired
-        We create new access token with same user identity
-        Optionally create new refresh token for extended security
-        Return new tokens to frontend
-        """
         try:
             # Get the user identity from the refresh token
             current_user_id = get_jwt_identity()
@@ -198,15 +224,41 @@ def register_routes(app):
             current_app.logger.error(f"Token refresh error: {e}")
             return jsonify({'success': False, 'message': 'Token refresh failed'}), 500
     
-    
+
+    def get_session_from_request():
+        # Get session ID from request headers or body
+        session_id = request.json.get('sessionId') if request.is_json else None
+        return session_id
+
     #LOGOUT API
     @app.route('/api/logout', methods=["POST"])
     def logout():
-        resp = jsonify({'success': True})
-        unset_jwt_cookies(resp)
-        return resp
+        try:
+            data = request.get_json() or {}
+            
+            empID = data.get('employeeID')
+            session_id = data.get('session_id')
 
-                                        #USER PAGE ROUTES
+            # Clean up session from Redis
+            if session_id:
+                redis_key = f'session:{session_id}'
+                redis_client.delete(redis_key)
+                redis_client.hdel('user_status', empID)
+
+            # Clean up user from online users (if empID provided)
+            if empID:
+                redis_client.srem('online_users', empID)
+            
+            # Always return success for logout (even if empID missing)
+            resp = jsonify({'success': True})
+            unset_jwt_cookies(resp) 
+            return resp
+            
+        except Exception as e:
+            print(f"Logout error: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+                 #USER PAGE ROUTES
 
     #CREATE USER
     @app.route('/api/user', methods=["POST"])
@@ -287,6 +339,17 @@ def register_routes(app):
             db.session.add(new_user)
             db.session.commit()
             return jsonify({'success': True, "message": "Employee created successfully"}), 201  
+
+    @app.route('/api/conversations', methods=['GET'])
+    @jwt_required()
+    def get_conversations():
+        current_user_id = get_jwt_identity()
+        current_user_conversation = Conversation.query.filter_by(employeeI=current_user_id)
+        other_participant = Conversation.query.filter_by()
+
+
+
+        pass
 
 
     #Reset user password (for fixing invalid password hashes)
@@ -1099,285 +1162,25 @@ def register_routes(app):
     @app.route('/api/accreditation/preview/<filename>')
     def preview_file(filename):   
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-
-            
-    #                                   MESSAGING API ROUTES
     
-    # Get all conversations for current user
-    @app.route('/api/conversations', methods=["GET"])
+    @app.route('/api/users/online-status', methods=['GET'])
     @jwt_required()
-    def get_conversations():
-        try:
-            current_user_id = get_jwt_identity()
-            
-            # Use SQLAlchemy ORM to get conversations where user is participant
-            user_conversations = (db.session.query(Conversation)
-                .join(ConversationParticipant, Conversation.conversationID == ConversationParticipant.conversationID)
-                .filter(ConversationParticipant.employeeID == current_user_id)
-                .filter(ConversationParticipant.isActive == True)
-                .filter(Conversation.isActive == True)
-                .order_by(Conversation.createdAt.desc())
-                .all())
-            
-            conversations_list = []
-            for conv in user_conversations:
-                # For direct conversations, get the other participant
-                if conv.conversationType == 'direct':
-                    other_participant = (db.session.query(ConversationParticipant)
-                        .join(Employee, ConversationParticipant.employeeID == Employee.employeeID)
-                        .filter(ConversationParticipant.conversationID == conv.conversationID)
-                        .filter(ConversationParticipant.employeeID != current_user_id)
-                        .filter(ConversationParticipant.isActive == True)
-                        .first())
-                    
-                    if other_participant:
-                        other_user = other_participant.employee
-                        conversation_name = f"{other_user.fName} {other_user.lName}"
-                        profile_pic = other_user.profilePic
-                        other_user_id = other_user.employeeID
-                    else:
-                        conversation_name = "Unknown User"
-                        profile_pic = None
-                        other_user_id = None
-                else:
-                    # Group conversation
-                    conversation_name = conv.conversationName or "Group Chat"
-                    profile_pic = None
-                    other_user_id = None
-                
-                # Get latest message for this conversation
-                latest_message = (db.session.query(Message)
-                    .filter(Message.conversationID == conv.conversationID)
-                    .filter(Message.isDeleted == False)
-                    .order_by(Message.sentAt.desc())
-                    .first())
-                
-                if latest_message:
-                    latest_message_text = latest_message.messageContent
-                    # Calculate time ago
-                    time_diff = datetime.now() - latest_message.sentAt
-                    if time_diff.days > 0:
-                        time_ago = f"{time_diff.days}d"
-                    elif time_diff.seconds // 3600 > 0:
-                        time_ago = f"{time_diff.seconds // 3600}h"
-                    else:
-                        time_ago = f"{(time_diff.seconds // 60) or 1}m"
-                    
-                    has_alert = latest_message.senderID != current_user_id
-                else:
-                    latest_message_text = "No messages yet"
-                    time_ago = "now"
-                    has_alert = False
-                
-                conversations_list.append({
-                    'id': conv.conversationID,
-                    'conversationType': conv.conversationType,
-                    'conversationName': conversation_name,
-                    'profilePic': profile_pic,
-                    'otherUserId': other_user_id,
-                    'latestMessage': latest_message_text,
-                    'latestMessageTime': time_ago,
-                    'hasAlert': has_alert
-                })
-            
-            return jsonify({
-                'success': True,
-                'conversations': conversations_list
+    def get_users_with_status():
+        empID = get_jwt_identity()
+        users = Employee.query.all()
+        online_users = {user.decode('utf-8') for user in redis_client.smembers('online_users')}
+        users_data = []
+        for user in users:
+            users_data.append({
+                'employeeID': user.employeeID,
+                'fName': user.fName,
+                'lName': user.lName,
+                'profilePic': user.profilePic,
+                'online_status': user.employeeID in online_users
             })
-            
-        except Exception as e:
-            current_app.logger.error(f"Error fetching conversations: {e}")
-            return jsonify({'success': False, 'error': str(e)}), 500
-
-    # Get users available to message (excluding current user)
-    @app.route('/api/users/available', methods=["GET"])
-    @jwt_required()
-    def get_available_users():
-        try:
-            current_user_id = get_jwt_identity()
-            
-            # Use SQLAlchemy ORM to get all users except current user
-            users = (db.session.query(Employee)
-                .filter(Employee.employeeID != current_user_id)
-                .order_by(Employee.fName.asc())
-                .all())
-            
-            users_list = []
-            for user in users:
-                users_list.append({
-                    'employeeID': user.employeeID,
-                    'name': f"{user.fName} {user.lName}",
-                    'firstName': user.fName,
-                    'lastName': user.lName,
-                    'profilePic': user.profilePic,
-                    'isOnline': user.isOnline or False
-                })
-            
-            return jsonify({
-                'success': True,
-                'users': users_list
-            })
-            
-        except Exception as e:
-            current_app.logger.error(f"Error fetching available users: {e}")
-            return jsonify({'success': False, 'error': str(e)}), 500
-
-    # Start new conversation with a user
-    @app.route('/api/conversations/start', methods=["POST"])
-    @jwt_required()
-    def start_conversation():
-        try:
-            current_user_id = get_jwt_identity()
-            data = request.get_json()
-            other_user_id = data.get('otherUserId')
-            
-            if not other_user_id:
-                return jsonify({'success': False, 'error': 'Other user ID required'}), 400
-            
-            # Check if direct conversation already exists
-            existing_conv = (db.session.query(Conversation)
-                .join(ConversationParticipant, Conversation.conversationID == ConversationParticipant.conversationID)
-                .filter(Conversation.conversationType == 'direct')
-                .filter(ConversationParticipant.employeeID.in_([current_user_id, other_user_id]))
-                .group_by(Conversation.conversationID)
-                .having(db.func.count(ConversationParticipant.participantID) == 2)
-                .first())
-            
-            if existing_conv:
-                # Check if both users are participants
-                participants = (db.session.query(ConversationParticipant.employeeID)
-                    .filter(ConversationParticipant.conversationID == existing_conv.conversationID)
-                    .all())
-                participant_ids = [p[0] for p in participants]
-                
-                if current_user_id in participant_ids and other_user_id in participant_ids:
-                    conversation_id = existing_conv.conversationID
-                else:
-                    existing_conv = None
-            
-            if not existing_conv:
-                # Create new conversation
-                new_conversation = Conversation(
-                    conversationType='direct',
-                    createdBy=current_user_id
-                )
-                db.session.add(new_conversation)
-                db.session.flush()  # Get the ID
-                
-                conversation_id = new_conversation.conversationID
-                
-                # Add participants
-                for user_id in [current_user_id, other_user_id]:
-                    participant = ConversationParticipant(
-                        conversationID=conversation_id,
-                        employeeID=user_id
-                    )
-                    db.session.add(participant)
-                
-                db.session.commit()
-            
-            return jsonify({
-                'success': True,
-                'conversationID': conversation_id
-            })
-            
-        except Exception as e:
-            current_app.logger.error(f"Error starting conversation: {e}")
-            db.session.rollback()
-            return jsonify({'success': False, 'error': str(e)}), 500
-    
-    # Send a new message
-    @app.route('/api/conversations/<int:conversation_id>/messages', methods=["POST"])
-    @jwt_required()
-    def send_message(conversation_id):
-        try:
-            current_user_id = get_jwt_identity()
-            data = request.get_json()
-            message_content = data.get('messageContent', '').strip()
-            
-            if not message_content:
-                return jsonify({'success': False, 'error': 'Message content required'}), 400
-            
-            # Verify user is participant
-            participant_check = (db.session.query(ConversationParticipant)
-                .filter(ConversationParticipant.conversationID == conversation_id)
-                .filter(ConversationParticipant.employeeID == current_user_id)
-                .filter(ConversationParticipant.isActive == True)
-                .first())
-            
-            if not participant_check:
-                return jsonify({'success': False, 'error': 'Access denied'}), 403
-            
-            # Create message
-            new_message = Message(
-                conversationID=conversation_id,
-                senderID=current_user_id,
-                messageContent=message_content
-            )
-            db.session.add(new_message)
-            db.session.commit()
-            
-            return jsonify({
-                'success': True,
-                'message': {
-                    'messageID': new_message.messageID,
-                    'sentAt': new_message.sentAt.isoformat(),
-                    'senderID': current_user_id,
-                    'messageContent': message_content
-                }
-            })
-            
-        except Exception as e:
-            current_app.logger.error(f"Error sending message: {e}")
-            db.session.rollback()
-            return jsonify({'success': False, 'error': str(e)}), 500
-
-    # Get messages for a specific conversation
-    @app.route('/api/conversations/<int:conversation_id>/messages', methods=["GET"])
-    @jwt_required()
-    def get_conversation_messages(conversation_id):
-        try:
-            current_user_id = get_jwt_identity()
-            
-            # Verify user is participant
-            participant_check = (db.session.query(ConversationParticipant)
-                .filter(ConversationParticipant.conversationID == conversation_id)
-                .filter(ConversationParticipant.employeeID == current_user_id)
-                .filter(ConversationParticipant.isActive == True)
-                .first())
-            
-            if not participant_check:
-                return jsonify({'success': False, 'error': 'Access denied'}), 403
-            
-            # Get messages for this conversation
-            messages = (db.session.query(Message)
-                .join(Employee, Message.senderID == Employee.employeeID)
-                .filter(Message.conversationID == conversation_id)
-                .order_by(Message.sentAt.asc())
-                .all())
-            
-            # Format messages
-            messages_list = []
-            for msg in messages:
-                sender = (db.session.query(Employee)
-                    .filter(Employee.employeeID == msg.senderID)
-                    .first())
-                
-                messages_list.append({
-                    'messageID': msg.messageID,
-                    'messageContent': msg.messageContent,
-                    'senderID': msg.senderID,
-                    'senderName': f"{sender.fName} {sender.lName}" if sender else 'Unknown',
-                    'sentAt': msg.sentAt.isoformat()
-                })
-            
-            return jsonify({
-                'success': True,
-                'messages': messages_list
-            })
-            
-        except Exception as e:
-            current_app.logger.error(f"Error fetching conversation messages: {e}")
-            return jsonify({'success': False, 'error': str(e)}), 500
-
+        
+        return jsonify({
+            'success': True,
+            'users': users_data
+        })
     

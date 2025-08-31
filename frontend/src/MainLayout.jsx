@@ -19,7 +19,9 @@ import{
     faIdCardClip,
     faArrowRightFromBracket
 } from '@fortawesome/free-solid-svg-icons';
-import { logoutAcc } from './utils/auth_utils';
+import { getCurrentUser } from './utils/auth_utils';
+import { apiPost } from './utils/api_utils';
+import { getSocket } from './utils/websocket_utils';
 
 const MainLayout = () => {
   //sets the active pages' path in the link
@@ -40,23 +42,13 @@ const MainLayout = () => {
     localStorage.setItem('darkMode', darkMode)
   }, [darkMode])
 
-  //Log out logic
+    //Log out logic
   const [showLogout, setShowLogout] = useState(false);
-  const [logout, setLogout] = useState()
   const navigate = useNavigate()
- //shows the logout confirmation
+  //shows the logout confirmation
   const loginCancel = () =>{
-    setLogout(false)
     setShowLogout(false)
   }
-
-  useEffect(() => {
-    if (logout){
-      // removes access_token, refresh_token, and user info
-      logoutAcc()
-      navigate('/login')
-    }
-  }, [logout])
 
   return(
     <>
@@ -136,7 +128,37 @@ const MainLayout = () => {
               Are you sure you want to Log Out?
             </h1>
             <div className="flex justify-center space-x-[50px]">
-              <button onClick={() => setLogout(true)} className="shadow-xl px-4 py-2 transition-all duration-300 text-white cursor-pointer w-[150px] rounded-2xl bg-zuccini-600 hover:bg-zuccini-700">Log out</button>
+                             <button onClick={ async () => {
+                 const sessionId = localStorage.getItem('session_id')
+                 const currentUser = getCurrentUser()
+                 // Close logout modal first
+                 setShowLogout(false)
+                 
+                 // Send session ID to backend (employeeID is optional now)
+                 await apiPost('/api/logout', { 
+                   session_id: sessionId, 
+                   employeeID: currentUser?.employeeID || null
+                 })
+                 
+                 // Clear frontend storage
+                 localStorage.removeItem('session_id')
+                 sessionStorage.removeItem('user')
+                 sessionStorage.removeItem('LoggedIn')
+
+                 //disconnect to websocket
+                 const socket = getSocket()
+                 socket.off('users_online')
+                 socket.disconnect()
+                 
+                 // Broadcast logout to other tabs
+                 const ch = new BroadcastChannel('auth')
+                 const payload = {type: 'logout', ts: Date.now()}
+                 ch.postMessage(payload)
+                 ch.close()
+                 
+                 // Navigate to login
+                 navigate('/Login', {replace: true})
+               }} className="shadow-xl px-4 py-2 transition-all duration-300 text-white cursor-pointer w-[150px] rounded-2xl bg-zuccini-600 hover:bg-zuccini-700">Log out</button>
               <button onClick={loginCancel} className="shadow-xl transition-all duration-300 px-4 py-3 w-[150px] text-white cursor-pointer rounded-2xl bg-zuccini-600 hover:bg-zuccini-700">Cancel</button>
             </div>
           </div>

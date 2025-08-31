@@ -1,222 +1,125 @@
-from flask_socketio import emit, join_room, leave_room, disconnect
-from flask_jwt_extended import decode_token, get_jwt_identity
-from flask import current_app, request
-from app import socketio
+from flask import Flask, jsonify, request, current_app
+from flask_cors import CORS
+from flask_jwt_extended import JWTManager, verify_jwt_in_request, get_jwt_identity, jwt_required
+from flask_socketio import SocketIO, emit, join_room, leave_room, disconnect
+from app import socketio, redis_client
 from datetime import datetime
-import logging
+import threading
 
-# Store connected users (in production, use Redis or database)
-connected_users = {}
+
+
+sid_to_user = {}
+user_to_sid = {}
+pending_broadcast_timer = None
+user_activity_timers = {}
+
+
+def get_online_users():
+    return list(user_to_sid.keys())
+
+def add_presence(sid, user_id):
+    sid_to_user[sid] = user_id
+    user_to_sid.setdefault(user_id, set()).add(sid)
+
+def remove_presence(sid):
+    user_id = sid_to_user.pop(sid, None)
+    if not user_id:
+        return
+    sids = user_to_sid.get(user_id)
+    if sids:
+        sids.discard(sid)
+        if not sids:
+            user_to_sid.pop(user_id, None)
+
+
+def broadcast_online_users():
+    ids = [b.decode() for b in redis_client.smembers('online_users')]
+    socketio.emit('users_online', ids, namespace='/')
+
+
+def schedule_broadcast_online_users(delay_ms=150):
+    global pending_broadcast_timer
+    if pending_broadcast_timer and pending_broadcast_timer.is_alive():
+        pending_broadcast_timer.cancel()
+    pending_broadcast_timer = threading.Timer(delay_ms/1000, broadcast_online_users)
+    pending_broadcast_timer.start()
+
+
 
 @socketio.on('connect')
-def handle_connect(auth):
-    """Handle client connection"""
+def on_connect():
     try:
-        # Get token from auth
-        token = auth.get('token') if auth else None
-        
-        if not token:
-            current_app.logger.error("No token provided")
-            disconnect()
-            return False
-            
-        # Decode JWT token
-        try:
-            decoded_token = decode_token(token)
-            user_identity = decoded_token['sub']  # This should be employeeID
-            
-            # Store user connection
-            connected_users[user_identity] = {
-                'session_id': request.sid,
-                'employeeID': user_identity,
-                'connected_at': datetime.now()
-            }
-            
-            current_app.logger.info(f"✅ User {user_identity} connected")
-            
-            # Send welcome message to user
-            emit('connected', {
-                'message': f'Welcome! You are connected as {user_identity}',
-                'user_id': user_identity
-            })
-            
-            # Notify all users about online users
-            online_users = list(connected_users.keys())
-            emit('users_online', online_users, broadcast=True)
-            
-            return True
-            
-        except Exception as e:
-            current_app.logger.error(f"Token decode error: {e}")
-            disconnect()
-            return False
-            
-    except Exception as e:
-        current_app.logger.error(f"Connection error: {e}")
+        verify_jwt_in_request(locations=['cookies'])
+        user_id = get_jwt_identity()
+    except Exception:
         disconnect()
         return False
 
+    add_presence(request.sid, user_id)
+    redis_client.sadd('online_users', user_id)
+    schedule_broadcast_online_users()
+    join_room(f'user:{user_id}')
+
+    user_status = redis_client.hget('user_status', user_id)
+    if user_status:
+        user_status = user_status.decode('utf-8')
+    else:
+        user_status = 'active'
+    emit('status_response', {
+        'userID': user_id,
+        'status': user_status,
+        'message': 'Connected Successfully!'
+    })
+
 @socketio.on('disconnect')
-def handle_disconnect(*args):
-    """Handle client disconnection"""
-    try:
-        # Find and remove user from connected_users
-        user_to_remove = None
-        for user_id, user_data in connected_users.items():
-            if user_data['session_id'] == request.sid:
-                user_to_remove = user_id
-                break
+def on_disconnect():
+    user_id = sid_to_user.get(request.sid)
+    if request.sid and user_id:
+        remove_presence(request.sid)
         
-        if user_to_remove:
-            del connected_users[user_to_remove]
-            current_app.logger.info(f"❌ User {user_to_remove} disconnected")
-            
-            # Update online users list
-            online_users = list(connected_users.keys())
-            emit('users_online', online_users, broadcast=True)
-    
-    except Exception as e:
-        current_app.logger.error(f"Disconnect error: {e}")
+    else:
+        return None
+    if user_id in user_activity_timers:
+        user_activity_timers[user_id].cancel()
+        del user_activity_timers[user_id]
 
-@socketio.on('send_message')
-def handle_message(data):
-    """Handle incoming messages"""
-    try:
-        current_app.logger.info(f"📨 Received message: {data}")
-        
-        # Get current user info
-        user_id = None
-        for uid, user_data in connected_users.items():
-            if user_data['session_id'] == request.sid:
-                user_id = uid
-                break
-        
-        if not user_id:
-            current_app.logger.error("User not found in connected users")
-            return
-        
-        conversation_id = data.get('conversationId')
-        if not conversation_id:
-            current_app.logger.error("No conversation ID provided")
-            return
-            
-        # Import models here to avoid circular imports
-        from app.models import ConversationParticipant
-        from app import db
-        
-        # Get all participants in this conversation
-        participants = db.session.query(ConversationParticipant.employeeID).filter(
-            ConversationParticipant.conversationID == conversation_id,
-            ConversationParticipant.isActive == True
-        ).all()
-        
-        participant_ids = [p[0] for p in participants]
-        current_app.logger.info(f"💬 Conversation {conversation_id} participants: {participant_ids}")
-        
-        # Debug connected users
-        current_app.logger.info(f"🔍 Connected users: {list(connected_users.keys())}")
-        for uid, user_data in connected_users.items():
-            current_app.logger.info(f"  - {uid}: session {user_data['session_id']}")
-        
-        # Prepare message data
-        message_response = {
-            'text': data.get('text', ''),
-            'user': data.get('user', 'Unknown'),
-            'employeeID': data.get('employeeID', user_id),
-            'timestamp': data.get('timestamp'),
-            'room': str(conversation_id),
-            'conversationId': conversation_id
-        }
-        
-        current_app.logger.info(f"📤 Sending message to conversation participants: {message_response}")
-        
-        # Send message only to participants who are currently connected
-        for participant_id in participant_ids:
-            if participant_id in connected_users:
-                participant_session = connected_users[participant_id]['session_id']
-                emit('receive_message', message_response, room=participant_session)
-                current_app.logger.info(f"✅ Sent to {participant_id} (session: {participant_session})")
-            else:
-                current_app.logger.info(f"⚠️ Participant {participant_id} not online - not in connected_users")
-        
-    except Exception as e:
-        current_app.logger.error(f"Message handling error: {e}")
-        emit('error', {'message': 'Failed to send message'})
 
-@socketio.on('join_room')
-def handle_join_room(data):
-    """Handle user joining a room"""
+@socketio.on('check_status')
+def check_status(data=None):
     try:
-        room = data.get('room')
-        user_name = data.get('user', 'Unknown')
-        
-        join_room(room)
-        current_app.logger.info(f"👥 {user_name} joined room {room}")
-        
-        emit('user_joined_room', {
-            'user': user_name,
-            'room': room,
-            'message': f'{user_name} joined the room'
-        }, room=room)
-        
+        verify_jwt_in_request(locations=['cookies'])
+        user_id = get_jwt_identity()
+        status = redis_client.hget('user_status', user_id)
+        status_str = status.decode('utf-8') if status else 'active'
+        return {'user_status': status_str}
     except Exception as e:
-        current_app.logger.error(f"Join room error: {e}")
+        try:
+            current_app.logger.error(f'check_status error: {e}')
+        except Exception:
+            pass
+        return {'user_status': 'active'}
 
-@socketio.on('leave_room')
-def handle_leave_room(data):
-    """Handle user leaving a room"""
+
+
+@socketio.on('status_change')
+def handle_status_change(data):
     try:
-        room = data.get('room')
-        user_name = data.get('user', 'Unknown')
-        
-        leave_room(room)
-        current_app.logger.info(f"👋 {user_name} left room {room}")
-        
-        emit('user_left_room', {
-            'user': user_name,
-            'room': room,
-            'message': f'{user_name} left the room'
-        }, room=room)
-        
+        verify_jwt_in_request(locations=['cookies'])
+        user_id = get_jwt_identity()
+        current = redis_client.hget('user_status', user_id)
+        current_str = current.decode('utf-8') if current else None
+        if current_str == data:
+            return {'updated': False, 'status': current_str}
+        redis_client.hset('user_status', user_id, data)
+        socketio.emit('broadcast', {
+            'userID': user_id,
+            'status': data
+        }, namespace='/')
+        return {'updated': True, 'status': data}
     except Exception as e:
-        current_app.logger.error(f"Leave room error: {e}")
+        try:
+            current_app.logger.error(f'status_change error: {e}')
+        except Exception:
+            pass
+        return {'updated': False}
 
-@socketio.on('typing_start')
-def handle_typing_start(data):
-    """Handle typing indicator start"""
-    try:
-        room = data.get('room', 'general')
-        user_name = data.get('user', 'Unknown')
-        
-        # Send to everyone in room except sender
-        emit('user_typing', {
-            'user': user_name,
-            'room': room,
-            'typing': True
-        }, room=room, include_self=False)
-        
-    except Exception as e:
-        current_app.logger.error(f"Typing start error: {e}")
-
-@socketio.on('typing_stop')
-def handle_typing_stop(data):
-    """Handle typing indicator stop"""
-    try:
-        room = data.get('room', 'general')
-        user_name = data.get('user', 'Unknown')
-        
-        # Send to everyone in room except sender
-        emit('user_typing', {
-            'user': user_name,
-            'room': room,
-            'typing': False
-        }, room=room, include_self=False)
-        
-    except Exception as e:
-        current_app.logger.error(f"Typing stop error: {e}")
-
-# Error handling
-@socketio.on_error()
-def error_handler(e):
-    current_app.logger.error(f"SocketIO Error: {e}")
-    emit('error', {'message': 'Something went wrong'})

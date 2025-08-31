@@ -5,7 +5,7 @@ let userCache = null
 const readCache = () => {
     if (userCache) return userCache
     try {
-        const raw = sessionStorage.getItem('user')
+        const raw = localStorage.getItem('user')
         return raw ? JSON.parse(raw) : null
     } catch {
         return null
@@ -15,15 +15,28 @@ const readCache = () => {
 const writeCache = (user) => {
     userCache = user
     if (user) {
-        sessionStorage.setItem('user', JSON.stringify(user))
+        localStorage.setItem('user', JSON.stringify(user))
+        localStorage.setItem('LoggedIn', 'true')
     } else {
-        sessionStorage.removeItem('user')
+        localStorage.removeItem('user')
+        localStorage.removeItem('LoggedIn')
     }
 }
 
 export const isLoggedIn = () => {
     const token = readCache()
-    return token !== null && token?.employeeID
+    // Check if user exists and has required fields
+    if (!token || !token.employeeID) {
+        return false
+    }
+    
+    // Also check if session ID exists in localStorage
+    const sessionId = localStorage.getItem('session_id')
+    if (!sessionId) {
+        return false
+    }
+    
+    return true
 }
 
 /**
@@ -48,11 +61,23 @@ export const cacheUserAfterLogin = async () => {
 }
 
 export const logoutAcc = async () => {
-    await apiPost('/api/logout')
-    writeCache(null)
+    try {
+        await apiPost('/api/logout')
+    } catch (error) {
+        console.error('Logout API error:', error)
+    } finally {
+        // Always clear cache regardless of API response
+        writeCache(null)
+        // Clear all storage
+        localStorage.removeItem('user')
+        localStorage.removeItem('LoggedIn')
+        localStorage.removeItem('session_id')
+        sessionStorage.removeItem('user')
+        sessionStorage.removeItem('LoggedIn')
+    }
 }
 
 
 export const updateCurrentUser = (updatedUser) => {
-    sessionStorage.setItem('user', JSON.stringify(updatedUser))
+    localStorage.setItem('user', JSON.stringify(updatedUser))
 }
