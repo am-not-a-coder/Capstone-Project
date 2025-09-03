@@ -1,11 +1,12 @@
-from flask import jsonify, request, session, send_from_directory, current_app
+from flask import jsonify, request, session, send_from_directory, current_app, Response
 from app.models import Employee
 from app import db
 from werkzeug.security import check_password_hash, generate_password_hash, _hash_internal
 from werkzeug.utils import secure_filename
-from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, get_jwt
+from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, decode_token, exceptions, verify_jwt_in_request
 from flask_jwt_extended.exceptions import JWTExtendedException
 from datetime import datetime, timedelta
+from app.nextcloud_service import upload_to_nextcloud, download_from_nextcloud, check_directory, safe_path
 import os
 import re
 from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria
@@ -69,6 +70,7 @@ def register_routes(app):
                     # Prepare user data (without sensitive information)
                     user_data = {
                         'employeeID': user.employeeID,
+                        'name': f"{user.fName} {user.lName}{user.suffix or ''}",
                         'firstName': user.fName,
                         'lastName': user.lName,
                         'suffix': user.suffix,
@@ -112,18 +114,12 @@ def register_routes(app):
     def refresh():
         """
         Endpoint to refresh access token using refresh token
-        
-        How it works:
-        1. Frontend sends request with refresh token in Authorization header
-        2. We verify refresh token is valid and not expired
-        3. We create new access token with same user identity
-        4. Optionally create new refresh token for extended security
-        5. Return new tokens to frontend
-        
-        Why this is secure:
-        - Refresh tokens are longer-lived but can be revoked
-        - Access tokens are short-lived, limiting damage if compromised
-        - User doesn't need to re-enter credentials
+
+        Frontend sends request with refresh token in Authorization header
+        We verify refresh token is valid and not expired
+        We create new access token with same user identity
+        Optionally create new refresh token for extended security
+        Return new tokens to frontend
         """
         try:
             # Get the user identity from the refresh token
@@ -221,6 +217,7 @@ def register_routes(app):
             return jsonify({'success': False, 'message': 'Email is required' }), 400
         elif not re.match(validEmail, email):
             return jsonify({'success': False, 'message': 'Please enter a valid email'}), 400
+        # Validate contact number format (11 digits)
         if not contactNum:
             return jsonify({'success': False, 'message': 'Contact number is required'}), 400
         elif not re.match(r'^\d{11}$', contactNum):
@@ -394,7 +391,16 @@ def register_routes(app):
 
 
                                         #DATA FETCHING ROUTES
-                                        
+
+    # Gets the data count for user, programs, and institutes                                        
+    @app.route('/api/count', methods=["GET"])
+    def get_count():
+        employee_count = (Employee.query.count())                                            
+        program_count = (Program.query.count())                                            
+        institute_count = (Institute.query.count())      
+        deadline_count = (Deadline.query.count())      
+
+        return jsonify({'employees' : employee_count, 'programs' : program_count, 'institutes' : institute_count, 'deadlines' : deadline_count  })                                    
                                                             
     # GET USER PROFILE BY EMPLOYEE ID
     @app.route('/api/profile/<string:employeeID>', methods=["GET"])
@@ -687,13 +693,17 @@ def register_routes(app):
     def get_area():
         areas = (Area.query
                  .join(Program, Area.programID == Program.programID)
-                 .outerjoin(Subarea, Area.areaID == Subarea.areaID)
+                 .order_by(Area.areaID.asc())                 
+                 .outerjoin(Subarea, Area.areaID == Subarea.areaID)                 
                  .add_columns(
                     Area.areaID,
-                    Program.programCode,
+                    Area.programID,
+                    Area.subareaID,
+                    Program.programCode,                
                     Area.areaName,
                     Area.areaNum,
                     Area.progress,
+                    Subarea.subareaName
                 )
             ).all()
 
@@ -702,11 +712,14 @@ def register_routes(app):
         for area in areas:
             area_data = {
                 'areaID' : area.areaID,
+                'programID': area.programID,
+                'subareaID': area.subareaID,    
                 'programCode': area.programCode,
+                'areaTitle': area.areaName,
+                'areaNum': area.areaNum,
                 'areaName': f"{area.areaNum}: {area.areaName}",
                 'progress': area.progress,
-                
-                'areaNum': area.areaNum
+                'subareaName': area.subareaName            
             }
             area_list.append(area_data)
         
@@ -809,6 +822,8 @@ def register_routes(app):
     # Accreditation page
     @app.route('/api/accreditation', methods=["GET"])
     def get_areas():
+        program_code = request.args.get('programCode')
+
         data = (
             db.session.query(
                 Area.areaID,
@@ -818,6 +833,7 @@ def register_routes(app):
                 Area.progress,
                 Subarea.subareaID,
                 Subarea.subareaName,
+                Criteria.criteriaID,
                 Criteria.criteriaContent,
                 Criteria.criteriaType,
                 Document.docID,
@@ -829,7 +845,8 @@ def register_routes(app):
             .outerjoin(Subarea, Area.areaID == Subarea.areaID)
             .outerjoin(Criteria, Subarea.subareaID == Criteria.subareaID)
             .outerjoin(Document, Criteria.docID == Document.docID)       
-            .order_by(Area.areaID)
+            .order_by(Area.areaID.asc(), Subarea.subareaID.asc(), Criteria.criteriaID.asc())
+            .filter(Program.programCode == program_code)
             .all() 
         )
 
@@ -842,6 +859,7 @@ def register_routes(app):
                 result[area_id] = {                    
                 'areaID': row.areaID,
                 'programCode': row.programCode,
+                'areaNum': row.areaNum,
                 'areaName': row.areaNum + ": " + row.areaName, 
                 'subareas': {}                  
             }
@@ -860,14 +878,15 @@ def register_routes(app):
             
             if row.criteriaContent:
                 criteria_data = {
+                    'criteriaID': row.criteriaID ,
                     'content': row.criteriaContent,
                     'docID': row.docID,
-                    'docName': f"{row.docName}{row.docType}",
+                    'docName': row.docName,
                     'docPath': row.docPath
                 }
 
             match row.criteriaType:
-                case "Input/s":
+                case "Inputs":
                     result[area_id]['subareas'][subarea_id]['criteria']['inputs'].append(criteria_data)
                 case "Processes":
                     result[area_id]['subareas'][subarea_id]['criteria']['processes'].append(criteria_data)
@@ -880,39 +899,6 @@ def register_routes(app):
 
         return jsonify(list(result.values())) 
     
-
-    @app.route('/api/subarea', methods=["GET"])
-    def get_subarea():
-        # Query all subareas with their criteria
-        results = (
-            db.session.query(
-                Subarea.subareaID,
-                Subarea.subareaName,
-                Area.areaID,
-                Criteria.criteriaID
-            )
-            .join(Area, Subarea.areaID == Area.areaID)
-            .outerjoin(Criteria, Subarea.subareaID == Criteria.subareaID)
-            .all()
-        )
-
-        subarea_dict = {}
-
-        for sa in results:
-            if sa.subareaID not in subarea_dict:
-                subarea_dict[sa.subareaID] = {
-                    'subareaID': sa.subareaID,
-                    'subareaName': sa.subareaName,
-                    'areaID': sa.areaID,
-                    'criteria': []  # group criteria here
-                }
-            if sa.criteriaID:
-                subarea_dict[sa.subareaID]['criteria'].append({
-                    'criteriaID': sa.criteriaID
-                })
-
-        return jsonify({'subarea': list(subarea_dict.values())}), 200
-
     @app.route('/api/accreditation/create_area', methods=["POST"])
     def create_area():
         data = request.form
@@ -981,19 +967,156 @@ def register_routes(app):
         return jsonify({'message': 'Criteria created successfully!'}), 200
 
 
-
     @app.route('/api/accreditation/upload', methods=["POST"])
+    @jwt_required()
     def upload_file():
-        file = request.files.get("uploadedfile")
+       # ==== Get and Validate Form Data ====
+        # Get form data
+        data = request.form
+        file = request.files.get("uploadedFile")
+        file_type = data.get("fileType")
+        file_name = data.get("fileName")
+        criteria_id = data.get("criteriaID")
+        program_code = data.get("programCode")
+        area_name = data.get("areaName")
+        subarea_name = data.get("subareaName")
+        criteria_type = data.get("criteriaType")
+        
+        # === Validate the Data ===   
+        # Check if file exists
+        if not file:
+            return jsonify({'success': False, 'message': 'No file provided'}), 400
+        
+        # Check if file has a valid name and extension
+        if not file.filename or '.' not in file.filename:        
+            return jsonify({'success': False, 'message': 'Invalid file name'}), 400
+        
+        allowed_extensions = {'pdf'}
+        file_extension = file.filename.rsplit('.', 1)[1].lower()
+        
+        if file_extension not in allowed_extensions:            
+            return jsonify({'success': False, 'message': 'Invalid file format. Only PDF files are allowed.'}), 400
+        
+        # Get uploader info
+        try:
+            uploader = Employee.query.filter_by(employeeID=get_jwt_identity()).first()
+        
+            if not uploader:
+                return jsonify({'success': False, 'message': 'User not found'}), 400
+            
+        except Exception as e:
+            return jsonify({'success': False, 'message': 'Authentication error'}), 400
+        
+        # ==== Save File ====
+
+        # Gets the file url
+        path = f"UDMS_Repository/Accreditation/Programs/{program_code}/{area_name}/{subarea_name}/{criteria_type}/{criteria_id}"
+        path = path.strip('/')
+
+        encoded_path = safe_path(path)
+
+        check_directory(encoded_path)             
+
+        # Generates a secure filename
+        filename = secure_filename(file.filename)
+
+        if not filename:
+            return jsonify({'success': False, 'message': 'Invalid filename'}), 400
+        
+        try:
+            # saves the file into repository (Nextcloud)
+            response = upload_to_nextcloud(file, path)
+            if response.status_code not in (200, 201, 204):
+                return jsonify({
+                    'success': False,
+                    'message': 'Nextcloud upload failed.',
+                    'status': response.status_code,
+                    'details': response.text
+                }), 400
+                                   
+            # ==== Create document record ====
+
+            # Create database record
+            new_document = Document(
+                docName=file_name,
+                docType=file_type,
+                docPath=f"{path}/{filename}",
+                employeeID=uploader.employeeID  
+            )
+            
+            db.session.add(new_document)
+            db.session.flush() # Get the docID after adding to session
+
+            # ==== Link document to criteria ====
+            criteria = Criteria.query.get(criteria_id)
+
+            if not criteria:
+                db.session.rollback()
+                return jsonify({'success': False, 'message': 'Criteria not found'}), 404
+            
+            criteria.docID = new_document.docID  # Link document to criteria
+
+            db.session.commit()
+            
+            return jsonify({
+                'success': True, 
+                'message': 'File uploaded successfully!', 
+                'filePath': f"{path}/{filename}",
+                'status': response.status_code, 
+            }), 200
+            
+        except Exception as e:
+            db.session.rollback()  # Rollback on error
+            return jsonify({'success': False, 'message': f'Failed to upload file: {str(e)}'}), 400
+        
 
 
-
-
-
-    
-    @app.route('/api/preview/<filename>')   
+    @app.route('/api/accreditation/preview/<filename>', methods=["GET"])   
+    @jwt_required()   
     def preview_file(filename):   
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+        token = request.args.get("token")
+
+        if token:
+            try:
+                decoded = decode_token(token) # validate the token manually
+            except exceptions.JWTDecodeError:
+                return jsonify({"success": False, "message": "Invalid token"}), 401
+            
+        else:
+            verify_jwt_in_request()  # fallback to Authorization header
+
+        NEXTCLOUD_URL = os.getenv("NEXTCLOUD_URL")
+        NEXTCLOUD_USER = os.getenv("NEXTCLOUD_USER")
+        NEXTCLOUD_PASSWORD = os.getenv("NEXTCLOUD_PASSWORD")
+        
+
+        if not all([NEXTCLOUD_URL, NEXTCLOUD_USER, NEXTCLOUD_PASSWORD]):
+            return jsonify({
+                'success': False,
+                'message': 'Nextcloud Configuration missing'
+            }), 500
+
+        doc = Document.query.filter_by(docName=filename).first()
+        if not doc:
+            return jsonify({'success': False, 'message': 'File not found.'}), 404    
+
+        # Get the file
+        response = download_from_nextcloud(doc.docPath)
+        
+        if response.status_code == 200:
+            return Response(
+                response.iter_content(chunk_size=8192),
+                content_type = response.headers.get("Content-Type", "application/octet-stream"),
+                headers={
+                    "Content-Disposition": f'inline; filename="{filename}"'
+                }
+            ) 
+        else:
+            return jsonify({
+                'success': False,
+                'status': response.status_code,
+                'detail': response.text 
+            }), response.status_code
 
             
            

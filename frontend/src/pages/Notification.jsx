@@ -73,7 +73,7 @@ const Notification = () => {
     : notifications.filter((notif) => notif.alert); // only show alerts if "unread" is selected
 
   return (
-      <div className="relative border border-neutral-800 rounded-[20px] min-w-[950px] shadow-md p-2 pb-4 bg-neutral-200 text-neutral-900 dark:text-white dark:bg-gray-900 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
+      <div className="relative border border-neutral-400 rounded-[20px] min-w-[950px] shadow-md p-2 pb-4 bg-neutral-200 text-neutral-900 inset-shadow-sm inset-shadow-gray-400 dark:text-white dark:bg-gray-900 dark:shadow-md dark:shadow-zuccini-800">
 
         {/* All and Unread Filter*/}
         <div className='flex gap-4 mt-2'>

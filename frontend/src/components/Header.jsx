@@ -141,13 +141,14 @@ const Header = ({title}) => {
         <header className="fixed z-10 flex items-center w-full col-span-5 col-start-2 p-4 pl-10 mb-3 -mt-5 lg:relative lg:pl-5">
              <HeaderTitle title={title}/>
              {/* Profile, messages, notifications */}
-        <div className='w-full'><div 
+        <div className='w-full'>
+            <div 
             ref={iconContainerRef}
-            className="fixed top-0 right-0 flex items-center justify-around w-full p-2 bg-gray-300 border border-gray-300 shadow-lg lg:rounded-3xl lg:top-4 lg:right-10 lg:w-45 lg:h-16 h-19 dark:bg-gray-900 dark:border-gray-800 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 ">
+            className="absolute top-0 right-0 flex items-center justify-around w-full p-2 bg-gray-200 border border-gray-300 shadow-lg lg:rounded-3xl lg:top-4 lg:right-10 lg:w-45 lg:h-16 h-19 dark:bg-gray-900 dark:border-gray-800 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 ">
                 {/* Message button */}
                 <FontAwesomeIcon 
                     icon={faComment} 
-                    className="p-2 text-lg transition-all duration-500 rounded-lg cursor-pointer bg-neutral-300 text-zuccini-800 lg:text-xl dark:text-zuccini-700 dark:bg-gray-800 dark:shadow-sm dark:shadow-zuccini-800"
+                    className="p-2 text-lg transition-all duration-500 rounded-lg cursor-pointer inset-shadow-sm inset-shadow-gray-400 bg-neutral-300 text-zuccini-800 lg:text-xl dark:text-zuccini-700 dark:bg-gray-800 dark:shadow-sm dark:shadow-zuccini-800"
                     onClick={() => {
                         setShowMessages((current) => !current);
                         setShowNotification(false);
@@ -157,7 +158,7 @@ const Header = ({title}) => {
                 {/* Notification button */}
                 <FontAwesomeIcon 
                     icon={faBell} 
-                    className="p-2 ml-2 text-xl text-center transition-all duration-500 rounded-lg cursor-pointer bg-neutral-300 text-zuccini-800 dark:text-zuccini-700 dark:bg-gray-800 dark:shadow-sm dark:shadow-zuccini-800" 
+                    className="p-2 ml-2 text-xl text-center transition-all duration-500 rounded-lg cursor-pointer inset-shadow-sm inset-shadow-gray-400 bg-neutral-300 text-zuccini-800 dark:text-zuccini-700 dark:bg-gray-800 dark:shadow-sm dark:shadow-zuccini-800" 
                     onClick={ () => {
                         setShowNotification ((current) => !current)
                         setShowMessages(false);
@@ -167,7 +168,7 @@ const Header = ({title}) => {
                 {/* Profile button */}
                 <FontAwesomeIcon 
                     icon={faCircleUser}
-                    className="ml-2 text-4xl transition-all duration-500 cursor-pointer lg:ml-8 text-zuccini-800 dark:text-zuccini-700" 
+                    className="ml-2 text-4xl transition-all duration-500 rounded-full p-0.5 cursor-pointer inset-shadow-sm inset-shadow-gray-400 lg:ml-6 text-zuccini-800 dark:shadow-sm dark:shadow-zuccini-600 dark:text-zuccini-700" 
                     onClick={ () => {
                         setShowProfile ((current) => !current);
                         setShowNotification(false);
@@ -178,38 +179,48 @@ const Header = ({title}) => {
             
             {/* Shows the profile tab */}
             {showProfile && (
-                <div ref={profileRef} className='fixed top-25 right-8 flex flex-col p-3 border-2  border-neutral-500 bg-neutral-200 text-neutral-900 transition-all duration-500 dark:border-gray-800 dark:bg-gray-900 w-[350px] rounded-2xl z-20'>
-                     <h1 className='mb-1 ml-2 text-2xl font-medium dark:text-white'>
-                        Profile
-                    </h1>
-                        {/* profile preview */}
-                        <div className='flex flex-col justify-center w-full px-5 py-10 mb-5 border rounded-lg dark:bg-gray-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
-                            <FontAwesomeIcon 
-                                icon={faCircleUser} 
-                                className='mb-5 text-6xl dark:text-white' 
-                        />
-                            <h1 className='mb-2 text-xl font-semibold text-center dark:text-white'>John Doe</h1>
-                            <h2 className='text-center text-md font-extralight dark:text-white'>johndoe123@gmail.com</h2>
-                        </div>
-                        {/* View Profile */}
-                        <Link to='/Profile' className='flex items-center w-full p-3 mb-5 text-xl transition-all duration-300 bg-neutral-300 border-neutral-900 dark:border-gray-800 rounded-xl inset-shadow-xs inset-shadow-neutral-400 hover:text-white hover:bg-zuccini-700 dark:bg-gray-950 dark:text-white dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
-                            <FontAwesomeIcon 
-                                icon={faAddressCard} 
-                                className='mr-4'
-                        />
-                            <h1 className='font-light'>View Profile</h1>
-                        </Link>
-                        {/* Edit Profile */}
-                        <Link to="/Profile#edit-profile" className='flex items-center w-full p-3 text-xl transition-all duration-300 bg-neutral-300 border-neutral-900 rounded-xl inset-shadow-xs inset-shadow-neutral-400 hover:text-white hover:bg-zuccini-700 dark:bg-gray-950 dark:text-white dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
-                            <FontAwesomeIcon 
-                                icon={faPenToSquare} 
-                                className='mr-5'
-                        />
-                            <h1 className='font-light'>Edit Profile</h1>
-                        </Link>
+                <div 
+                ref={profileRef} 
+                className="fixed top-24 right-8 flex flex-col p-5 bg-gray-300 dark:bg-gray-900 
+                            border border-gray-200 dark:border-gray-700 shadow-2xl w-[340px] 
+                            rounded-2xl z-20 transition-all duration-500"
+                >
+                {/* Header */}
+                <h1 className="mb-4 text-xl font-bold text-gray-800 dark:text-white">
+                    Profile
+                </h1>
+
+                {/* Profile Preview */}
+                <div className="flex flex-col items-center border-neutral-400 border p-6 mb-6 rounded-xl bg-gray-200 inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-950/50 dark:shadow-md dark:shadow-zuccini-800 ">
+                    <FontAwesomeIcon 
+                    icon={faCircleUser} 
+                    className="mb-4 text-7xl text-gray-400 dark:text-gray-700" 
+                    />
+                    <h1 className="text-lg font-semibold text-gray-900 dark:text-white">John Doe</h1>
+                    <h2 className="text-sm text-gray-600 dark:text-gray-400">johndoe123@gmail.com</h2>
                 </div>
-            )}
-            
+
+                {/* Actions */}
+                <div className="flex flex-col gap-3">
+                    <Link 
+                    to="/Profile" 
+                    className="flex items-center gap-3 px-4 py-3 text-gray-700 transition-all duration-200 rounded-xl bg-gray-100 inset-shadow-sm inset-shadow-gray-400 hover:bg-zuccini-700 hover:text-white dark:bg-gray-950/50 dark:shadow-md dark:shadow-zuccini-900 dark:text-gray-200 dark:hover:bg-zuccini-800"
+                    >
+                    <FontAwesomeIcon icon={faAddressCard} className="text-lg" />
+                    <span className="font-medium">View Profile</span>
+                    </Link>
+
+                    <Link 
+                    to="/Profile#edit-profile" 
+                    className="flex items-center gap-3 px-4 py-3 text-gray-700 transition-all duration-200 rounded-xl bg-gray-200 inset-shadow-sm inset-shadow-gray-400 hover:bg-zuccini-700 hover:text-white dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50 dark:text-gray-200 dark:hover:bg-zuccini-800"
+                    >
+                    <FontAwesomeIcon icon={faPenToSquare} className="text-lg" />
+                    <span className="font-medium">Edit Profile</span>
+                    </Link>
+                </div>
+                </div>
+                )}
+
             
             {/* Shows the Notification Tab*/}
             {showNotification && (
@@ -270,7 +281,7 @@ const Header = ({title}) => {
 
 export const HeaderTitle = ({title}) => {
     return(
-     <h1 className="z-[60] fixed lg:relative top-5 ml-2 text-2xl lg:text-5xl font-semibold text-neutral-900 text-shadow-lg dark:text-white">{title}</h1>   
+     <h1 className="z-[60] fixed lg:relative top-3 ml-2 text-2xl lg:text-5xl font-semibold text-neutral-900 text-shadow-md dark:text-shadow-zuccini-900 dark:text-white">{title}</h1>   
     )
 
 }

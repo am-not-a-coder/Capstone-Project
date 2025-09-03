@@ -25,14 +25,16 @@ const MessagesItem = ({picture, userName, message, time, alert, onDelete, onOpen
               alt="profile picture"
               className='w-10 h-10 mr-3 rounded-full'
             />
+
             {isOnline && (
               <span className='absolute bottom-0 w-3 h-3 bg-green-500 border-2 border-neutral-600 dark:border-neutral-00 rounded-full right-3'>{isOnline}</span>
             )}
           </div>
 
+
             {/* Message content */}
             <div className="flex flex-col w-[50%]">
-             <h1 className='flex items-center font-bold text-md truncate'>
+             <h1 className='flex items-center font-bold truncate text-md'>
                 {userName}
                 {alert && (
                 <span className='h-2.5 w-2.5 bg-blue-500 rounded-full ml-2'>{alert}</span>)}
