@@ -293,6 +293,12 @@ useEffect(() => {
     } 
   }, []);
   
+  // Count number of checked files
+  // const doneCount = Object.values(done).filter(value => value).length;
+  // const allCriteria = areas.subareas.flatMap(sub => sub.criteria);
+  // const doneCount = allCriteria.filter(c => done[c.id]).length;
+  // const doneTotal = allCriteria.length;
+      const [done, setDone] = useState({});
 
   return (
       <>
@@ -430,15 +436,34 @@ useEffect(() => {
                   {selectedProgram && visible === "areas" && (
                     <div className="flex flex-col w-full overflow-auto">
                       <div className="w-full p-2 text-gray-700 rounded-xl">
-                        {areas.sort((a, b) => a.areaID - b.areaID)
-                        .map((area) => (
+                        {areas.sort((a, b) => a.areaID - b.areaID).map((area) => {
+                          const allCriteria = Array.isArray(area.subareas)
+                            ? area.subareas.flatMap(sub => [
+                                ...(sub.criteria?.inputs || []),
+                                ...(sub.criteria?.processes || []),
+                                ...(sub.criteria?.outcomes || []),
+                              ])
+                            : [];
+
+                          const doneCount = allCriteria.filter(c => done[c.criteriaID]).length;
+                          const doneTotal = allCriteria.length;
+
+                          const toggleDone = (criteriaID) => {
+                          setDone(prev => ({
+                              ...prev,
+                              [criteriaID]: !prev[criteriaID]
+                            }));
+                          };
+                        
+                        return (
                               <div key={area.areaID} className='flex flex-col'>
                                 <AreaCont 
                                   title={area.areaName} 
                                   onClick={() => handleDropDown(area)}
                                   onIconClick={() => handleDropDown(area)}
                                   isExpanded={expandedAreaIndex === area.areaID}
-                                  
+                                  doneCount={doneCount}
+                                  doneTotal={doneTotal}
                                 /> 
                                 <div className={`list-upper-alpha list-inside overflow-hidden transition-all duration-500 ease-in-out ${expandedAreaIndex === area.areaID ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
                                 {Array.isArray(area.subareas) && area.subareas.filter(sa => sa.subareaID != null).length > 0 ? (area.subareas.filter(sa => sa.subareaID != null).map((subarea) => (
@@ -453,6 +478,9 @@ useEffect(() => {
                                     onCreate={() => {setShowCreateModal(true)}}
                                     onRefresh={refreshAreas}
                                     onFilePreview={handleFilePreview}
+                                    done={done}
+                                    setDone={setDone}
+                                    toggleDone={toggleDone}
                                   />))
                                   ) : (
                                   <div className='flex flex-col items-center justify-center p-5 mb-3 text-neutral-800 bg-neutral-300/50 dark:bg-gray-800/50 dark:text-white rounded-2xl'>
@@ -464,7 +492,7 @@ useEffect(() => {
                                 }
                                 </div>
                               </div>
-                            ))}            
+                            )})}            
                       </div>
                     </div>
                   )}
