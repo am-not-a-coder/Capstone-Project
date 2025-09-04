@@ -12,6 +12,8 @@ import {useNavigate} from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useState } from 'react';
 import { apiGet } from '../utils/api_utils';
+import toast , { Toaster } from 'react-hot-toast';
+
 
 const Dashboard = () => {
     
@@ -21,7 +23,7 @@ const Dashboard = () => {
         institutes: 0,
         deadlines: 0
     })
-    
+    const logged = sessionStorage.getItem('isLogged')
     useEffect(()=> {
         const fetchCounts = async () => {
             try{
@@ -32,6 +34,26 @@ const Dashboard = () => {
             }
         }
         fetchCounts();
+
+        if (logged) {
+
+                        const currentUser = getCurrentUser()
+            
+                        if (currentUser?.employeeID) {
+            
+                            toast.success(`Welcome, ${currentUser.lastName} | ${currentUser.employeeID}!`, {
+            
+                                duration: 2000,
+            
+                                icon: '🎊'
+            
+                            })
+            
+                        }
+            
+                        sessionStorage.removeItem('LoggedIn')
+            
+                    }
     }, [])
     
     return (
