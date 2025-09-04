@@ -23,12 +23,20 @@ import { initPresenceListeners, getSocket } from './utils/websocket_utils';
 
 
 function App() {
+  console.log('🚀 App component rendering...')
 
   const [authReady, setAuthReady] = useState(false)
   const [authTick, setAuthTick] = useState(0)
+  
+  console.log('🔍 Current state - authReady:', authReady, 'authTick:', authTick)
   const awayTimeRef = useRef(null)
   const lastStatusRef = useRef('active')
   const mouseMoveThrottleRef = useRef(false)
+
+  // Monitor authReady changes
+  useEffect(() => {
+    console.log('🔄 authReady changed to:', authReady)
+  }, [authReady])
 
 
   const handleMouse = async () => {
@@ -64,7 +72,7 @@ function App() {
             await logoutAcc()
             
             // Redirect to login
-            window.location.href = '/Login'
+            window.location.href = '/login'
           }
         }
       } catch (error) {
@@ -75,6 +83,7 @@ function App() {
 let isComponentMounted = true
 
 const loadUser = async () => {
+  console.log('🔄 loadUser called, isComponentMounted:', isComponentMounted)
   try {
     if (localStorage.getItem('session_id')) {
       console.log('Found session_id, validating with backend...')
@@ -100,11 +109,15 @@ const loadUser = async () => {
         sessionStorage.removeItem('user')
         sessionStorage.removeItem('LoggedIn')
       }
+    } else {
+      console.log('No session_id found, user not logged in')
     }
   } catch (error) {
     console.error('Error loading user:', error)
   } finally {
-    if (isComponentMounted) setAuthReady(true)
+    console.log('🔓 Setting authReady to true...')
+    setAuthReady(true)
+    console.log('✅ authReady set to true')
   }
 }
 
@@ -216,7 +229,14 @@ useEffect(() => {
   
   loadUser()
   
+  // Fallback timeout to ensure authReady gets set
+  const fallbackTimeout = setTimeout(() => {
+    console.log('⏰ Fallback timeout - setting authReady to true')
+    setAuthReady(true)
+  }, 3000) // 3 second timeout
+  
   return () => {
+    clearTimeout(fallbackTimeout)
     isComponentMounted = false
     ch.close()
     window.removeEventListener('click', handleMouse)
@@ -231,16 +251,20 @@ useEffect(() => {
 
 // If the user is not logged in it will redirect to login page
 const ProtectedRoute = ({children}) => {
+  console.log('🔒 ProtectedRoute - authReady:', authReady, 'isLoggedIn:', isLoggedIn())
   if (!authReady) {
-    return null // or a loading spinner
+    console.log('⏳ Auth not ready, showing loading...')
+    return <div style={{padding: '20px', fontSize: '18px', color: 'blue'}}>Loading... Please wait</div>
   } else {
-    return isLoggedIn() ? children : <Navigate to="/Login" />
+    const loggedIn = isLoggedIn()
+    console.log('🔐 Auth ready, logged in:', loggedIn)
+    return loggedIn ? children : <Navigate to="/login" />
   }
 }
 
 //public route
 const PublicOnlyRoute = ({ children }) => { 
-  if (!authReady) return null // or a loading spinner
+  if (!authReady) return <div>Loading...</div>
   return isLoggedIn() ? <Navigate to="/Dashboard" replace /> : children
 }
   

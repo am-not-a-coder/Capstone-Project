@@ -157,7 +157,7 @@ const MainLayout = () => {
                  ch.close()
                  
                  // Navigate to login
-                 navigate('/Login', {replace: true})
+                 navigate('/login', {replace: true})
                }} className="shadow-xl px-4 py-2 transition-all duration-300 text-white cursor-pointer w-[150px] rounded-2xl bg-zuccini-600 hover:bg-zuccini-700">Log out</button>
               <button onClick={loginCancel} className="shadow-xl transition-all duration-300 px-4 py-3 w-[150px] text-white cursor-pointer rounded-2xl bg-zuccini-600 hover:bg-zuccini-700">Cancel</button>
             </div>
