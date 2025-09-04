@@ -1,13 +1,9 @@
-import { getAccessToken, getRefreshToken, storeToken, clearTokens } from "./auth_utils"
 // Base API URL from environment variables for flexibility
 const API_URL = import.meta.env.VITE_APP_API_URL || 'http://localhost:5000'
 
 export const MakeApiCalls = async (endpoint, options = {}) => {
     // Combine base URL with endpoint
     const fullUrl = `${API_URL}${endpoint}`
-
-    // Get current access token for authentication
-    const accessToken = getAccessToken()
 
     // Default headers (don't set Content-Type for FormData)
     const defaultHeaders = {}
