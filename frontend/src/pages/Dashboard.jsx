@@ -23,7 +23,7 @@ const Dashboard = () => {
         institutes: 0,
         deadlines: 0
     })
-    const logged = sessionStorage.getItem('isLogged')
+    const logged = sessionStorage.getItem('LoggedIn')
     useEffect(()=> {
         const fetchCounts = async () => {
             try{
@@ -36,24 +36,15 @@ const Dashboard = () => {
         fetchCounts();
 
         if (logged) {
-
-                        const currentUser = getCurrentUser()
-            
-                        if (currentUser?.employeeID) {
-            
-                            toast.success(`Welcome, ${currentUser.lastName} | ${currentUser.employeeID}!`, {
-            
-                                duration: 2000,
-            
-                                icon: '🎊'
-            
-                            })
-            
-                        }
-            
-                        sessionStorage.removeItem('LoggedIn')
-            
-                    }
+            const currentUser = getCurrentUser()
+            if (currentUser?.employeeID) {
+                toast.success(`Welcome, ${currentUser.lastName} | ${currentUser.employeeID}!`, {
+                    duration: 2000,
+                    icon: '🎊'
+                })
+            }
+            sessionStorage.removeItem('LoggedIn')
+        }
     }, [])
     
     return (

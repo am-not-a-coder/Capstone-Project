@@ -247,23 +247,14 @@ const PublicOnlyRoute = ({ children }) => {
   return (
     <Router>
       <Routes>
-        {/* Default Page */}
         <Route 
-        path="/" 
-        element=
-        {authReady ? (<Navigate to={isLoggedIn() ? "/Dashboard" : '/login'} replace/>): null}
-        />
-
-        <Route 
-        path="/Login" 
+        path="/login" 
         element={
           <PublicOnlyRoute>
             <Login />
           </PublicOnlyRoute>
         }
         />
-        
-        
         
         {/* These are the routes that needs authentication */}
         {/* MainLayout wraps other pages */}
@@ -272,6 +263,7 @@ const PublicOnlyRoute = ({ children }) => {
             <MainLayout />
           </ProtectedRoute>
           }>
+          <Route index element={<Navigate to="/Dashboard" replace />} />
           <Route path="/Dashboard" element={<Dashboard />} />
           <Route path="/Institutes" element={<Institutes />} />
           <Route path="/Programs" element={<Programs />} />
@@ -285,7 +277,6 @@ const PublicOnlyRoute = ({ children }) => {
          <Route path='/Notification' element={<Notification />}/>
          <Route path='/Messages' element={<Messages />} />
         </Route>
-
 
       </Routes>
     </Router>
