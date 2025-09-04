@@ -1,12 +1,13 @@
-from flask import jsonify, request, session, send_from_directory, current_app
+from flask import jsonify, request, session, send_from_directory, current_app, Response
 from app.models import Employee
 from app import db, redis_client, socketio
 from werkzeug.security import check_password_hash, generate_password_hash, _hash_internal
 from werkzeug.utils import secure_filename
-from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, get_jwt
+from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, decode_token, exceptions, verify_jwt_in_request
 from flask_jwt_extended import set_access_cookies, set_refresh_cookies, unset_jwt_cookies
 from flask_jwt_extended.exceptions import JWTExtendedException
 from datetime import datetime, timedelta
+from app.nextcloud_service import upload_to_nextcloud, download_from_nextcloud, check_directory, safe_path
 import os
 import re
 import time
@@ -519,7 +520,16 @@ def register_routes(app):
 
 
                                         #DATA FETCHING ROUTES
-                                        
+
+    # Gets the data count for user, programs, and institutes                                        
+    @app.route('/api/count', methods=["GET"])
+    def get_count():
+        employee_count = (Employee.query.count())                                            
+        program_count = (Program.query.count())                                            
+        institute_count = (Institute.query.count())      
+        deadline_count = (Deadline.query.count())      
+
+        return jsonify({'employees' : employee_count, 'programs' : program_count, 'institutes' : institute_count, 'deadlines' : deadline_count  })                                    
                                                             
     # GET USER PROFILE BY EMPLOYEE ID
     @app.route('/api/profile/<string:employeeID>', methods=["GET"])
@@ -812,13 +822,17 @@ def register_routes(app):
     def get_area():
         areas = (Area.query
                  .join(Program, Area.programID == Program.programID)
-                 .outerjoin(Subarea, Area.areaID == Subarea.areaID)
+                 .order_by(Area.areaID.asc())                 
+                 .outerjoin(Subarea, Area.areaID == Subarea.areaID)                 
                  .add_columns(
                     Area.areaID,
-                    Program.programCode,
+                    Area.programID,
+                    Area.subareaID,
+                    Program.programCode,                
                     Area.areaName,
                     Area.areaNum,
                     Area.progress,
+                    Subarea.subareaName
                 )
             ).all()
 
@@ -827,11 +841,14 @@ def register_routes(app):
         for area in areas:
             area_data = {
                 'areaID' : area.areaID,
+                'programID': area.programID,
+                'subareaID': area.subareaID,    
                 'programCode': area.programCode,
+                'areaTitle': area.areaName,
+                'areaNum': area.areaNum,
                 'areaName': f"{area.areaNum}: {area.areaName}",
                 'progress': area.progress,
-                
-                'areaNum': area.areaNum
+                'subareaName': area.subareaName            
             }
             area_list.append(area_data)
         
@@ -934,7 +951,7 @@ def register_routes(app):
     # Accreditation page
     @app.route('/api/accreditation', methods=["GET"])
     def get_areas():
-        program_code = request.args.get('programCode', "BSIT")
+        program_code = request.args.get('programCode')
 
         data = (
             db.session.query(
@@ -957,7 +974,7 @@ def register_routes(app):
             .outerjoin(Subarea, Area.areaID == Subarea.areaID)
             .outerjoin(Criteria, Subarea.subareaID == Criteria.subareaID)
             .outerjoin(Document, Criteria.docID == Document.docID)       
-            .order_by(Area.areaID.asc(), Subarea.subareaID.asc())
+            .order_by(Area.areaID.asc(), Subarea.subareaID.asc(), Criteria.criteriaID.asc())
             .filter(Program.programCode == program_code)
             .all() 
         )
@@ -971,6 +988,7 @@ def register_routes(app):
                 result[area_id] = {                    
                 'areaID': row.areaID,
                 'programCode': row.programCode,
+                'areaNum': row.areaNum,
                 'areaName': row.areaNum + ": " + row.areaName, 
                 'subareas': {}                  
             }
@@ -997,7 +1015,7 @@ def register_routes(app):
                 }
 
             match row.criteriaType:
-                case "Input/s":
+                case "Inputs":
                     result[area_id]['subareas'][subarea_id]['criteria']['inputs'].append(criteria_data)
                 case "Processes":
                     result[area_id]['subareas'][subarea_id]['criteria']['processes'].append(criteria_data)
@@ -1010,39 +1028,6 @@ def register_routes(app):
 
         return jsonify(list(result.values())) 
     
-
-    @app.route('/api/subarea', methods=["GET"])
-    def get_subarea():
-        # Query all subareas with their criteria
-        results = (
-            db.session.query(
-                Subarea.subareaID,
-                Subarea.subareaName,
-                Area.areaID,
-                Criteria.criteriaID
-            )
-            .join(Area, Subarea.areaID == Area.areaID)
-            .outerjoin(Criteria, Subarea.subareaID == Criteria.subareaID)
-            .all()
-        )
-
-        subarea_dict = {}
-
-        for sa in results:
-            if sa.subareaID not in subarea_dict:
-                subarea_dict[sa.subareaID] = {
-                    'subareaID': sa.subareaID,
-                    'subareaName': sa.subareaName,
-                    'areaID': sa.areaID,
-                    'criteria': []  # group criteria here
-                }
-            if sa.criteriaID:
-                subarea_dict[sa.subareaID]['criteria'].append({
-                    'criteriaID': sa.criteriaID
-                })
-
-        return jsonify({'subarea': list(subarea_dict.values())}), 200
-
     @app.route('/api/accreditation/create_area', methods=["POST"])
     def create_area():
         data = request.form
@@ -1116,15 +1101,24 @@ def register_routes(app):
     def upload_file():
        # ==== Get and Validate Form Data ====
         # Get form data
+        data = request.form
         file = request.files.get("uploadedFile")
         file_type = request.form.get("fileType")
         file_name = request.form.get("fileName")
         criteria_id = request.form.get("criteriaID")
         
+        file_type = data.get("fileType")
+        file_name = data.get("fileName")
+        criteria_id = data.get("criteriaID")
+        program_code = data.get("programCode")
+        area_name = data.get("areaName")
+        subarea_name = data.get("subareaName")
+        criteria_type = data.get("criteriaType")
+        
+        # === Validate the Data ===   
         # Check if file exists
         if not file:
             return jsonify({'success': False, 'message': 'No file provided'}), 400
-        
         
         # Check if file has a valid name and extension
         if not file.filename or '.' not in file.filename:        
@@ -1147,10 +1141,18 @@ def register_routes(app):
             return jsonify({'success': False, 'message': 'Authentication error'}), 400
         
         # ==== Save File ====
-        # Generate secure filename
+
+        # Gets the file url
+        path = f"UDMS_Repository/Accreditation/Programs/{program_code}/{area_name}/{subarea_name}/{criteria_type}/{criteria_id}"
+        path = path.strip('/')
+
+        encoded_path = safe_path(path)
+
+        check_directory(encoded_path)             
+
+        # Generates a secure filename
         filename = secure_filename(file.filename)
 
-        
         if not filename:
             return jsonify({'success': False, 'message': 'Invalid filename'}), 400
         
@@ -1165,13 +1167,23 @@ def register_routes(app):
             
             file_url = f"/uploads/{filename}"
             
+            # saves the file into repository (Nextcloud)
+            response = upload_to_nextcloud(file, path)
+            if response.status_code not in (200, 201, 204):
+                return jsonify({
+                    'success': False,
+                    'message': 'Nextcloud upload failed.',
+                    'status': response.status_code,
+                    'details': response.text
+                }), 400
+                                   
             # ==== Create document record ====
 
             # Create database record
             new_document = Document(
                 docName=file_name,
                 docType=file_type,
-                docPath=file_url,
+                docPath=f"{path}/{filename}",
                 employeeID=uploader.employeeID  
             )
             
@@ -1192,7 +1204,8 @@ def register_routes(app):
             return jsonify({
                 'success': True, 
                 'message': 'File uploaded successfully!', 
-                'filePath': file_url
+                'filePath': f"{path}/{filename}",
+                'status': response.status_code, 
             }), 200
             
         except Exception as e:
@@ -1201,6 +1214,8 @@ def register_routes(app):
         
 
     @app.route('/api/accreditation/preview/<filename>')
+    @app.route('/api/accreditation/preview/<filename>', methods=["GET"])   
+    @jwt_required()   
     def preview_file(filename):   
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
     
@@ -1224,4 +1239,57 @@ def register_routes(app):
             'success': True,
             'users': users_data
         })
+        token = request.args.get("token")
+
+        if token:
+            try:
+                decoded = decode_token(token) # validate the token manually
+            except exceptions.JWTDecodeError:
+                return jsonify({"success": False, "message": "Invalid token"}), 401
+            
+        else:
+            verify_jwt_in_request()  # fallback to Authorization header
+
+        NEXTCLOUD_URL = os.getenv("NEXTCLOUD_URL")
+        NEXTCLOUD_USER = os.getenv("NEXTCLOUD_USER")
+        NEXTCLOUD_PASSWORD = os.getenv("NEXTCLOUD_PASSWORD")
+        
+
+        if not all([NEXTCLOUD_URL, NEXTCLOUD_USER, NEXTCLOUD_PASSWORD]):
+            return jsonify({
+                'success': False,
+                'message': 'Nextcloud Configuration missing'
+            }), 500
+
+        doc = Document.query.filter_by(docName=filename).first()
+        if not doc:
+            return jsonify({'success': False, 'message': 'File not found.'}), 404    
+
+        # Get the file
+        response = download_from_nextcloud(doc.docPath)
+        
+        if response.status_code == 200:
+            return Response(
+                response.iter_content(chunk_size=8192),
+                content_type = response.headers.get("Content-Type", "application/octet-stream"),
+                headers={
+                    "Content-Disposition": f'inline; filename="{filename}"'
+                }
+            ) 
+        else:
+            return jsonify({
+                'success': False,
+                'status': response.status_code,
+                'detail': response.text 
+            }), response.status_code
+
+            
+           
+
+
+
+        
+                    
+        
+
     

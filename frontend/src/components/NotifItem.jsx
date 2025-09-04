@@ -19,7 +19,7 @@ const NotificationItem = ({ notifTitle, content, date, alert, picture, link, onD
   return (
     <div 
     onClick={handleClick}
-    className='relative flex items-center w-full min-h-[50px] p-3 border mt-2 rounded-xl bg-neutral-200 shadow-md transition-transform duration-200 cursor-pointer hover:shadow-lg hover:scale-101 dark:hover:shadow-md dark:hover:shadow-zuccini-800 dark:border-none dark:bg-gray-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-700'>
+    className='relative flex items-center w-full min-h-[70px] p-3 border border-neutral-400 mt-1 rounded-xl bg-neutral-200 shadow-md transition-transform duration-200 cursor-pointer inset-shadow-sm inset-shadow-gray-400 hover:shadow-lg hover:scale-101 dark:hover:shadow-md dark:hover:shadow-zuccini-800 dark:bg-gray-950 dark:shadow-sm dark:shadow-zuccini-900'>
 
       {/* Profile Pic */}
       <img 
@@ -35,8 +35,6 @@ const NotificationItem = ({ notifTitle, content, date, alert, picture, link, onD
           {alert && (
             <span className='w-2 h-2 ml-2 bg-blue-500 rounded-full'></span>
           )}
-
-          
         </h1>
 
         <p className='ml-5 truncate text-md'>{content}</p>

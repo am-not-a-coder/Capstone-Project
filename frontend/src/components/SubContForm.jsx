@@ -3,12 +3,11 @@ import {
  faChevronDown,
  faChevronUp
 } from '@fortawesome/free-solid-svg-icons';
-import {faCircleCheck} from '@fortawesome/free-regular-svg-icons';
 import { useState} from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import UploadModal from './modals/UploadModal';
 
-const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate, onClick, onRefresh, onFilePreview}) => {
+const SubContForm = ({title, criteria, programCode, areaName, subareaName, onCreate, onClick, onRefresh, onFilePreview}) => {
     const [expanded, setExpanded] = useState(false);
     const [criteriaExpand, setCriteriaExpand] = useState(null);
     const [showUpload, setShowUpload] = useState(false);
@@ -63,8 +62,7 @@ const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate,
         }`}>
             {/* Criteria Rendering */}
             {items.length > 0 ? items.map((item, index) => (
-                <div key={index} 
-                className='flex flex-row justify-between gap-3 p-3 mb-2 ml-5 transition-all duration-300 border shadow-md cursor-default rounded-2xl border-neutral-400 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600'>
+                <div key={index} className='flex flex-row justify-between gap-3 p-3 mb-2 ml-5 transition-all duration-300 border shadow-md cursor-default rounded-2xl border-neutral-400 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600'>
                     <span className='break-words text-[15px] max-w-[65%] whitespace-pre-wrap'>{item.content}</span>
 
                     <div className='flex flex-col items-center justify-center'>
@@ -73,6 +71,7 @@ const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate,
                             <button
                             onClick={() =>{onFilePreview(item.docName, item.docPath)}}
                             className='text-sm font-light text-center cursor-pointer hover:underline'>{item.docName}</button>
+                            
 
                         ) : (
                             <span className='text-sm text-gray-500'>No file attached</span>
@@ -82,31 +81,12 @@ const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate,
                     </div>
 
                     <div className='flex items-center justify-between gap-5 mr-3'>
-                        <FontAwesomeIcon icon={faCircleCheck}
-                            onClick={() => setDone(!done)}
-                        className={`text-xl ${done ? 'text-zuccini-600' : 'text-neutral-500 '} cursor-pointer`} />
-                        <FontAwesomeIcon 
-                            icon={faPlus} 
-                            onClick={(e) => { 
-                                 e.stopPropagation(); // Prevent event bubbling                                
-                                handleUploadTrigger(item.criteriaID, groupName);
-                                console.log(`Program Code: ${programCode}`)
-                                console.log(`Area Name: ${areaName}`)
-                                console.log(`Sub-Area Name: ${subareaName}`)
-                                console.log(`Criteria Type: ${groupName}`)
-                                console.log(`Criteria ID: ${item.criteriaID}`)
-                                
-                                }
-                            } 
-                            className="text-xl transition-colors cursor-pointer hover:text-blue-600" 
-                        />
+                       {/* This is where the forms should go */}
                     </div>
                 </div>
             )) : (
-                <div className='flex flex-col items-center justify-center p-5 mb-3 text-neutral-800 bg-neutral-300/50 dark:bg-gray-800/50 dark:text-white rounded-2xl'>
-                      <h1 className='text-lg font-semibold'>No Criteria found</h1>
-                      <p className='mb-1 font-light text-md'>Want to Create one?</p>
-                      <button onClick={onCreate}  className='px-10 py-2 transition-all duration-300 cursor-pointer bg-neutral-300 dark:bg-gray-600 hover:text-white hover:bg-zuccini-600/60 rounded-2xl'>Create</button>
+                <div className='flex flex-col items-center min-h-[150px] justify-center p-5 mb-3 text-neutral-800 bg-neutral-300/50 dark:bg-gray-800/50 dark:text-white rounded-2xl'>
+                      <h1 className='text-lg text-gray-500'>No Criteria found</h1>                     
                     </div>
             )}
         </div>
@@ -157,4 +137,4 @@ const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate,
     )
 }
 
-export default SubCont;
+export default SubContForm;

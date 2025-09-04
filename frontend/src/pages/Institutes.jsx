@@ -100,8 +100,8 @@ const Institutes = () => {
         
     return(
         <>
-            <div className="p-6 border border-neutral-800 rounded-xl bg-neutral-200 dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:bg-gray-900">
-                <div className="flex flex-wrap gap-16 mb-8">
+             <div className="min-h-screen p-3 border rounded-[20px] border-neutral-300 dark:bg-gray-900 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-800">
+                <div className="flex flex-wrap gap-5 mt-20 mb-8 lg:mt-8" >
                   <CreateCard setShowForm={setShowForm}/>
                 {institutes.map(institute => (
                     <ProgramCard program={institute} key={institute.code}/>

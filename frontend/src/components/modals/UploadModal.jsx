@@ -8,9 +8,9 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import StatusModal from './StatusModal';
-import { apiPostForm } from '../../utils/api_utils';
+import { apiPostForm, apiGet } from '../../utils/api_utils';
 
-const UploadModal = ({ onClose, showModal, criteriaID, onUploadSuccess}) => {
+const UploadModal = ({ onClose, showModal, programCode, areaName, subareaName, criteriaType, criteriaID, onUploadSuccess}) => {
 
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
@@ -108,6 +108,7 @@ const UploadModal = ({ onClose, showModal, criteriaID, onUploadSuccess}) => {
   };
 
   const closeModal = () => {
+    refreshAreas();
     resetUpload();
     if (onClose) {
       onClose();
@@ -139,9 +140,13 @@ const UploadModal = ({ onClose, showModal, criteriaID, onUploadSuccess}) => {
     formData.append('fileType', fileType);
     formData.append('fileName', fileName);
     formData.append('criteriaID', criteriaID);
+    formData.append('programCode', programCode);
+    formData.append('areaName', areaName);
+    formData.append('subareaName', subareaName);
+    formData.append('criteriaType', criteriaType);
 
     try{
-      const response = await apiPostForm('/api/accreditation/upload', formData,{withCredentials: true});
+      const response = await apiPostForm('/api/accreditation/upload', formData, {withCredentials: true});
       
       // Clear the simulation interval
       clearInterval(progressInterval);
@@ -163,7 +168,7 @@ const UploadModal = ({ onClose, showModal, criteriaID, onUploadSuccess}) => {
       }
 
     }catch(err){
-      clearInterval(progressInterval); // Add this line
+      clearInterval(progressInterval);
       setStatusMessage('File upload failed. Please try again.');
       setStatusType('error');
       setIsUploading(false);
@@ -171,6 +176,15 @@ const UploadModal = ({ onClose, showModal, criteriaID, onUploadSuccess}) => {
       setShowStatusModal(true);
     }
   }
+
+   const refreshAreas = async (programCode) => {
+        try {
+           const response = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`, {withCredentials: true})
+          Array.isArray(response.data) ? setAreas(response.data) : setAreas([]);
+        } catch(err) {
+          console.error('Error refreshing areas:', err);
+        }
+      }
 
   return (
     <div>
@@ -270,9 +284,9 @@ const UploadModal = ({ onClose, showModal, criteriaID, onUploadSuccess}) => {
                       <span className="text-gray-600 dark:text-gray-400">Uploading...</span>
                       <span className="text-gray-600 dark:text-gray-400">{Math.round(uploadProgress)}%</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+                    <div className="w-full h-2 bg-gray-200 rounded-full dark:bg-gray-700">
                       <div 
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+                        className="h-2 transition-all duration-300 ease-out bg-blue-600 rounded-full"
                         style={{ width: `${uploadProgress}%` }}
                       ></div>
                     </div>

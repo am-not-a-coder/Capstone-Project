@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react';    
 import {
     faBell,
@@ -18,9 +18,15 @@ import { getCurrentUser } from '../utils/auth_utils';
 
 
 const Header = ({title}) => {
+    //location detection
+    const location = useLocation();
+
     const [showProfile , setShowProfile] = useState(false);
     const [showNotification, setShowNotification] = useState(false);
     const [showMessages, setShowMessages] = useState(false);
+
+    //state for message read status
+    const [messageReadStatus, setMessageReadStatus] = useState({});
 
     //closes tab when clicked outside
 
@@ -106,20 +112,23 @@ const Header = ({title}) => {
     //static message data
     const messages = [
         {
+            id: 1,
             profilePic: avatar1,
             user: 'Miguel Derick Pangindian',
             message: 'WHY DID YOU REDEEM IT?!?!?',
             time: '3m',
-            alert: true
+            alert: !messageReadStatus[1] //check if read
         },
         {
+            id: 2,
             profilePic: avatar2,
             user: 'Jayson Permejo',
             message: "Hello? How are you, I'm under the water, I'm so much drowning, bulululul",
             time: '5h',
-            alert: false
+            alert: !messageReadStatus[2]
         },
         {
+            id: 3,
             profilePic: avatar3,
             user: 'Rafael Caparic',
             message: "Nothing beats a jet2 holiday!",
@@ -134,13 +143,14 @@ const Header = ({title}) => {
         <header className="fixed z-10 flex items-center w-full col-span-5 col-start-2 p-4 pl-10 mb-3 -mt-5 lg:relative lg:pl-5">
              <HeaderTitle title={title}/>
              {/* Profile, messages, notifications */}
-        <div className='w-full'><div 
+        <div className='w-full'>
+            <div 
             ref={iconContainerRef}
-            className="fixed top-0 right-0 flex items-center justify-around w-full p-2 bg-gray-300 border border-gray-300 shadow-lg lg:rounded-3xl lg:top-4 lg:right-10 lg:w-45 lg:h-16 h-19 dark:bg-gray-900 dark:border-gray-800 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 ">
+            className="absolute top-0 right-0 flex items-center justify-around w-full p-2 bg-gray-200 border border-gray-300 shadow-lg lg:rounded-3xl lg:top-4 lg:right-10 lg:w-45 lg:h-16 h-19 dark:bg-gray-900 dark:border-gray-800 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 ">
                 {/* Message button */}
                 <FontAwesomeIcon 
                     icon={faComment} 
-                    className="p-2 text-lg transition-all duration-500 rounded-lg cursor-pointer bg-neutral-300 text-zuccini-800 lg:text-xl dark:text-zuccini-700 dark:bg-gray-800 dark:shadow-sm dark:shadow-zuccini-800"
+                    className="p-2 text-lg transition-all duration-500 rounded-lg cursor-pointer inset-shadow-sm inset-shadow-gray-400 bg-neutral-300 text-zuccini-800 lg:text-xl dark:text-zuccini-700 dark:bg-gray-800 dark:shadow-sm dark:shadow-zuccini-800"
                     onClick={() => {
                         setShowMessages((current) => !current);
                         setShowNotification(false);
@@ -150,7 +160,7 @@ const Header = ({title}) => {
                 {/* Notification button */}
                 <FontAwesomeIcon 
                     icon={faBell} 
-                    className="p-2 ml-2 text-xl text-center transition-all duration-500 rounded-lg cursor-pointer bg-neutral-300 text-zuccini-800 dark:text-zuccini-700 dark:bg-gray-800 dark:shadow-sm dark:shadow-zuccini-800" 
+                    className="p-2 ml-2 text-xl text-center transition-all duration-500 rounded-lg cursor-pointer inset-shadow-sm inset-shadow-gray-400 bg-neutral-300 text-zuccini-800 dark:text-zuccini-700 dark:bg-gray-800 dark:shadow-sm dark:shadow-zuccini-800" 
                     onClick={ () => {
                         setShowNotification ((current) => !current)
                         setShowMessages(false);
@@ -160,7 +170,7 @@ const Header = ({title}) => {
                 {/* Profile button */}
                 <FontAwesomeIcon 
                     icon={faCircleUser}
-                    className="ml-2 text-4xl transition-all duration-500 cursor-pointer lg:ml-8 text-zuccini-800 dark:text-zuccini-700" 
+                    className="ml-2 text-4xl transition-all duration-500 rounded-full p-0.5 cursor-pointer inset-shadow-sm inset-shadow-gray-400 lg:ml-6 text-zuccini-800 dark:shadow-sm dark:shadow-zuccini-600 dark:text-zuccini-700" 
                     onClick={ () => {
                         setShowProfile ((current) => !current);
                         setShowNotification(false);
@@ -201,8 +211,9 @@ const Header = ({title}) => {
                             <h1 className='font-light'>Edit Profile</h1>
                         </Link>
                 </div>
-            )}
-            
+                </div>
+                )}
+
             
             {/* Shows the Notification Tab*/}
             {showNotification && (
@@ -213,13 +224,15 @@ const Header = ({title}) => {
                                 Notifications
                             </h1>
                             <Link className='px-2 ml-2 text-lg font-medium text-blue-500 hover:bg-neutral-300 dark:hover:bg-neutral-800'
-                            to='/Notification'>See All
+                            to='/Notification'
+                            onClick={() => (setShowNotification(false))}
+                            >See All
                             </Link>
                         </div>
                        <div className='flex flex-col min-h-[300px] p-3 bg-neutral-300 w-full rounded-xl inset-shadow-sm inset-shadow-neutral-400 transition-all duration-500 dark:text-white dark:border-gray-800 dark:bg-gray-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
                             {notifications && notifications.length > 0 ? (
                             notifications.map((notification, index) => (
-                                <Notifications key={index} picture={notification.profilePic} notifTitle={notification.title} content={notification.content} date={notification.date} alert={notification.alert} link={notification.link}/>
+                                <Notifications key={index} picture={notification.profilePic} notifTitle={notification.title} content={notification.content} date={notification.date} alert={notification.alert} link={notification.link} onClose={() => setShowNotification(false)}/>
                             )) 
                         ) : ( <h1 className='text-xl text-center text-neutral-600'>No new notifications</h1> 
                         )}
@@ -235,13 +248,15 @@ const Header = ({title}) => {
                             Messages
                         </h1>
                         <Link className='px-2 ml-2 text-lg font-medium text-blue-500 hover:bg-neutral-300 dark:hover:bg-neutral-800'
-                        to='/Messages'>See All
+                        to='/Messages'
+                        onClick={() => setShowMessages(false)}
+                        >See All
                         </Link>
                     </div>    
                     <div className='flex flex-col p-3 min-h-[300px] bg-neutral-300 w-full rounded-xl dark:text-white dark:bg-gray-950 dark:inset-shadow-xs dark:inset-shadow-zuccini-800'>
                         {messages && messages.length > 0 ? (
                             messages.map((message, index) => (
-                                <Messages key={index} picture={message.profilePic} userName={message.user} message={message.message} time={message.time} alert={message.alert}/>
+                                <Messages key={index} picture={message.profilePic} userName={message.user} message={message.message} time={message.time} alert={message.alert} messagesId={message.id} onMarkAsRead={(id) => setMessageReadStatus(prev => ({...prev, [id]: true}))} onClose={() => setShowMessages(false)}/>
                             ))
                         ) : (
                             <h1 className='text-xl text-center text-neutral-600'>No new messages</h1>
@@ -259,20 +274,21 @@ const Header = ({title}) => {
 
 export const HeaderTitle = ({title}) => {
     return(
-     <h1 className="z-[60] fixed lg:relative top-5 ml-2 text-2xl lg:text-5xl font-semibold text-neutral-900 text-shadow-lg dark:text-white">{title}</h1>   
+     <h1 className="z-[60] fixed lg:relative top-3 ml-2 text-2xl lg:text-5xl font-semibold text-neutral-900 text-shadow-md dark:text-shadow-zuccini-900 dark:text-white">{title}</h1>   
     )
 
 }
 
 //generates the notification div
 
-export const Notifications = ({notifTitle, content, date, alert, picture, link}) => {
+export const Notifications = ({notifTitle, content, date, alert, picture, link, onClose}) => {
     const navigate = useNavigate();
 
     const handleClick = () => {
         if(link) {
             navigate(link); // Navigate to the specified link
         }
+        onClose(); //auto close dropdown
     };
 
     return(
@@ -302,10 +318,22 @@ export const Notifications = ({notifTitle, content, date, alert, picture, link})
 
 //generates the message div
 
-export const Messages = ({picture, userName, message, time, alert}) => {
+export const Messages = ({picture, userName, message, time, alert, messagesId, onMarkAsRead, onClose}) => {
+    const navigate = useNavigate();
+    const location = useLocation(); //get current location
+
+    //handles click navigation to messgs page with specfiic convo
+    const handleMessageClick = () => {
+        onMarkAsRead(messagesId); //mark as read
+        onClose(); //auto close dropdown
+        navigate(`/Messages?openConversation=${messagesId}`);
+        
+    }
 
     return (
-        <div className='relative flex items-center w-full min-h-[50px] p-3 border mb-2 rounded-xl bg-neutral-200 shadow-md transition-transform duration-200 cursor-pointer hover:shadow-lg hover:scale-101 dark:border-none dark:bg-gray-900 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm '>
+        <div 
+        onClick={handleMessageClick}
+        className='relative flex items-center w-full min-h-[50px] p-3 border mb-2 rounded-xl bg-neutral-200 shadow-md transition-transform duration-200 cursor-pointer hover:shadow-lg hover:scale-101 dark:border-none dark:bg-gray-900 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm '>
             <img 
             src={picture} 
             alt="profile picture"

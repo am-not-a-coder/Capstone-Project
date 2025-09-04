@@ -46,7 +46,7 @@ const Documents = () => {
   return (
     <>
       {/* Outer container for the document panel */}
-      <div className="border border-neutral-800 rounded-[20px] min-w-[950px] min-h-[450px] shadow-md p-6 bg-neutral-200 dark:bg-gray-900 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
+      <div className="border border-neutral-800 rounded-[20px] min-w-[950px] min-h-screen shadow-md p-6 bg-neutral-200 inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-900 dark:shadow-md dark:shadow-zuccini-800">
         
         {/* Search Bar Section */}
         <div className="flex max-w-[500px] items-center mx-auto mb-4">
@@ -56,7 +56,7 @@ const Documents = () => {
           <input
             type="text"
             placeholder="Search Document"
-            className="flex-grow px-3 py-2 text-base transition duration-300 bg-gray-200 border border-r-0 text-neutral-800 rounded-l-md focus:outline-none focus:ring focus:ring-zuccini-600 placeholder-neutral-500 dark:text-white dark:border-none dark:inset-shadow-sm dark:inset-shadow-zuccini-800 dark:bg-gray-950"
+            className="flex-grow px-3 py-2 text-base transition duration-300 bg-gray-200 border border-r-0 text-neutral-800 rounded-l-md focus:outline-none focus:ring focus:ring-zuccini-600 placeholder-neutral-500 dark:text-white dark:border-none dark:inset-shadow-sm dark:inset-shadow-gray-800 dark:bg-gray-950/50"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -74,7 +74,7 @@ const Documents = () => {
         </div>
 
         {/* Filter Tags Section */}
-        <div className="border border-neutral-800 rounded-[20px] px-5 py-4 dark:bg-gray-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
+        <div className="border border-neutral-800 rounded-[20px] px-5 py-4 dark:bg-gray-950/50 dark:inset-shadow-sm dark:inset-shadow-gray-800">
           
           {/* Header + removable tag chip (inline using flex) */}
           <div className="flex flex-wrap items-center gap-3 mb-3">
@@ -111,7 +111,7 @@ const Documents = () => {
             filteredFiles.map((file, index) => (
               <div
                 key={index}
-                className="border text-neutral-800 border-neutral-800 shadow-md rounded-[20px] px-4 py-5 flex justify-between items-center cursor-pointer hover:shadow-lg dark:hover:shadow-md dark:hover:shadow-zuccini-800 transition dark:bg-gray-950 dark:inset-shadow-sm dark:inset-shadow-zuccini-800"
+                className="border text-neutral-800 border-neutral-800 shadow-md rounded-[20px] px-4 py-5 flex justify-between items-center cursor-pointer hover:shadow-lg dark:hover:shadow-md dark:hover:shadow-zuccini-800 transition dark:bg-gray-950/50 dark:inset-shadow-sm dark:inset-shadow-gray-800"
               >
                 <div className="flex items-center space-x-3">
                   {/* Icon for PDF */}

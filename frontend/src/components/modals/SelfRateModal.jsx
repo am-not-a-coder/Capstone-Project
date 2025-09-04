@@ -3,7 +3,7 @@ import StatusModal from './StatusModal';
 import { apiGet, apiPostForm } from '../../utils/api_utils';
 
 
-const CreateModal = ({onClick, onCreate, setShowCreateModal}) => {
+const SelfRateModal = ({onClick, onCreate, setShowSelfRateModal}) => {
 
 const [programID, setProgramID] = useState('');
 const [areaNum, setAreaNum] = useState('');
@@ -206,7 +206,7 @@ const [statusType, setStatusType] = useState("success"); // status type (success
 
     const handleCloseModal = () => {
         setShowStatusModal(false);
-        setShowCreateModal(false);
+        setShowSelfRateModal(false);
         
     // Clear inputs and refresh areas after success    
         setSelectedAreaID('')
@@ -421,4 +421,4 @@ return(
 )
 }
 
-export default CreateModal;
+export default SelfRateModal;
