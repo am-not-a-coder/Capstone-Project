@@ -74,6 +74,7 @@ export const logoutAcc = async () => {
         localStorage.removeItem('session_id')
         sessionStorage.removeItem('user')
         sessionStorage.removeItem('LoggedIn')
+        sessionStorage.removeItem('welcomeShown')
     }
 }
 

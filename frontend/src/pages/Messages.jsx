@@ -6,6 +6,8 @@ import { useState, useRef, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSquareXmark, faPaperPlane } from '@fortawesome/free-solid-svg-icons';
 import { useLocation, useSearchParams } from 'react-router-dom';
+import { apiGet } from '../utils/api_utils';
+import { subscribePresence, getOnlineIds, getSocket } from '../utils/websocket_utils';
 
 //contains static users data, never deleted by "Delete All" button
 const usersData = [
@@ -61,20 +63,21 @@ const messagesData = [
   ];
 
 
+
+
+
+
 const Messages = () => {
   //Parameter handling
   const [searchParams] = useSearchParams();
-  const openConversationId = searchParams.get('openConversation');
+  const openConversationId = searchParams.get('openConversation')
+
 
   //state to hold messages
-  const [messages, setMessages] = useState(messagesData);
+  const [messages, setMessages] = useState([]);
 
   //state to hold individual conversation threads
-  const [conversationThreads, setConversationThreads] = useState({
-    1: [messagesData[0]], //miguel thread
-    2: [messagesData[1]], //son thread
-    3: [messagesData[2]] //rap thread
-  });
+  const [conversationThreads, setConversationThreads] = useState({});
 
   //state to manage view type
   const [view, setView] = useState('all'); //'all' or 'unread'
@@ -88,10 +91,15 @@ const Messages = () => {
   //state for auto open mssg
   const [autoOpenEnabled, setAutoOpenEnabled] = useState(true);
 
+  const [conversation, setConversation] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [onlineIds, setOnlineIds] = useState(() => getOnlineIds())
+  const isSelectedOnline = selectedConversation ? onlineIds.has(String(selectedConversation.id)) : false;
+
   //Effect for auto open convo from URL
   useEffect(() => {
     if (openConversationId) {
-      const messageToOpen = messages.find(msg => msg.id === parseInt(openConversationId));
+      const messageToOpen = messages.find(msg => String(msg.id) === String(openConversationId));
 
       if (messageToOpen) {
         handleOpenConversation(messageToOpen); //auto open convo
@@ -121,6 +129,45 @@ const Messages = () => {
   useEffect(() => {
     scrollToBottom();
   }, [conversationThreads, selectedConversation]);
+
+  useEffect(() => {
+    let mounted = true
+    const fetchConversations = async () => {
+      try {
+        setLoading(true)
+        const res = await apiGet('/api/conversations')
+        if (!mounted) return
+        if (res?.success) {
+          const msgs = (res.data.conversations || []).map(c => ({
+            id: String(c.otherParticipant.employeeID),
+            profilePic: c.otherParticipant.profilePic || avatar1,
+            user: c.otherParticipant.name || 'Unknown',
+            message: '',
+            time: '',
+            alert: false
+          }))
+          setMessages(msgs)
+          setConversation(res.data.conversations)
+          const threadsInit = {}
+          msgs.forEach(m => { threadsInit[m.id] = [] })
+          setConversationThreads(threadsInit)
+        }
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+    fetchConversations()
+    return () => { mounted = false }
+  }, [])
+
+  useEffect(() => {
+    const unsubscribe = subscribePresence((ids) => {
+      console.log('Online IDs updated:', Array.from(ids))
+      setOnlineIds(ids)
+    })
+    
+    return () => unsubscribe()
+  }, [])
 
   //handles delete one message
   const handleDelete = (indexToRemove) => {
@@ -245,7 +292,7 @@ const Messages = () => {
   //filter mesages based on view type
   const filteredMessages = view === 'all' 
   ? messages
-  : usersData.filter(user => user.isOnline); //show users
+  : messages.filter(user => onlineIds.has(String(user.id))); //show users
     
   return (
     <div className="flex flex-row relative border border-neutral-800 rounded-[20px] min-w-[950px] min-h-[90%] shadow-md p-2 pb-4 bg-neutral-200 text-neutral-900 dark:text-white dark:bg-gray-900 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
@@ -296,7 +343,7 @@ const Messages = () => {
                   message={messageObj ? messageObj.message : ""}
                   time={messageObj ? messageObj.time : ""}
                   alert={messageObj ? messageObj.alert : false}
-                  isOnline={item.isOnline}
+                  isOnline={onlineIds.has(String(item.id))}
 
                   onDelete={view === 'all' ? () => handleDelete(index) : undefined}
                   onOpenConversation={() => handleOpenConversation(item)}
@@ -320,7 +367,7 @@ const Messages = () => {
                   message=""
                   time=""
                   alert={false}
-                  isOnline={item.isOnline}
+                  isOnline={onlineIds.has(String(item.id))}
                   onOpenConversation={() => handleOpenConversation(item)}
                   isSelected={selectedConversation?.id === item.id}
                   showMessagePreview={false}
@@ -356,8 +403,10 @@ const Messages = () => {
               </h2>
               
               <div className='flex items-center'>
-                <div className='w-2.5 h-2.5 mr-2 bg-green-500 rounded-full'></div>
-                <p className='text-neutral-700 text-sm dark:text-neutral-400'>Active now</p>
+              <div className={`w-2.5 h-2.5 mr-2 rounded-full ${isSelectedOnline ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+              <p className='text-neutral-700 text-sm dark:text-neutral-400'>
+                {isSelectedOnline ? 'Active now' : 'Offline'}
+              </p>
               </div>
             </div>
 

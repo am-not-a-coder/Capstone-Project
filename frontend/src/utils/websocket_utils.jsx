@@ -22,23 +22,23 @@ export const getSocket = () => {
 
 export const initPresenceListeners = () => {
   const socket = getSocket();
+  console.log('🔌 Initializing presence listeners...', socket.connected)
+  
   const handleUserOnline = (ids) => { 
     console.log('👥 users_online received:', ids); 
+    try {
+      setOnlineIds(new Set(ids || []))
+    } catch (e) {
+      console.error('Failed to update presence from users_online', e)
+    }
   };
   
   socket.off('users_online').on('users_online', handleUserOnline);
 
- // Snapshot on every connect/reconnect
+  // Remove the snapshot - let WebSocket handle it
   socket.off('connect').on('connect', () => {
     console.log('Socket connected?', socket.connected)
-    import('./api_utils').then(({ apiGet }) => {
-      apiGet('/api/users/online-status').then(r => {
-        if (r.success) console.log('📸 users_online snapshot on connect:', r.data.users.map(u => u.employeeID));
-      });
-    });
   });
-
-
 
   // Add disconnect handler for debugging
   socket.off('disconnect').on('disconnect', () => {
@@ -50,3 +50,27 @@ export const initPresenceListeners = () => {
     console.error('🚨 Socket connection error:', error);
   });
 };
+
+let onlineIds = new Set(); let subscribers = new Set();
+
+const setOnlineIds = (idsSet) => {
+  // Store a new Set to avoid external mutation
+  onlineIds = new Set(idsSet || [])
+  // Notify subscribers with a fresh copy
+  subscribers.forEach((cb) => {
+    try { cb(new Set(onlineIds)) } catch {}
+  })
+}
+
+export const getOnlineIds = () => new Set(onlineIds)
+
+export const subscribePresence = (cb) => {
+  if (typeof cb !== 'function') return () => {}
+  subscribers.add(cb)
+  // Push current value immediately
+  try { cb(new Set(onlineIds)) } catch {}
+  // Return unsubscribe
+  return () => {
+    subscribers.delete(cb)
+  }
+}

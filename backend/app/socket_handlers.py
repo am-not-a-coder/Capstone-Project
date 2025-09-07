@@ -57,7 +57,7 @@ def on_connect():
 
     add_presence(request.sid, user_id)
     redis_client.sadd('online_users', user_id)
-    schedule_broadcast_online_users()
+    schedule_broadcast_online_users()  # This should trigger the broadcast
     join_room(f'user:{user_id}')
 
     user_status = redis_client.hget('user_status', user_id)
@@ -76,9 +76,11 @@ def on_disconnect():
     user_id = sid_to_user.get(request.sid)
     if request.sid and user_id:
         remove_presence(request.sid)
+        # Remove from Redis when user disconnects
+        redis_client.srem('online_users', user_id)
+        # Broadcast the updated list
+        schedule_broadcast_online_users()
         
-    else:
-        return None
     if user_id in user_activity_timers:
         user_activity_timers[user_id].cancel()
         del user_activity_timers[user_id]
