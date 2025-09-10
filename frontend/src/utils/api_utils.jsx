@@ -1,6 +1,16 @@
 // Base API URL from environment variables for flexibility
 const API_URL = import.meta.env.VITE_APP_API_URL || 'http://localhost:5000'
 
+const getCookie = (name) => {
+    const m = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]+)'))
+    return m ? decodeURIComponent(m[2]) : null
+  }
+const toJson = async (res) => {
+    let data = null
+    try { data = await res.json() } catch {}
+    return { success: res.ok, status: res.status, data }
+}
+
 export const MakeApiCalls = async (endpoint, options = {}) => {
     // Combine base URL with endpoint
     const fullUrl = `${API_URL}${endpoint}`
@@ -104,13 +114,20 @@ export const apiGet = (endpoint, additionalOptions = {}) => {
 }
 
 // POST request with JSON body
-export const apiPost = (endpoint, data = {}, additionalOptions = {}) => {
-    return MakeApiCalls(endpoint, {
-        method: 'POST',
-        body: JSON.stringify(data),
-        ...additionalOptions
+export const apiPost = async (url, body) => {
+    const csrf = getCookie('csrf_access_token')
+    const res = await fetch(`${API_URL}${url}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': csrf || ''
+      },
+      body: JSON.stringify(body || {})
     })
-}
+    return toJson(res)
+  }
+
 
 // PUT request with JSON body
 export const apiPut = (endpoint, data = {}, additionalOptions = {}) => {
@@ -122,8 +139,14 @@ export const apiPut = (endpoint, data = {}, additionalOptions = {}) => {
 }
 
 // DELETE request
-export const apiDelete = (endpoint, additionalOptions = {}) => {
-    return MakeApiCalls(endpoint, { method: 'DELETE', ...additionalOptions })
+export const apiDelete = async (url) => {
+  const csrf = getCookie('csrf_access_token')
+  const res = await fetch(`${API_URL}${url}`, {
+    method: 'DELETE',
+    credentials: 'include',
+    headers: { 'X-CSRF-TOKEN': csrf || '' }
+  })
+  return toJson(res)
 }
 
 // POST request with FormData (e.g. file uploads)

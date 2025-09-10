@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { use, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Carousel from '../components/Carousel';
 import { apiPost } from '../utils/api_utils';
 import udmsLogo from '../assets/udms-logo.png';
@@ -26,6 +26,7 @@ const Login = () => {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState();
     const [loading, setLoading] = useState(false);
+    const EMP_ID_REGEX = /^\d{2}-\d{2}-\d{3}$/
 
 
     const handleLogin = async (e) => {
@@ -40,6 +41,12 @@ const Login = () => {
             setLoading(false)
             toast.dismiss(toastId)
             return;
+        }
+        if (!EMP_ID_REGEX.test(employeeID)) {
+            setError('Employee ID must be in the format 12-34-567')
+            setLoading(false)
+            toast.dismiss(toastId)
+            return
         }
         
         
@@ -93,6 +100,20 @@ const Login = () => {
         }
     }
 
+    const formatEmployeeId = (raw) => {
+        const digits = raw.replace(/\D/g, '').slice(0, 7)        // up to 7 digits
+        const p1 = digits.slice(0, 2)
+        const p2 = digits.slice(2, 4)
+        const p3 = digits.slice(4, 7)
+        if (digits.length <= 2) return p1
+        if (digits.length <= 4) return `${p1}-${p2}`
+        return `${p1}-${p2}-${p3}`
+      }
+      
+      const handleEmployeeIdChange = (e) => {
+        setEmployeeID(formatEmployeeId(e.target.value))
+      }
+
     return(
         
     <>
@@ -126,19 +147,25 @@ const Login = () => {
              
                     <h2 className=' text-3xl font-bold text-center text-neutral-800'>Login</h2><br /><br />
                  
-                        <div className='relative mb-4 w[90%]'>
+                        <div className='relative mb-4 w-[90%]'>
                             <label htmlFor='employeeID' className='block text-sm font-medium text-gray-700'>Employee ID</label>
                             <FontAwesomeIcon icon={faUser} className='absolute top-9.5 left-2 text-sm lg:text-md text-gray-400' />
                             <div className='absolute top-8.5 left-8 h-6 border-l border-gray-400'></div>
-                            <input type='text' 
-                            name='employeeID' 
-                            placeholder="Employee ID"
-                            value={employeeID}
-                            onChange={(e) => setEmployeeID(e.target.value)}
-                            className={`relative w-full px-10 py-2 mt-1 border-gray-300 rounded-md shadow-sm focus:outline-none ${error ? 'border-red-600' : ''} focus:ring-zuccini-900 focus:border-zuccini-900`}/>
+                            <input
+                                type="text"
+                                name="employeeID"
+                                value={employeeID}
+                                onChange={handleEmployeeIdChange}
+                                inputMode="numeric"
+                                maxLength={10}
+                                placeholder="12-34-567"
+                                pattern="\d{2}-\d{2}-\d{3}"
+                                required
+                                className={`relative w-full px-10 py-2 mt-1 border border-gray-300 rounded-md shadow-sm ${error ? 'border-red-600' : ''} focus:outline-none focus:ring-zuccini-900 focus:border-zuccini-900`}
+                            />
                         </div>
 
-                        <div className='relative mb-6'>
+                        <div className='relative mb-6 w-[90%]'>
                             <label htmlFor='password' className='block text-sm font-medium text-gray-700'>Password</label>
                             <FontAwesomeIcon icon={faKey} className='absolute top-9.5 left-2 text-md text-gray-400' />
                             <div className='absolute top-8.5 left-8 h-6 border-l border-gray-400'></div>  
@@ -147,7 +174,7 @@ const Login = () => {
                             placeholder="Password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className={`relative w-full px-10 py-2 mt-1 border border-gray-300 rounded-md shadow-sm  ${error ? 'border-red-600' : ''} focus:outline-none focus:ring-zuccini-900 focus:border-zuccini-900`}/>
+                            className={`relative w-full px-10 py-2 mt-1 border border-gray-300 rounded-md shadow-sm ${error ? 'border-red-600' : ''} focus:outline-none focus:ring-zuccini-900 focus:border-zuccini-900`}/>
                             <FontAwesomeIcon icon={showPassword ? faEye : faEyeSlash} 
                             onClick={() => {setShowPassword((current) => !current)}}
                             className='absolute cursor-pointer top-9 right-3 text-neutral-400'/>

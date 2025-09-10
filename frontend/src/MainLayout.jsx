@@ -21,7 +21,7 @@ import{
 } from '@fortawesome/free-solid-svg-icons';
 import { getCurrentUser } from './utils/auth_utils';
 import { apiPost } from './utils/api_utils';
-import { getSocket } from './utils/websocket_utils';
+import { getSocket, resetPresenceListeners } from './utils/websocket_utils';
 
 const MainLayout = () => {
   //sets the active pages' path in the link
@@ -147,8 +147,11 @@ const MainLayout = () => {
 
                  //disconnect to websocket
                  const socket = getSocket()
-                 socket.off('users_online')
+                 resetPresenceListeners()
+                 socket.removeAllListeners?.()
                  socket.disconnect()
+                 socket.off('users_online')
+                 
                  
                  // Broadcast logout to other tabs
                  const ch = new BroadcastChannel('auth')

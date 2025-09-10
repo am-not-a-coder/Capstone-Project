@@ -1,4 +1,6 @@
+import json
 from flask import jsonify, request, session, send_from_directory, current_app, Response
+from flask_migrate import current
 from app.models import Employee
 from app import db, redis_client, socketio
 from werkzeug.security import check_password_hash, generate_password_hash, _hash_internal
@@ -1213,7 +1215,6 @@ def register_routes(app):
             return jsonify({'success': False, 'message': f'Failed to upload file: {str(e)}'}), 400
         
 
-    @app.route('/api/accreditation/preview/<filename>')
     @app.route('/api/accreditation/preview/<filename>', methods=["GET"])   
     @jwt_required()   
     def preview_file(filename):   
@@ -1227,69 +1228,115 @@ def register_routes(app):
         online_users = {user.decode('utf-8') for user in redis_client.smembers('online_users')}
         users_data = []
         for user in users:
+            status = redis_client.hget('user_status', user.employeeID)
+            status_str = status.decode('utf-8') if status else 'active'
             users_data.append({
                 'employeeID': user.employeeID,
                 'fName': user.fName,
                 'lName': user.lName,
                 'profilePic': user.profilePic,
-                'online_status': user.employeeID in online_users
+                'online_status': user.employeeID in online_users,
+                'status': status_str
             })
         
         return jsonify({
             'success': True,
             'users': users_data
         })
-        token = request.args.get("token")
-
-        if token:
-            try:
-                decoded = decode_token(token) # validate the token manually
-            except exceptions.JWTDecodeError:
-                return jsonify({"success": False, "message": "Invalid token"}), 401
-            
-        else:
-            verify_jwt_in_request()  # fallback to Authorization header
-
-        NEXTCLOUD_URL = os.getenv("NEXTCLOUD_URL")
-        NEXTCLOUD_USER = os.getenv("NEXTCLOUD_USER")
-        NEXTCLOUD_PASSWORD = os.getenv("NEXTCLOUD_PASSWORD")
-        
-
-        if not all([NEXTCLOUD_URL, NEXTCLOUD_USER, NEXTCLOUD_PASSWORD]):
-            return jsonify({
-                'success': False,
-                'message': 'Nextcloud Configuration missing'
-            }), 500
-
-        doc = Document.query.filter_by(docName=filename).first()
-        if not doc:
-            return jsonify({'success': False, 'message': 'File not found.'}), 404    
-
-        # Get the file
-        response = download_from_nextcloud(doc.docPath)
-        
-        if response.status_code == 200:
-            return Response(
-                response.iter_content(chunk_size=8192),
-                content_type = response.headers.get("Content-Type", "application/octet-stream"),
-                headers={
-                    "Content-Disposition": f'inline; filename="{filename}"'
-                }
-            ) 
-        else:
-            return jsonify({
-                'success': False,
-                'status': response.status_code,
-                'detail': response.text 
-            }), response.status_code
 
             
-           
+    @app.route('/api/conversations/<int:conversation_id>/message', methods =['GET'])
+    @jwt_required()
+    def get_messages(conversation_id):
+        current_user_id = get_jwt_identity()
 
+        participants = ConversationParticipant.query.filter_by(
+            conversationID=conversation_id,
+            employeeID=current_user_id
+        ).first()
 
+        if not participants:
+            return jsonify({'success': False, 'message': 'Access Denied.'}), 403
 
+        messages = Message.query.filter_by(conversationID=conversation_id).order_by(Message.sentAt.asc()).all()
+
+        messages_data = []
+        for msg in messages:
+            messages_data.append({
+                'id': msg.messageID,
+                'content': msg.messageContent,
+                'senderID': msg.senderID,
+                'createdAt': msg.sentAt.isoformat() if msg.sentAt else None,
+                'isOwn': msg.senderID == current_user_id
+            })
+
+        return jsonify({
+            'success': True,
+            'messages': messages_data
+        }), 200
+
+    @app.route('/api/conversations/<int:conversation_id>/message', methods=['POST'])
+    @jwt_required()
+    def send_message(conversation_id):
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+
+        participant = ConversationParticipant.query.filter_by(
+            conversationID=conversation_id,
+            employeeID=current_user_id
+        ).first()
+
+        if not participant:
+            return jsonify({'success': False, 'message': 'Access Denied'}), 403
+
+        content = data.get('content', '').strip()
+        if not content:
+            return jsonify({'success': False, 'message': 'Message cannot be empty'}), 400
+
+        new_message = Message(
+            conversationID=conversation_id,
+            senderID=current_user_id,
+            messageContent=content
+        )
+
+        db.session.add(new_message)
+        db.session.commit()
+
+        socketio.emit('new_message', {
+            'conversationID': conversation_id,
+            'message': {
+                'id': new_message.messageID,
+                'content': new_message.messageContent,
+                'senderID': new_message.senderID,
+                'createdAt': new_message.sentAt.isoformat(),
+                'isOwn': False
+            }
+        }, room=f'conversation:{conversation_id}') 
         
+        return jsonify({
+            'success': True,
+            'message': 'Message sent successfully'
+        }), 201
                     
-        
+    @app.route('/api/conversations/<int:conversation_id>', methods=['DELETE'])
+    @jwt_required()
+    def delete_conversation(conversation_id):
+        current_user_id = get_jwt_identity()
+
+        conv = Conversation.query.filter_by(conversationID=conversation_id).first()
+        if not conv:
+            return jsonify({'success': False, 'message': 'Not found'}), 404
+
+        is_participant = ConversationParticipant.query.filter_by(
+            conversationID=conversation_id, employeeID=current_user_id
+        ).first() is not None
+        if not (is_participant or current_user_id == conv.createdBy):
+            return jsonify({'success': False, 'message': 'Forbidden'}), 403
+
+        db.session.delete(conv)
+        db.session.commit()
+
+        socketio.emit('conversation_deleted', {'conversationID': conversation_id}, room=f'conversation:{conversation_id}')
+        return jsonify({'success': True}), 200
 
     

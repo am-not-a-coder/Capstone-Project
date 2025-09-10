@@ -249,7 +249,7 @@ const Users = () => {
 
     return (
         <div className="min-h-screen p-6 border border-neutral-300 rounded-[20px] bg-neutral-200 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-800 dark:bg-gray-900">
-            {showStatusModal && (
+        {showStatusModal && (
                 <StatusModal message={statusMessage} type={statusType} showModal={showStatusModal} onClick={()=>setShowStatusModal(false)} />
             )}
 
@@ -279,7 +279,7 @@ const Users = () => {
                         <FontAwesomeIcon icon={faPlus} className="mr-2" />
                         Add User
                     </button>
-                </div>
+                        </div>
 
                 <div className="relative">
                     <FontAwesomeIcon 
@@ -293,8 +293,8 @@ const Users = () => {
                         value={searchQuery} 
                         placeholder='Search users...'
                     />
-                </div>
-            </div>
+                        </div>
+                        </div>
 
     {/* Add User Form */}
     <div className={`${visible === "add" ? "block" : "hidden"} mb-8`}>
@@ -349,8 +349,8 @@ const Users = () => {
               });
             }
           }}
-        />
-      </div>
+                            />
+                        </div>
 
       {/* Form Fields */}
       <div className="grid grid-cols-1 gap-6 lg:w-2/3 md:grid-cols-2">
@@ -459,7 +459,7 @@ const Users = () => {
           >
             <FontAwesomeIcon icon={!hidePassword ? faEye : faEyeSlash} />
           </button>
-        </div>
+                        </div>
 
         {/* Email */}
         <div className="relative">
@@ -479,7 +479,7 @@ const Users = () => {
           >
             Email Address
           </label>
-        </div>
+                        </div>
 
         {/* Contact Number */}
         <div className="relative">
@@ -511,14 +511,14 @@ const Users = () => {
             onChange={(e) => setProgramID(e.target.value)} 
             className="peer w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
           >
-            <option value="">Select Program</option>
+                                <option value="">Select Program</option>
             {programOption.map((program) => (
               <option key={program.programID} value={program.programID}>
                 {program.programName}
               </option>
             ))}
-          </select>
-        </div>
+                            </select>
+                        </div>
 
         {/* Area Select */}
         <div className="relative">
@@ -530,14 +530,14 @@ const Users = () => {
             onChange={(e) => setAreaID(e.target.value)} 
             className="peer w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
           >
-            <option value="">Select Area</option>
+                                <option value="">Select Area</option>
             {areaOption.map((area) => (
               <option key={area.areaID} value={area.areaID}>
                 {area.areaNum}
               </option>
             ))}
-          </select>
-        </div>
+                            </select>
+                        </div>
 
         {/* Submit */}
         <div className="flex justify-center mt-6 md:col-span-2">
@@ -552,7 +552,7 @@ const Users = () => {
       </div>
     </form>
   </div>
-</div>
+                    </div>
 
 
             {/* Users List */}
@@ -573,7 +573,7 @@ const Users = () => {
                             >
                                 <div className="p-6 text-center">
                                     <div className="mb-4">
-                                        {user.profilePic ? 
+                            {user.profilePic ? 
                                             <img 
                                                 src={`http://localhost:5000${user.profilePic}`} 
                                                 alt="Profile" 

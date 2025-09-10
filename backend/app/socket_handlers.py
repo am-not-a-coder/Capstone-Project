@@ -125,3 +125,16 @@ def handle_status_change(data):
             pass
         return {'updated': False}
 
+@socketio.on('join_conversation')
+def join_conversation(data):
+    conversation_id = data.get('conversationID')
+    if conversation_id:
+        join_room(f'conversation:{conversation_id}')
+        return {'success': True}
+
+@socketio.on('leave_conversation')
+def leave_conversation(data):
+    conversation_id = data.get('conversationID')
+    if conversation_id:
+        leave_room(f'conversation:{conversation_id}')
+        return {'success': True}
