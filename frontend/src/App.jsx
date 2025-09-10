@@ -1,5 +1,4 @@
 import {BrowserRouter as Router, Routes, Route, Navigate} from 'react-router-dom';
-import axios from 'axios';
 import { isLoggedIn } from './utils/auth_utils';
 // Importing Pages
 import Login from './pages/Login';
@@ -24,7 +23,7 @@ function App() {
   //   error => {
   //     if (error.response?.status === 401){
   //       console.log("Your token is expired!")
-  //       localStorage.removeItem('token');
+  //       localStorage.removeItem('token');  
   //       window.location.href = '/login'
   //     }
   //     return Promise.reject(error);
@@ -35,7 +34,7 @@ function App() {
 
   // If the user is not logged in it will redirect to login page
     const ProtectedRoute = ({children}) => {
-      // Use   authentication check instead of direct localStorage access
+      // Use authentication check instead of direct localStorage access
       return isLoggedIn() ? children : <Navigate to="/Login" />
     }
   

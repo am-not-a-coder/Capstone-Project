@@ -437,8 +437,7 @@ useEffect(() => {
                                   title={area.areaName} 
                                   onClick={() => handleDropDown(area)}
                                   onIconClick={() => handleDropDown(area)}
-                                  isExpanded={expandedAreaIndex === area.areaID}
-                                  
+                                  isExpanded={expandedAreaIndex === area.areaID}                                
                                 /> 
                                 <div className={`list-upper-alpha list-inside overflow-hidden transition-all duration-500 ease-in-out ${expandedAreaIndex === area.areaID ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
                                 {Array.isArray(area.subareas) && area.subareas.filter(sa => sa.subareaID != null).length > 0 ? (area.subareas.filter(sa => sa.subareaID != null).map((subarea) => (

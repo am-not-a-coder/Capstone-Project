@@ -12,8 +12,11 @@ import {useNavigate} from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useState } from 'react';
 import { apiGet } from '../utils/api_utils';
+import AnnouncementModal from '../components/modals/AnnouncementModal';
 
 const Dashboard = () => {
+
+    const [showAnnounceModal, setShowAnnounceModal] = useState(false);
     
     const [count, setCount] = useState({
         employees: 0,
@@ -33,6 +36,12 @@ const Dashboard = () => {
         }
         fetchCounts();
     }, [])
+
+    const handleCreateAnnouncement = (announcement) => {
+        console.log("New announcement:", announcement);
+        // Here you can push it to state, API call, etc.
+        };
+
     
     return (
         <>
@@ -51,7 +60,9 @@ const Dashboard = () => {
                     <h2 className="mb-4 text-xl font-semibold text-neutral-800 dark:text-white">Announcements</h2>
                 </div>
 
-                <div className="absolute flex flex-row items-center justify-around px-5 py-1 transition-all duration-500 cursor-pointer top-5 right-5 rounded-3xl hover:bg-zuccini-600 active:bg-zuccini-500" >
+                <div 
+                onClick={() => setShowAnnounceModal(true)}
+                className="absolute flex flex-row items-center justify-around px-5 py-1 transition-all duration-500 cursor-pointer top-5 right-5 rounded-3xl hover:bg-zuccini-600 active:bg-zuccini-500" >
                     <FontAwesomeIcon icon={faPlus} className="mr-2 dark:text-white" />
                     <h1 className="text-lg dark:text-white">New</h1>
                 </div>
@@ -60,6 +71,10 @@ const Dashboard = () => {
                     <p className="p-5 font-light text-center text-gray-700 transition-all duration-500 dark:text-white">No new announcements</p>
                 </div>
             </section>
+
+            {showAnnounceModal && (
+                <AnnouncementModal setShowModal={setShowAnnounceModal} onCreate={handleCreateAnnouncement}/>
+            )}
 
             <section className='grid grid-rows-2 gap-4 mt-4 lg:grid-cols-2 lg:grid-rows-1'>
 

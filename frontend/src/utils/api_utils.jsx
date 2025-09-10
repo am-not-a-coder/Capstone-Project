@@ -34,57 +34,72 @@ export const MakeApiCalls = async (endpoint, options = {}) => {
     try {
         const response = await fetch(fullUrl, finalOptions)
         
-        // Handle blob responses (for file downloads)
-        if (options.responseType === 'blob') {
-            if (response.ok) {
-                const blob = await response.blob()
-                return {
-                    success: true,
-                    data: blob,
-                    status: response.status,
-                    headers: response.headers
-                }
-            }
-            
-            // For error responses with blob type, try to parse as JSON first
-            let errorData
-            try {
-                errorData = await response.json()
-            } catch {
-                errorData = { message: `HTTP ${response.status}: ${response.statusText}` }
-            }
-            
-            // Handle authentication failures for blob requests
-            if (response.status === 401) {
-                const refreshToken = getRefreshToken()
-                if (refreshToken && endpoint !== '/api/refresh-token') {
-                    try {
-                        const refreshResult = await refreshAccessToken()
-                        if (refreshResult.success) {
-                            // Retry original request with new token
-                            return MakeApiCalls(endpoint, options)
-                        }
-                    } catch (refreshError) {
-                        console.error('Token refresh failed:', refreshError)
-                    }
-                }
+        
 
-                clearTokens()
-                window.location.href = '/login'
-                return {
-                    success: false,
-                    error: 'Authentication expired. Please login again.',
-                    status: 401
-                }
-            }
-            
-            return {
-                success: false,
-                error: errorData.message || errorData.error || 'Request failed',
-                data: errorData,
-                status: response.status
+// Handle blob responses (for file downloads)
+if (options.responseType === 'blob') {
+    if (response.ok) {
+        const blob = await response.blob()
+        return {
+            success: true,
+            data: blob,
+            status: response.status,
+            headers: response.headers
+        }
+    }
+    
+    // Error Handling for non-JSON responses
+    let errorData
+    try {
+       
+        const errorText = await response.text()
+        
+        // Try to parse as JSON, but fallback to text
+        try {
+            errorData = JSON.parse(errorText)
+        } catch {
+            errorData = { 
+                message: errorText || `HTTP ${response.status}: ${response.statusText}`,
+                status: response.status 
             }
         }
+    } catch {
+        errorData = { message: `HTTP ${response.status}: ${response.statusText}` }
+    }
+    
+    if (response.status === 401) {
+        const refreshToken = getRefreshToken()
+        if (refreshToken && endpoint !== '/api/refresh-token') {
+            try {
+                const refreshResult = await refreshAccessToken()
+                if (refreshResult.success) {
+                    // Add a retry counter to prevent infinite loops
+                    const retryCount = (options._retryCount || 0) + 1
+                    if (retryCount <= 1) { // Only retry once
+                        return MakeApiCalls(endpoint, { ...options, _retryCount: retryCount })
+                    }
+                }
+            } catch (refreshError) {
+                console.error('Token refresh failed:', refreshError)
+            }
+        }
+
+        
+        return {
+            success: false,
+            error: 'Authentication expired. Please login again.',
+            status: 401,
+            needsAuth: true // Flag to indicate auth is needed
+        }
+    }
+    
+    return {
+        success: false,
+        error: errorData.message || errorData.error || 'Request failed',
+        data: errorData,
+        status: response.status
+    }
+}
 
         // Regular JSON response handling
         const data = await response.json()
@@ -156,7 +171,7 @@ const refreshAccessToken = async () => {
 
         const data = await response.json()
 
-        if (response.ok && data.access_token) {
+        if (response.ok && data.access_token) { 
             storeToken({
                 access_token: data.access_token,
                 refresh_token: data.refresh_token || refreshToken,
