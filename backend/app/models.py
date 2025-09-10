@@ -25,6 +25,7 @@ class Area(db.Model):
     areaNum = db.Column(db.String(10))
     progress = db.Column(db.Integer)
     subareaID = db.Column(db.Integer)
+    rating = db.Column(db.Float)
 
     program = db.relationship("Program", back_populates="areas")
     subareas = db.relationship("Subarea", back_populates="area", cascade="all, delete-orphan")
@@ -48,6 +49,7 @@ class Subarea(db.Model):
     areaID = db.Column(db.Integer, db.ForeignKey('area.areaID'), nullable=False)
     subareaName = db.Column(db.String(100))
     criteriaID = db.Column(db.Integer)
+    rating = db.Column(db.Float)
 
     area = db.relationship("Area", back_populates="subareas")
 
@@ -60,6 +62,7 @@ class Criteria(db.Model):
     subareaID = db.Column(db.Integer, db.ForeignKey('subarea.subareaID'), nullable=False)
     criteriaContent = db.Column(db.Text)
     criteriaType = db.Column(db.String(50))
+    rating = db.Column(db.Float)
     docID = db.Column(db.Integer, db.ForeignKey('document.docID'), nullable=False)
 
     subarea = db.relationship("Subarea", back_populates="criteria")

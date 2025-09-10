@@ -6,6 +6,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 //Area container div
 
+
 export default function AreaCont(props) {
     // props: title, onClick, isExpanded, onIconClick
     
@@ -19,12 +20,13 @@ export default function AreaCont(props) {
             <h1 className='font-semibold text-md'>{props.title}</h1>
 			<p className='right-[14%] opacity-70 font-semibold absolute'>{props.doneCount} / {props.doneTotal}</p>
             <p className='absolute right-[6%] font-semibold text-lg'>{percentage}</p>
+
             <div className='mr-3'>
                 <FontAwesomeIcon 
-                    icon={props.isExpanded ? faChevronUp : faChevronDown} 
+                    icon={isExpanded ? faChevronUp : faChevronDown} 
                     onClick={e => {
                         e.stopPropagation();
-                        if (props.onIconClick) props.onIconClick(e);
+                        if (onIconClick) onIconClick(e);
                     }}
                     className='cursor-pointer'
                 />

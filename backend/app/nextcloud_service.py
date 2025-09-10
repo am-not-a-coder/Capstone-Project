@@ -53,3 +53,26 @@ def download_from_nextcloud(doc_path):
             text = str(e)
             headers = {}
         return MockResponse()
+
+def delete_from_nextcloud(doc_path):
+    try:
+        target_url = f"{NEXTCLOUD_URL.rstrip('/')}/{doc_path.strip('/')}"
+
+        response = requests.delete(
+                target_url, 
+                auth=HTTPBasicAuth(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD), 
+                timeout = 30
+            )
+
+        print(f"Response status: {response.status_code}")
+        print(f"Response text: {response.text}")
+
+        return response
+    except requests.exceptions.RequestException as e:
+        print(f"Nextcloud request failed: {e}")
+
+        class MockResponse:
+            status_code = 500,
+            text = str(e)
+            headers = {}
+        return MockResponse()
