@@ -12,6 +12,8 @@ import {useNavigate} from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useState } from 'react';
 import { apiGet } from '../utils/api_utils';
+import toast, { Toaster } from 'react-hot-toast'
+import { getCurrentUser } from '../utils/auth_utils';
 import AnnouncementModal from '../components/modals/AnnouncementModal';
 
 const Dashboard = () => {
@@ -24,7 +26,6 @@ const Dashboard = () => {
         institutes: 0,
         deadlines: 0
     })
-    
     useEffect(()=> {
         const fetchCounts = async () => {
             try{
@@ -35,6 +36,20 @@ const Dashboard = () => {
             }
         }
         fetchCounts();
+
+        // Check if this is a fresh login (not a page refresh or navigation)
+        const hasShownWelcome = sessionStorage.getItem('welcomeShown')
+        if (!hasShownWelcome) {
+            const currentUser = getCurrentUser()
+            if (currentUser?.employeeID) {
+                toast.success(`Welcome, ${currentUser.lastName} | ${currentUser.employeeID}!`, {
+                    duration: 2000,
+                    icon: '🎊'
+                })
+                // Mark that welcome has been shown for this session
+                sessionStorage.setItem('welcomeShown', 'true')
+            }
+        }
     }, [])
 
     const handleCreateAnnouncement = (announcement) => {
@@ -45,6 +60,7 @@ const Dashboard = () => {
     
     return (
         <>
+        <Toaster />
             {/* Dashboard links */}
             <section className='grid grid-rows-4 gap-1 mt-20 mb-5 lg:mt-8 lg:grid-cols-4 lg:grid-rows-1'>   
                 <DashboardLinks icon={faUsers} text="Users" count={count.employees}/>            

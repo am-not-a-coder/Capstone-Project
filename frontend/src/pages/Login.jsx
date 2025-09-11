@@ -1,10 +1,10 @@
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Carousel from '../components/Carousel';
 import { apiPost } from '../utils/api_utils';
-import { storeToken } from '../utils/auth_utils';
 import udmsLogo from '../assets/udms-logo.png';
 import UDMLogo from '../assets/UDM-logo.png';
+import toast , { Toaster } from 'react-hot-toast';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
     faKey,
@@ -12,64 +12,114 @@ import {
     faEye,
     faEyeSlash
 } from '@fortawesome/free-solid-svg-icons';
+import { cacheUserAfterLogin } from '../utils/auth_utils';
+import { logoutAcc } from '../utils/auth_utils';
+import { initPresenceListeners, getSocket } from '../utils/websocket_utils'
 
 
 const Login = () => {
+
+    const navigate = useNavigate()
 
     const [employeeID, setEmployeeID] = useState('');
     const [error, setError] = useState(null);
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState();
+    const [loading, setLoading] = useState(false);
+    const EMP_ID_REGEX = /^\d{2}-\d{2}-\d{3}$/
 
-    const navigate = useNavigate()
 
     const handleLogin = async (e) => {
         e.preventDefault();
+        setLoading(true)
 
+        const toastId = toast.loading('Logging in...')
+        
         // Client-side validation
         if (!employeeID.trim() || !password.trim()) {
             setError('Please enter a valid employee ID and password')
+            setLoading(false)
+            toast.dismiss(toastId)
             return;
         }
+        if (!EMP_ID_REGEX.test(employeeID)) {
+            setError('Employee ID must be in the format 12-34-567')
+            setLoading(false)
+            toast.dismiss(toastId)
+            return
+        }
+        
+        
 
         try {
-            // Use our centralized API utility instead of direct axios
+            
             // This automatically handles headers, error formatting, etc.
             const response = await apiPost('/api/login', {
                 employeeID: employeeID.trim(),
                 password: password.trim()
             });
+            const ch = new BroadcastChannel('auth')
 
             if (response.success && response.data.success) {
+                const payload = { type: 'login', ts: Date.now()}
+                ch.postMessage(payload)
+                
+                // Store session ID from backend response
+                if (response.data.user.sessionID) {
+                    localStorage.setItem('session_id', response.data.user.sessionID)
+                }
+                
                 // Clear any previous errors
-                setError(null);
-                
-                // Store all authentication data using our utility
-                // This includes access_token, refresh_token, and user info
-                storeToken({
-                    access_token: response.data.access_token,
-                    refresh_token: response.data.refresh_token,
-                    user: response.data.user
-                });
-                
+                setError(null)
+                await cacheUserAfterLogin()
                 // Navigate to dashboard after successful login
-                navigate('/Dashboard');
+                toast.dismiss(toastId)
+                ch.close()
+
+                //call websocket connection
+
                 
-            } else {
+
+                navigate('/Dashboard', {replace: true });
+                
+            } else { 
                 // Display backend error message to user
                 setError(response.error || response.data?.message || 'Login failed');
+                toast.error('Login Failed')
+                setLoading(false)
+                toast.dismiss(toastId)
             }
+            
             
         } catch (err) {
             // Handle unexpected errors (network issues, etc.)
             console.error('Login error:', err);
             setError('Server error. Please try again.');
+            setLoading(false)
+            toast.dismiss(toastId)
         }
     }
 
+    const formatEmployeeId = (raw) => {
+        const digits = raw.replace(/\D/g, '').slice(0, 7)        // up to 7 digits
+        const p1 = digits.slice(0, 2)
+        const p2 = digits.slice(2, 4)
+        const p3 = digits.slice(4, 7)
+        if (digits.length <= 2) return p1
+        if (digits.length <= 4) return `${p1}-${p2}`
+        return `${p1}-${p2}-${p3}`
+      }
+      
+      const handleEmployeeIdChange = (e) => {
+        setEmployeeID(formatEmployeeId(e.target.value))
+      }
+
     return(
+        
     <>
     {/* container w/ gradient-background */}
+            {/* toaster */}
+            <Toaster />
     
             <div className={`flex flex-row h-screen w-full lg:w-screen overflow-hidden bg-linear-to-br from-[#4c7a57] to-[#0e3844] relative`}>
 
@@ -97,19 +147,25 @@ const Login = () => {
              
                     <h2 className=' text-3xl font-bold text-center text-neutral-800'>Login</h2><br /><br />
                  
-                        <div className='relative mb-4 w[90%]'>
+                        <div className='relative mb-4 w-[90%]'>
                             <label htmlFor='employeeID' className='block text-sm font-medium text-gray-700'>Employee ID</label>
                             <FontAwesomeIcon icon={faUser} className='absolute top-9.5 left-2 text-sm lg:text-md text-gray-400' />
                             <div className='absolute top-8.5 left-8 h-6 border-l border-gray-400'></div>
-                            <input type='text' 
-                            name='employeeID' 
-                            placeholder="Employee ID"
-                            value={employeeID}
-                            onChange={(e) => setEmployeeID(e.target.value)}
-                            className={`relative w-full px-10 py-2 mt-1 border-gray-300 rounded-md shadow-sm focus:outline-none ${error ? 'border-red-600' : ''} focus:ring-zuccini-900 focus:border-zuccini-900`}/>
+                            <input
+                                type="text"
+                                name="employeeID"
+                                value={employeeID}
+                                onChange={handleEmployeeIdChange}
+                                inputMode="numeric"
+                                maxLength={10}
+                                placeholder="12-34-567"
+                                pattern="\d{2}-\d{2}-\d{3}"
+                                required
+                                className={`relative w-full px-10 py-2 mt-1 border border-gray-300 rounded-md shadow-sm ${error ? 'border-red-600' : ''} focus:outline-none focus:ring-zuccini-900 focus:border-zuccini-900`}
+                            />
                         </div>
 
-                        <div className='relative mb-6'>
+                        <div className='relative mb-6 w-[90%]'>
                             <label htmlFor='password' className='block text-sm font-medium text-gray-700'>Password</label>
                             <FontAwesomeIcon icon={faKey} className='absolute top-9.5 left-2 text-md text-gray-400' />
                             <div className='absolute top-8.5 left-8 h-6 border-l border-gray-400'></div>  
@@ -118,7 +174,7 @@ const Login = () => {
                             placeholder="Password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className={`relative w-full px-10 py-2 mt-1 border border-gray-300 rounded-md shadow-sm  ${error ? 'border-red-600' : ''} focus:outline-none focus:ring-zuccini-900 focus:border-zuccini-900`}/>
+                            className={`relative w-full px-10 py-2 mt-1 border border-gray-300 rounded-md shadow-sm ${error ? 'border-red-600' : ''} focus:outline-none focus:ring-zuccini-900 focus:border-zuccini-900`}/>
                             <FontAwesomeIcon icon={showPassword ? faEye : faEyeSlash} 
                             onClick={() => {setShowPassword((current) => !current)}}
                             className='absolute cursor-pointer top-9 right-3 text-neutral-400'/>

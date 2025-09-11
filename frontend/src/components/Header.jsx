@@ -13,6 +13,7 @@ import avatar2 from '../assets/avatar2.png';
 import avatar3 from '../assets/avatar3.png';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useNavigate } from 'react-router-dom';
+import { getCurrentUser } from '../utils/auth_utils';
 
 
 
@@ -33,6 +34,7 @@ const Header = ({title}) => {
     const notifRef = useRef(null);
     const messageRef = useRef(null);
     const iconContainerRef = useRef(null)
+    const user = getCurrentUser()
 
     useEffect( () => {
         const handleOutsideClick = (e) => {
@@ -135,8 +137,6 @@ const Header = ({title}) => {
         }
     ]
 
-
-
     return(
         <header className="fixed z-10 flex items-center w-full col-span-5 col-start-2 p-4 pl-10 mb-3 -mt-5 lg:relative lg:pl-5">
              <HeaderTitle title={title}/>
@@ -193,11 +193,11 @@ const Header = ({title}) => {
                 {/* Profile Preview */}
                 <div className="flex flex-col items-center border-neutral-400 border p-6 mb-6 rounded-xl bg-gray-200 inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-950/50 dark:shadow-md dark:shadow-zuccini-800 ">
                     <FontAwesomeIcon 
-                    icon={faCircleUser} 
+                    icon={user.profilePic == null ? faCircleUser : user.profilePic} 
                     className="mb-4 text-7xl text-gray-400 dark:text-gray-700" 
                     />
-                    <h1 className="text-lg font-semibold text-gray-900 dark:text-white">John Doe</h1>
-                    <h2 className="text-sm text-gray-600 dark:text-gray-400">johndoe123@gmail.com</h2>
+                    <h1 className="text-lg font-semibold text-gray-900 dark:text-white">{user.firstName} {user.lastName}</h1>
+                    <h2 className="text-sm text-gray-600 dark:text-gray-400">{user.email}</h2>
                 </div>
 
                 {/* Actions */}

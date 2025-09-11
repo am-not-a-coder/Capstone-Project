@@ -1,20 +1,25 @@
+import json
 from flask import jsonify, request, session, send_from_directory, current_app, Response
+from flask_migrate import current
 from app.models import Employee
-from app import db
+from app import db, redis_client, socketio
 from werkzeug.security import check_password_hash, generate_password_hash, _hash_internal
 from werkzeug.utils import secure_filename
 from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, decode_token, exceptions, verify_jwt_in_request
+from flask_jwt_extended import set_access_cookies, set_refresh_cookies, unset_jwt_cookies
 from flask_jwt_extended.exceptions import JWTExtendedException
 from datetime import datetime, timedelta
 from app.nextcloud_service import upload_to_nextcloud, download_from_nextcloud, delete_from_nextcloud, check_directory, safe_path
 import os
 import re
-from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria
+import time
+import redis
+from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message
 
 
 def register_routes(app):
-                                        #AUTHENTICATION(LOGIN/LOGOUT) PAGE ROUTES 
-
+                                  #AUTHENTICATION(LOGIN/LOGOUT) PAGE ROUTES 
+    
     # JWT Exception Handler
     @app.errorhandler(JWTExtendedException)
     def handle_jwt_exception(e):
@@ -28,6 +33,7 @@ def register_routes(app):
             data = request.get_json()
             empID = data.get("employeeID")
             password = data.get("password")
+
             #Fetches the user from the db using the employeeID
             user = Employee.query.filter_by(employeeID=empID).first()
             #If the user is not found in the db
@@ -45,13 +51,23 @@ def register_routes(app):
                 current_app.logger.error(f"Invalid password hash for user {empID}: {hash_error}")
                 return jsonify({'success': False, 'message': 'User account has invalid password format. Contact administrator.'}), 400
                 
-            if is_valid_password: #checks if the user input hashed password matches the hashed pass in the db 
-                # After login, store the user info in the session
+            if is_valid_password: 
                 
+                #remove this 
                 user.isOnline = True
-                db.session.commit()      
+                db.session.commit()
+
+                session_id = f'{empID}:{int(time.time())}'
+                
+                # Store in Redis
+                redis_client.setex(f'session:{session_id}', 3600, 'active')
+                redis_client.sadd('online_users', empID)
+                redis_client.hset('user_status', empID, 'active')
+                print(f"Session created: session:{session_id}")  # Debug log
                 try:
                     # Create both access token (15 minutes) and refresh token (7 days)
+
+
                     access_token = create_access_token(
                         identity=empID,
                         expires_delta=timedelta(minutes=15),  # Short-lived for security
@@ -64,10 +80,10 @@ def register_routes(app):
                     
                     refresh_token = create_refresh_token(
                         identity=empID,
-                        expires_delta=timedelta(days=7)  # Longer-lived for convenience
+                        expires_delta=timedelta(days=7)
                     )
                     
-                    # Prepare user data (without sensitive information)
+                    
                     user_data = {
                         'employeeID': user.employeeID,
                         'name': f"{user.fName} {user.lName}{user.suffix or ''}",
@@ -78,16 +94,19 @@ def register_routes(app):
                         'contactNum': user.contactNum,
                         'profilePic': user.profilePic,
                         'isAdmin': user.isAdmin,
-                        'role': 'admin' if user.isAdmin else 'user'
+                        'role': 'admin' if user.isAdmin else 'user',
+                        'sessionID': session_id
                     }
                     
-                    return jsonify({
-                        'success': True, 
-                        'message': 'Login successful',
-                        'access_token': access_token,
-                        'refresh_token': refresh_token,
+                    resp = jsonify({
+                        'success': True,
+                        'message': f"Welcome!, {user_data['lastName']}",
                         'user': user_data
                     })
+                    set_access_cookies(resp, access_token)
+                    set_refresh_cookies(resp, refresh_token)
+                    return resp
+                
                 except Exception as jwt_error:
                     current_app.logger.error(f"JWT Error: {jwt_error}")
                     return jsonify({'success': False, 'message': 'Token generation failed'}), 500
@@ -98,6 +117,50 @@ def register_routes(app):
             current_app.logger.error(f"Login error: {e}")
             return jsonify({'success': False, 'message': 'Internal server error'}), 500
         
+    @app.route('/api/me', methods=['GET'])
+    @jwt_required()
+    def me():
+        emp_id = get_jwt_identity()
+        user = Employee.query.filter_by(employeeID=emp_id).first()
+        if not user:
+            return jsonify({'success': False, 'message': 'User not found'})
+        return jsonify({
+            'success': True,
+            'user': {
+                'employeeID': user.employeeID,
+                'firstName': user.fName,
+                'lastName': user.lName,
+                'suffix' : user.suffix,
+                'email': user.email,
+                'contactNum': user.contactNum,
+                'profilePic': user.profilePic,
+                'isAdmin': user.isAdmin,
+                'role': 'admin' if user.isAdmin else 'user'
+            }
+        }), 200
+    
+    @app.route('/api/validate-session', methods=['POST'])
+    def validate_session():
+        try:
+            session_id = request.json.get('session_id')
+            print(f"Validating session: {session_id}")  # Debug log
+            
+            if not session_id:
+                return jsonify({'valid': False, 'error': 'No session ID'}), 400
+            
+            # Check if session exists in Redis
+            redis_key = f'session:{session_id}'
+            exists = redis_client.exists(redis_key)
+            print(f"Redis key {redis_key} exists: {exists}")  # Debug log
+            
+            if not exists:
+                return jsonify({'valid': False}), 401
+            
+            return jsonify({'valid': True}), 200
+            
+        except Exception as e:
+            print(f"Validation error: {e}")
+            return jsonify({'valid': False, 'error': str(e)}), 500
 
         
     @app.route('/api/protected', methods=["GET"])
@@ -112,15 +175,6 @@ def register_routes(app):
     @app.route('/api/refresh-token', methods=["POST"])
     @jwt_required(refresh=True)  # This decorator requires refresh token, not access token
     def refresh():
-        """
-        Endpoint to refresh access token using refresh token
-
-        Frontend sends request with refresh token in Authorization header
-        We verify refresh token is valid and not expired
-        We create new access token with same user identity
-        Optionally create new refresh token for extended security
-        Return new tokens to frontend
-        """
         try:
             # Get the user identity from the refresh token
             current_user_id = get_jwt_identity()
@@ -173,16 +227,41 @@ def register_routes(app):
             current_app.logger.error(f"Token refresh error: {e}")
             return jsonify({'success': False, 'message': 'Token refresh failed'}), 500
     
-    
+
+    def get_session_from_request():
+        # Get session ID from request headers or body
+        session_id = request.json.get('sessionId') if request.is_json else None
+        return session_id
+
     #LOGOUT API
     @app.route('/api/logout', methods=["POST"])
     def logout():
-        session["isOnline"] = False
-        session.clear()
-        return jsonify({"message":"You have logged out the system"})
-    
+        try:
+            data = request.get_json() or {}
+            
+            empID = data.get('employeeID')
+            session_id = data.get('session_id')
 
-                                        #USER PAGE ROUTES
+            # Clean up session from Redis
+            if session_id:
+                redis_key = f'session:{session_id}'
+                redis_client.delete(redis_key)
+                redis_client.hdel('user_status', empID)
+
+            # Clean up user from online users (if empID provided)
+            if empID:
+                redis_client.srem('online_users', empID)
+            
+            # Always return success for logout (even if empID missing)
+            resp = jsonify({'success': True})
+            unset_jwt_cookies(resp) 
+            return resp
+            
+        except Exception as e:
+            print(f"Logout error: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+                 #USER PAGE ROUTES
 
     #CREATE USER
     @app.route('/api/user', methods=["POST"])
@@ -1056,6 +1135,10 @@ def register_routes(app):
         # Get form data
         data = request.form
         file = request.files.get("uploadedFile")
+        file_type = request.form.get("fileType")
+        file_name = request.form.get("fileName")
+        criteria_id = request.form.get("criteriaID")
+        
         file_type = data.get("fileType")
         file_name = data.get("fileName")
         criteria_id = data.get("criteriaID")
@@ -1106,6 +1189,16 @@ def register_routes(app):
             return jsonify({'success': False, 'message': 'Invalid filename'}), 400
         
         try:
+            # Create upload directory
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+            # Save file
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            print("Saving file to:", file_path)
+            file.save(file_path)
+            
+            file_url = f"/uploads/{filename}"
+            
             # saves the file into repository (Nextcloud)
             response = upload_to_nextcloud(file, encoded_path)
             if response.status_code not in (200, 201, 204):
@@ -1151,7 +1244,6 @@ def register_routes(app):
             db.session.rollback()  # Rollback on error
             return jsonify({'success': False, 'message': f'Failed to upload file: {str(e)}'}), 400
         
-
 
     @app.route('/api/accreditation/preview/<filename>', methods=["GET"])   
     @jwt_required()   
@@ -1362,12 +1454,126 @@ def register_routes(app):
         db.session.commit()
         return jsonify({'success': True, 'message': 'Area rating saved!' }), 200
 
-        
 
-        
 
-    
+    @app.route('/api/users/online-status', methods=['GET'])
+    @jwt_required()
+    def get_users_with_status():
+        empID = get_jwt_identity()
+        users = Employee.query.all()
+        online_users = {user.decode('utf-8') for user in redis_client.smembers('online_users')}
+        users_data = []
+        for user in users:
+            status = redis_client.hget('user_status', user.employeeID)
+            status_str = status.decode('utf-8') if status else 'active'
+            users_data.append({
+                'employeeID': user.employeeID,
+                'fName': user.fName,
+                'lName': user.lName,
+                'profilePic': user.profilePic,
+                'online_status': user.employeeID in online_users,
+                'status': status_str
+            })
+        
+        return jsonify({
+            'success': True,
+            'users': users_data
+        })
+
             
+    @app.route('/api/conversations/<int:conversation_id>/message', methods =['GET'])
+    @jwt_required()
+    def get_messages(conversation_id):
+        current_user_id = get_jwt_identity()
+
+        participants = ConversationParticipant.query.filter_by(
+            conversationID=conversation_id,
+            employeeID=current_user_id
+        ).first()
+
+        if not participants:
+            return jsonify({'success': False, 'message': 'Access Denied.'}), 403
+
+        messages = Message.query.filter_by(conversationID=conversation_id).order_by(Message.sentAt.asc()).all()
+
+        messages_data = []
+        for msg in messages:
+            messages_data.append({
+                'id': msg.messageID,
+                'content': msg.messageContent,
+                'senderID': msg.senderID,
+                'createdAt': msg.sentAt.isoformat() if msg.sentAt else None,
+                'isOwn': msg.senderID == current_user_id
+            })
+
+        return jsonify({
+            'success': True,
+            'messages': messages_data
+        }), 200
+
+    @app.route('/api/conversations/<int:conversation_id>/message', methods=['POST'])
+    @jwt_required()
+    def send_message(conversation_id):
+        current_user_id = get_jwt_identity()
+        data = request.get_json()
+
+        participant = ConversationParticipant.query.filter_by(
+            conversationID=conversation_id,
+            employeeID=current_user_id
+        ).first()
+
+        if not participant:
+            return jsonify({'success': False, 'message': 'Access Denied'}), 403
+
+        content = data.get('content', '').strip()
+        if not content:
+            return jsonify({'success': False, 'message': 'Message cannot be empty'}), 400
+
+        new_message = Message(
+            conversationID=conversation_id,
+            senderID=current_user_id,
+            messageContent=content
+        )
+
+        db.session.add(new_message)
+        db.session.commit()
+
+        socketio.emit('new_message', {
+            'conversationID': conversation_id,
+            'message': {
+                'id': new_message.messageID,
+                'content': new_message.messageContent,
+                'senderID': new_message.senderID,
+                'createdAt': new_message.sentAt.isoformat(),
+                'isOwn': False
+            }
+        }, room=f'conversation:{conversation_id}') 
+        
+        return jsonify({
+            'success': True,
+            'message': 'Message sent successfully'
+        }), 201
+                    
+    @app.route('/api/conversations/<int:conversation_id>', methods=['DELETE'])
+    @jwt_required()
+    def delete_conversation(conversation_id):
+        current_user_id = get_jwt_identity()
+
+        conv = Conversation.query.filter_by(conversationID=conversation_id).first()
+        if not conv:
+            return jsonify({'success': False, 'message': 'Not found'}), 404
+
+        is_participant = ConversationParticipant.query.filter_by(
+            conversationID=conversation_id, employeeID=current_user_id
+        ).first() is not None
+        if not (is_participant or current_user_id == conv.createdBy):
+            return jsonify({'success': False, 'message': 'Forbidden'}), 403
+
+        db.session.delete(conv)
+        db.session.commit()
+
+        socketio.emit('conversation_deleted', {'conversationID': conversation_id}, room=f'conversation:{conversation_id}')
+        return jsonify({'success': True}), 200
            
 
 

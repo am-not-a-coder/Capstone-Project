@@ -20,7 +20,7 @@ import "@cyntler/react-doc-viewer/dist/index.css";
 import "../../index.css"
 
   const Programs = () => {
-    {/*use state function*/}
+    // use state function
   const [programs, setPrograms] = useState([]);
   const [employees, setEmployees] = useState([]); 
   const [areas, setAreas] = useState([]);
@@ -46,7 +46,7 @@ import "../../index.css"
     // Get user info using our centralized utility
     const currentUser = getCurrentUser();
 
-useEffect(() => {
+    useEffect(() => {
   const fetchProgram = async () => {
     try {
       // Use our centralized API utility - no manual token handling!
@@ -75,7 +75,7 @@ useEffect(() => {
           const response = await apiGet('/api/users');
           
           if (response.success) {
-            Array.isArray(response.data.users) ? setEmployees(response.data.users) : setEmployees([]);
+          Array.isArray(response.data.users) ? setEmployees(response.data.users) : setEmployees([]);
           } else {
             console.error("Error fetching employees:", response.error);
             setEmployees([]);
@@ -111,44 +111,44 @@ useEffect(() => {
       }
     }
 
-  function handleModify(mode) {
+    function handleModify(mode) {
       setActiveModify((prev) => (prev === mode ? null : mode));
       if (mode !== "edit") {
         setEditIndex(null);
         setForm({ code: "", name: "", color: "", programDean: "" });
       }
-  }
+    }
 
-  function handleEditSelect(e) {
+    function handleEditSelect(e) {
       const idx = e.target.value;
       setEditIndex(idx);
       const prog = programs[idx];
       setForm({ ...prog });
-  }
+    }
 
-  function handleDeleteSelect(e) {
+    function handleDeleteSelect(e) {
       setEditIndex(e.target.value);
-  }
+    }
 
   function handleDelete(e) {
       e.preventDefault();
       if (editIndex !== null) {
-        setPrograms(programs.filter((_, idx) => idx != editIndex));
-        setShowForm(false);
-        setEditIndex(null);
-        setActiveModify(null);
+          setPrograms(programs.filter((_, idx) => idx != editIndex));
+          setShowForm(false);
+          setEditIndex(null);
+          setActiveModify(null);
       }
   }
 
   const handleSubmit = (e) => {
       e.preventDefault();
-      if (activeModify === "edit" && editIndex !== null) {
-        // Edit mode
-        const updated = [...programs];
+        if (activeModify === "edit" && editIndex !== null) {
+          // Edit mode
+          const updated = [...programs];
         updated[editIndex] = { ...form };
         setPrograms(updated);
-      } else {
-        // Add mode
+        } else {
+          // Add mode
         setPrograms([
           ...programs,
           {
@@ -159,13 +159,13 @@ useEffect(() => {
           },
         ]);
       }
-      setShowForm(false);
+        setShowForm(false);
       setForm({ code: "", name: "", color: "", programDean: "" });
-      setEditIndex(null);
-      setActiveModify(null);
-  };
+        setEditIndex(null);
+        setActiveModify(null);
+    };
 
-  const [form, setForm] = useState({
+    const [form, setForm] = useState({
       code: "",
       name: "",
       color: "",
@@ -300,7 +300,7 @@ useEffect(() => {
   // const doneTotal = allCriteria.length;
       const [done, setDone] = useState({});
 
-  return (
+    return (
       <>
           <div className="relative flex flex-row min-h-screen p-3 px-5 border rounded-[20px] border-neutral-300 dark:bg-gray-900 inset-shadow-sm inset-shadow-gray-400 dark:inset-shadow-gray-500 dark:shadow-md dark:shadow-zuccini-800">
           
@@ -422,7 +422,7 @@ useEffect(() => {
                   <div className={`${visible == "programs" ? 'block' : 'hidden'} flex flex-wrap gap-4`}>
                     <CreateCard form={form} handleChange={handleChange} setShowForm={setShowForm} />
                     
-                    {programs.map(program=> (
+            {programs.map(program=> (
                       <ProgramCard 
                         program={program} 
                         key={program.programID} 
@@ -611,8 +611,8 @@ useEffect(() => {
               handleChange={handleChange}
               handleModify={handleModify}
             />}
-        </div>  
+        </div>
       </>
-  );
+    );
 }
 export default Programs;

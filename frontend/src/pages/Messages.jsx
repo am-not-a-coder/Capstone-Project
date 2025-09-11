@@ -1,4 +1,3 @@
-import React from 'react'
 import avatar1 from '../assets/avatar1.png';
 import avatar2 from '../assets/avatar2.png';
 import avatar3 from '../assets/avatar3.png';
@@ -7,75 +6,23 @@ import { useState, useRef, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSquareXmark, faPaperPlane } from '@fortawesome/free-solid-svg-icons';
 import { useLocation, useSearchParams } from 'react-router-dom';
-
-//contains static users data, never deleted by "Delete All" button
-const usersData = [
-  {
-    id: 1,
-    profilePic: avatar1,
-    user: 'Miguel Derick Pangindian',
-    isOnline: true
-  },
-  {
-    id: 2,
-    profilePic: avatar2,
-    user: 'Jayson Permejo',
-    isOnline: false
-  },
-  {
-    id: 3,
-    profilePic: avatar3,
-    user: 'Rafael Caparic',
-    isOnline: true
-  }
-];
-
-//static message data with id to track converstaion
-const messagesData = [
-    {
-      id: 1,
-      profilePic: avatar1,
-      user: 'Miguel Derick Pangindian',
-      message: 'WHY DID YOU REDEEM IT?!?!?',
-      time: '3m',
-      alert: true,
-      isOnline: true // online user
-    },
-    {
-      id: 2,
-      profilePic: avatar2,
-      user: 'Jayson Permejo',
-      message: "Hello? How are you, I'm under the water, I'm so much drowning, bulululul",
-      time: '5h',
-      alert: true,
-      isOnline: false // offline
-    },
-    {
-      id: 3,
-      profilePic: avatar3,
-      user: 'Rafael Caparic',
-      message: "Nothing beats a jet2 holiday!",
-      time: '4d',
-      alert: false,
-      isOnline: true
-    }
-  ];
+import { apiGet, apiPost, apiDelete } from '../utils/api_utils';
+import { subscribePresence, getOnlineIds, getSocket } from '../utils/websocket_utils';
+import { getCurrentUser } from '../utils/auth_utils'
 
 
 const Messages = () => {
+  
   //Parameter handling
   const [searchParams] = useSearchParams();
-  const openConversationId = searchParams.get('openConversation');
+  const openConversationId = searchParams.get('openConversation')
+
 
   //state to hold messages
-  const [messages, setMessages] = useState(messagesData);
+  const [messages, setMessages] = useState([]);
 
   //state to hold individual conversation threads
-  const [conversationThreads, setConversationThreads] = useState({
-    1: [messagesData[0]], //miguel thread
-    2: [messagesData[1]], //son thread
-    3: [messagesData[2]] //rap thread
-  });
+  const [conversationThreads, setConversationThreads] = useState({});
 
   //state to manage view type
   const [view, setView] = useState('all'); //'all' or 'unread'
@@ -89,10 +36,39 @@ const Messages = () => {
   //state for auto open mssg
   const [autoOpenEnabled, setAutoOpenEnabled] = useState(true);
 
+  const [conversation, setConversation] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [onlineIds, setOnlineIds] = useState(() => getOnlineIds())
+  const isSelectedOnline = selectedConversation ? onlineIds.has(String(selectedConversation.id)) : false;
+  const [userStatus, setUserStatus] = useState(() => new Map())
+
+  const selectedStatus = selectedConversation
+    ? (userStatus.get(String(selectedConversation.id)) || 'active')
+    : 'active'
+  const selectedDotClass = !isSelectedOnline
+    ? 'bg-gray-400'
+    : (selectedStatus === 'away' ? 'bg-orange-500' : 'bg-green-500')
+  const selectedText = !isSelectedOnline
+    ? 'Offline'
+    : (selectedStatus === 'away' ? 'Away' : 'Active now')
+
+  useEffect(() => {
+    const socket = getSocket()
+    const onBroadcast = ({ userID, status}) => {
+        setUserStatus(prev => {
+          const next = new Map(prev)
+          next.set(String(userID), status || 'active')
+          return next
+        })
+    }
+    socket.on('broadcast', onBroadcast)
+    return () => socket.off('broadcast', onBroadcast)
+  }, [])
+
   //Effect for auto open convo from URL
   useEffect(() => {
     if (openConversationId) {
-      const messageToOpen = messages.find(msg => msg.id === parseInt(openConversationId));
+      const messageToOpen = messages.find(msg => String(msg.id) === String(openConversationId));
 
       if (messageToOpen) {
         handleOpenConversation(messageToOpen); //auto open convo
@@ -123,18 +99,177 @@ const Messages = () => {
     scrollToBottom();
   }, [conversationThreads, selectedConversation]);
 
-  //handles delete one message
-  const handleDelete = (indexToRemove) => {
-    //get the messg being deleted
-    const messageToDelete = messages[indexToRemove];
+  useEffect(() => {
+    let mounted = true
+    const fetchConversations = async () => {
+      try {
+        setLoading(true)
+        const res = await apiGet('/api/conversations')
+        if (!mounted) return
+        if (res?.success) {
+          const msgs = (res.data.conversations || []).map(c => ({
+            id: String(c.otherParticipant.employeeID),
+            conversationId: String(c.conversationID),
+            profilePic: c.otherParticipant.profilePic || avatar1,
+            user: c.otherParticipant.name || 'Unknown',
+            message: '',
+            time: '',
+            alert: false
+          }))
+          setMessages(msgs)
+          setConversation(res.data.conversations)
+          const threadsInit = {}
+          msgs.forEach(m => { threadsInit[m.conversationId] = [] })
+          setConversationThreads(threadsInit)
+        }
 
-    //check if this messg is currently openm 
-    if (selectedConversation && selectedConversation.id === messageToDelete.id) {
-      setSelectedConversation(null); //close convo
+      } finally {
+        if (mounted) setLoading(false)
+      }
     }
+    fetchConversations()
+    return () => { mounted = false }
+  }, [])
 
-    setMessages(prev => prev.filter((_, index) => index !== indexToRemove)) //delete a message
-  };
+  useEffect(() => {
+    let mounted = true
+    const seedPresence = async () => {
+      try {
+        const res = await apiGet('/api/users/online-status')
+        if (!mounted || !res?.success) return
+        const ids = new Set((res.data?.users || [])
+          .filter(u => u.online_status)
+          .map(u => String(u.employeeID)))
+        // if you have a presence store setter:
+        // setOnlineIds(ids) from websocket_utils, or local setOnlineIds(ids)
+        setOnlineIds(ids)
+        // Seed status map for away/active snapshot
+        setUserStatus(prev => {
+          const next = new Map(prev)
+          ;(res.data?.users || []).forEach(u => {
+            next.set(String(u.employeeID), u.status || 'active')
+          })
+          return next
+        })
+      } catch {}
+    }
+    seedPresence()
+    return () => { mounted = false }
+  }, [])
+
+  useEffect(() => {
+    const unsubscribe = subscribePresence((ids) => {
+      console.log('Online IDs updated:', Array.from(ids))
+      setOnlineIds(ids)
+    })
+    
+    return () => unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    const socket = getSocket()
+  
+    const handleNewMessage = (data) => {
+      const { conversationID, message } = data
+      const currentId = getCurrentUser()?.employeeID
+      if (!currentId) return
+  
+      if (String(message.senderID) === String(currentId)) {
+        // We already appended optimistically; skip duplicate
+        return
+      }
+  
+      const normalized = {
+        id: message.id,
+        message: message.content,
+        time: message.createdAt ? 'now' : '',
+        sender: 'received',
+        profilePic: (selectedConversation?.conversationId === String(conversationID)
+          ? (selectedConversation?.profilePic || avatar1)
+          : avatar1)
+      }
+  
+      setConversationThreads(prev => ({
+        ...prev,
+        [conversationID]: [...(prev[conversationID] || []), normalized]
+      }))
+    }
+  
+    socket.on('new_message', handleNewMessage)
+    return () => socket.off('new_message', handleNewMessage)
+  }, [selectedConversation])
+
+  useEffect(() => {
+    const socket = getSocket()
+    const onDeleted = ({ conversationID }) => {
+      // If we are viewing this conversation, close it
+      if (selectedConversation?.conversationId === String(conversationID)) {
+        setSelectedConversation(null)
+        setAutoOpenEnabled(false)
+      }
+      // Remove from cache and list
+      setConversationThreads(prev => {
+        const copy = { ...prev }; delete copy[String(conversationID)]; return copy
+      })
+      setMessages(prev => prev.filter(m => m.conversationId !== String(conversationID)))
+    }
+    socket.on('conversation_deleted', onDeleted)
+    return () => socket.off('conversation_deleted', onDeleted)
+  }, [selectedConversation])
+
+  const fetchMessages = async (conversationId) => {
+    try {
+      const res = await apiGet(`/api/conversations/${conversationId}/message`)
+      if (res?.success) {
+        const currentId = getCurrentUser()?.employeeID
+        const otherPic =
+          selectedConversation?.conversationId === String(conversationId)
+            ? (selectedConversation?.profilePic || avatar1)
+            : avatar1
+  
+        const formatted = (res.data?.messages || []).map(msg => {
+          const isOwn = String(msg.senderID) === String(currentId)
+          return {
+            id: msg.id,
+            message: msg.content,
+            time: msg.createdAt ? 'now' : '',
+            sender: isOwn ? 'sent' : 'received',
+            profilePic: isOwn ? null : otherPic
+          }
+        })
+  
+        setConversationThreads(prev => ({
+          ...prev,
+          [conversationId]: formatted
+        }))
+      }
+    } catch (e) {
+      console.error('Error fetching messages:', e)
+    }
+  }
+
+  //handles delete one message
+  const handleDeleteConversation = async () => {
+    const conversationId = selectedConversation?.conversationId
+    if (!conversationId) return
+    if (!window.confirm('Delete this conversation?')) return
+  
+    const socket = getSocket()
+    socket.emit('leave_conversation', { conversationID: conversationId })
+  
+    const res = await apiDelete(`/api/conversations/${conversationId}`)
+    if (res?.success) {
+      // remove from left list
+      setMessages(prev => prev.filter(m => m.conversationId !== conversationId))
+      // remove thread cache
+      setConversationThreads(prev => {
+        const copy = { ...prev }; delete copy[conversationId]; return copy
+      })
+      // clear selection
+      setSelectedConversation(null)
+      setAutoOpenEnabled(false)
+    }
+  }
 
   //handles delete all messages
   const handleDeleteAll = () => {
@@ -143,84 +278,83 @@ const Messages = () => {
 
   //handle opening a conversation
   const handleOpenConversation = (data) => {
-    // if coming from active users, data may not have mssg/time/alert
-    const msgData = messages.find(msg => msg.id === data.id) || {
-      id: data.id,
-      profilePic: data.profilePic,
-      user: data.user,
-      message: "",
-      time: "",
-      alert: false,
-      isOnline: data.isOnline
-    };
-    setSelectedConversation(msgData); //store selected mess. data
+  const conv = conversation.find(c => String(c.otherParticipant.employeeID) === String(data.id))
+  const conversationId = String(conv?.conversationID)
 
-    //Mark messg as read if alert
-    if (msgData.alert) {
-      setMessages(prev => 
-        prev.map(msg => msg.id === msgData.id ? {...msg, alert: false}
-        : msg 
-        )
-      );
-    }
-  };
+  // Leave previous room if any
+  const socket = getSocket()
+  const prevId = selectedConversation?.conversationId
+  if (prevId) {
+    socket.emit('leave_conversation', { conversationID: prevId })
+  }
+
+  const msgData = messages.find(msg => msg.id === data.id) || {
+    ...data,
+    conversationId,
+    message: "", time: "", alert: false
+  }
+  const selection = { ...msgData, conversationId }
+  setSelectedConversation(selection)
+
+  if (conversationId) {
+    socket.emit('join_conversation', { conversationID: conversationId })
+    fetchMessages(conversationId)
+  }
+
+  if (msgData.alert) {
+    setMessages(prev => prev.map(msg => msg.id === msgData.id ? { ...msg, alert: false } : msg))
+  }
+}
 
   //handle closing a converstaion
   const handleCloseConversation = () => {
-    setSelectedConversation(null); //clear selecttion
-    setAutoOpenEnabled(false); //disable auto open until view changes
-  };
+    const socket = getSocket()
+    const prevId = selectedConversation?.conversationId
+    if (prevId) {
+      socket.emit('leave_conversation', { conversationID: prevId })
+    }
+    setSelectedConversation(null)
+    setAutoOpenEnabled(false)
+  }
 
   //handle send message function
-  const handleSendMessage = () => {
-    if (newMessage.trim() === "") return; //dont send empty message
-
-    const message = {
+  const handleSendMessage = async () => {
+    console.log('clicked')
+    if (newMessage.trim() === "") return
+    const conversationId = selectedConversation?.conversationId
+    console.log('[send] convoId:', conversationId, 'text:', newMessage)
+    if (!conversationId) return
+  
+    const optimistic = {
       id: Date.now(),
-      profilePic: null, //no profile pic for sent messages
+      profilePic: null,
       user: "You",
       message: newMessage.trim(),
       time: "now",
       alert: false,
-      sender: "sent" //mark as sent message
-    };
-    
-    //Add message to specefic convo thread
+      sender: "sent"
+    }
+  
+    // Optimistic: append in the correct thread
     setConversationThreads(prev => ({
       ...prev,
-      [selectedConversation.id]: [...prev[selectedConversation.id], message]
-    }));
-
-    //check if user exists in messgs
-    const userExists = messages.some(msg => msg.id === selectedConversation.id);
-    
-    if (userExists) {
-      // message preview update to latest messg for existing user
-      setMessages((prev => prev.map(msg => msg.id === selectedConversation.id
-        ? {...msg, message: `You: ${newMessage.trim()}`, time: "now", alert: false}
-        : msg
-      )));
-    } else {
-      //restore use to messgs
-      setMessages((prev => [
-        {
-          id: selectedConversation.id,
-          profilePic: selectedConversation.profilePic,
-          user: selectedConversation.user,
-          message: `You: ${newMessage.trim()}`,
-          time: "now",
-          alert: false,
-          isOnline: selectedConversation.isOnline
-        },
-        ...prev
-      ]));
+      [conversationId]: [...(prev[conversationId] || []), optimistic]
+    }))
+    // Update preview
+    setMessages(prev => prev.map(m => m.id === selectedConversation.id
+      ? { ...m, message: `You: ${newMessage.trim()}`, time: "now", alert: false }
+      : m
+    ))
+    setNewMessage("")
+  
+    try {
+      await apiPost(`/api/conversations/${conversationId}/message`, { content: optimistic.message })
+      // Recipient will get WS new_message; this tab is already updated optimistically
+    } catch (e) {
+      console.error('Send failed:', e)
+      // Optional: rollback optimistic append here
     }
-
-    setNewMessage(""); //clear input
-
-    //Scroll to bottom after sending
-    setTimeout(() => scrollToBottom(), 100);
-  };
+  }
 
   //handle enter key
   const handleKeyPress = (e) => {
@@ -246,7 +380,7 @@ const Messages = () => {
   //filter mesages based on view type
   const filteredMessages = view === 'all' 
   ? messages
-  : usersData.filter(user => user.isOnline); //show users
+  : messages.filter(user => onlineIds.has(String(user.id))); //show users
     
   return (
     <div className="flex flex-row relative border border-neutral-800 rounded-[20px] min-w-[950px] min-h-[90%] shadow-md p-2 pb-4 bg-neutral-200 text-neutral-900 dark:text-white dark:bg-gray-900 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
@@ -297,9 +431,10 @@ const Messages = () => {
                   message={messageObj ? messageObj.message : ""}
                   time={messageObj ? messageObj.time : ""}
                   alert={messageObj ? messageObj.alert : false}
-                  isOnline={item.isOnline}
-
-                  onDelete={view === 'all' ? () => handleDelete(index) : undefined}
+                  isOnline={onlineIds.has(String(item.id))}
+                  status={userStatus.get(String(item.id)) || 'active'}
+                  
+                  onDelete={view === 'all' ? () => handleDeleteConversation() : undefined}
                   onOpenConversation={() => handleOpenConversation(item)}
                   isSelected={selectedConversation ?.id === item.id} //check if this messg is selelcted
                   showMessagePreview={view === 'all'}
@@ -321,7 +456,8 @@ const Messages = () => {
                   message=""
                   time=""
                   alert={false}
-                  isOnline={item.isOnline}
+                  isOnline={onlineIds.has(String(item.id))}
+                  status={userStatus.get(String(item.id)) || 'active'}
                   onOpenConversation={() => handleOpenConversation(item)}
                   isSelected={selectedConversation?.id === item.id}
                   showMessagePreview={false}
@@ -357,8 +493,10 @@ const Messages = () => {
               </h2>
               
               <div className='flex items-center'>
-                <div className='w-2.5 h-2.5 mr-2 bg-green-500 rounded-full'></div>
-                <p className='text-neutral-700 text-sm dark:text-neutral-400'>Active now</p>
+              <div className={`w-2.5 h-2.5 mr-2 rounded-full ${selectedDotClass}`}></div>
+              <p className='text-neutral-700 text-sm dark:text-neutral-400'>
+                {selectedText}
+              </p>
               </div>
             </div>
 
@@ -373,7 +511,7 @@ const Messages = () => {
           {/* Dynamic Messages display */}
           <div className='flex-1 p-4 bg-neutral-300 overflow-y-auto  dark:bg-neutral-900' style={{maxHeight: '400px'}}>
             {/* Display logic - shows only selected conversation */}
-            {conversationThreads[selectedConversation.id]?.map((msg) => (
+            {conversationThreads[selectedConversation.conversationId]?.map((msg) => (
               <div key={msg.id}>
                 {msg.sender === "sent" ? (
                   //Sent messages (right side)

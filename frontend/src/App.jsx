@@ -13,39 +13,272 @@ import Tasks from './pages/Tasks';
 import Profile from './pages/Profile';
 import Notification from './pages/Notification';
 import Messages from './pages/Messages';
+import { fetchCurrentUser, getCurrentUser } from './utils/auth_utils';
+import { useEffect, useRef, useState } from 'react';
+import { logoutAcc } from './utils/auth_utils';
+import { apiPost } from './utils/api_utils';
+import { initPresenceListeners, getSocket } from './utils/websocket_utils';
+
+
 
 
 function App() {
+  console.log('🚀 App component rendering...')
 
-  //Checks if the token is not expired and directs the user to login if it is
-  // axios.interceptors.response.use(
-  //   response => response,
-  //   error => {
-  //     if (error.response?.status === 401){
-  //       console.log("Your token is expired!")
-  //       localStorage.removeItem('token');  
-  //       window.location.href = '/login'
-  //     }
-  //     return Promise.reject(error);
-  //   }
-  // )
+  const [authReady, setAuthReady] = useState(false)
+  const [authTick, setAuthTick] = useState(0)
+  
+  console.log('🔍 Current state - authReady:', authReady, 'authTick:', authTick)
+  const awayTimeRef = useRef(null)
+  const lastStatusRef = useRef('active')
+  const mouseMoveThrottleRef = useRef(false)
+
+  // Monitor authReady changes
+  useEffect(() => {
+    console.log('🔄 authReady changed to:', authReady)
+  }, [authReady])
 
 
+  const handleMouse = async () => {
+    if (localStorage.getItem('user')) {
+      try {
+        // Get existing session ID from localStorage
+        const existingSessionId = localStorage.getItem('session_id')
+        
+        if (existingSessionId) {
+          console.log('Validating existing session:', existingSessionId)
+          
+          // Validate existing session
+          const validationResponse = await apiPost('/api/validate-session', { 
+            session_id: existingSessionId 
+          })
 
-  // If the user is not logged in it will redirect to login page
-    const ProtectedRoute = ({children}) => {
-      // Use authentication check instead of direct localStorage access
-      return isLoggedIn() ? children : <Navigate to="/Login" />
+          if (!validationResponse.success) {
+            console.log('Session Expired! Logging out...')
+            
+            // Clear all storage
+            localStorage.removeItem('session_id')
+            localStorage.removeItem('user')
+            localStorage.removeItem('LoggedIn')
+            sessionStorage.removeItem('user')
+            sessionStorage.removeItem('LoggedIn')
+            
+            // Broadcast logout to other tabs
+            const ch = new BroadcastChannel('auth')
+            ch.postMessage({ type: 'logout', ts: Date.now() })
+            ch.close()
+            
+            // Force logout
+            await logoutAcc()
+            
+            // Redirect to login
+            window.location.href = '/login'
+          }
+        }
+      } catch (error) {
+        console.error('Mouse handler error', error)
+      }
     }
+} 
+let isComponentMounted = true
+
+const loadUser = async () => {
+  console.log('🔄 loadUser called, isComponentMounted:', isComponentMounted)
+  try {
+    if (localStorage.getItem('session_id')) {
+      console.log('Found session_id, validating with backend...')
+
+      try {
+        await fetchCurrentUser() // This will call /api/me and validate the session
+        console.log('Session valid, initializing WebSocket...')
+        initPresenceListeners()
+        const socket = getSocket()
+        if (socket.connected) {
+          startInactivityTimer()
+        } else {
+          socket.once('connect', () => {
+            startInactivityTimer()
+          })
+        }
+      } catch (error) {
+        console.log('Session invalid, clearing storage...')
+        // Session is invalid, clear everything
+        localStorage.removeItem('session_id')
+        localStorage.removeItem('user')
+        localStorage.removeItem('LoggedIn')
+        sessionStorage.removeItem('user')
+        sessionStorage.removeItem('LoggedIn')
+      }
+    } else {
+      console.log('No session_id found, user not logged in')
+    }
+  } catch (error) {
+    console.error('Error loading user:', error)
+  } finally {
+    console.log('🔓 Setting authReady to true...')
+    setAuthReady(true)
+    console.log('✅ authReady set to true')
+  }
+}
+
+const startInactivityTimer = () => {
+  try {
+    const socket = getSocket()
+    console.log('[timer] got socket. connected?', socket.connected)
+
+    if (lastStatusRef.current === 'away') return
+
+    if (awayTimeRef.current) clearTimeout(awayTimeRef.current)
+
+    awayTimeRef.current = setTimeout(() => {
+      try {
+        console.log('[timer] emitting check_status (ack)')
+        socket.emit('check_status', (res) => {
+          console.log('[timer] ack:', res)
+          if (res && res.user_status === 'active') {
+            console.log('[timer] emitting status_change: away')
+            socket.emit('status_change', 'away', (ack) => {
+              if (ack && ack.updated) {
+                lastStatusRef.current = 'away'
+              }
+            })
+            return
+          }
+          return
+        })
+      } catch (err) {
+        console.error('[timer] emit error', err)
+        return
+      }
+    }, 5000)
+  } catch (err) {
+    console.error('[timer] setup error', err)
+  }
+}
+
+const resetInactivityTimer = () => {
+  if (!localStorage.getItem('user')) return
+  try {
+    const socket = getSocket()
+    if (socket && socket.connected && lastStatusRef.current !== 'active') {
+      socket.emit('status_change', 'active')
+      lastStatusRef.current = 'active'
+    }
+  } catch {}
+  startInactivityTimer()
+}
+
+const stopInactivityTimer = () => {
+  if (awayTimeRef.current) {
+    clearTimeout(awayTimeRef.current)
+    awayTimeRef.current = null
+  }
+}
+
+useEffect(() => {
+  console.log('mount on appjsxs')
+  
+    // Check if we're on the login page and clear session_id
+    if (window.location.pathname === '/login') {
+      localStorage.removeItem('session_id')
+      localStorage.removeItem('user')
+      localStorage.removeItem('LoggedIn')
+    }
+
+  const ch = new BroadcastChannel('auth');
+
+  //event listeners
+  window.addEventListener('click', handleMouse)
+  window.addEventListener('click', resetInactivityTimer)
+  const onMouseMove = () => {
+    if (mouseMoveThrottleRef.current) return
+    mouseMoveThrottleRef.current = true
+    resetInactivityTimer()
+    setTimeout(() => { mouseMoveThrottleRef.current = false }, 1500)
+  }
+  window.addEventListener('mousemove', onMouseMove)
+  window.addEventListener('keydown', resetInactivityTimer)
+
+  ch.onmessage = async (e) => {
+    const { type } = e.data || {};
+    if (type === 'login') {
+      console.log('login')
+      initPresenceListeners()
+      await fetchCurrentUser()
+      setAuthTick(t => t + 1)
+      const socket = getSocket()
+      if (socket.connected) {
+        startInactivityTimer()
+      } else {
+        socket.once('connect', () => {
+          startInactivityTimer()
+        })
+      }
+    }
+    if (type === 'logout') {
+      // Clear storage immediately
+      localStorage.removeItem('session_id')
+      localStorage.removeItem('user')
+      localStorage.removeItem('LoggedIn')
+      // Force logout
+      logoutAcc()
+      setAuthTick(t => t + 1);
+      stopInactivityTimer()
+    }
+  }
+  
+  loadUser()
+  
+  // Fallback timeout to ensure authReady gets set
+  const fallbackTimeout = setTimeout(() => {
+    console.log('⏰ Fallback timeout - setting authReady to true')
+    setAuthReady(true)
+  }, 3000) // 3 second timeout
+  
+  return () => {
+    clearTimeout(fallbackTimeout)
+    isComponentMounted = false
+    ch.close()
+    window.removeEventListener('click', handleMouse)
+    window.removeEventListener('click', resetInactivityTimer)
+    window.removeEventListener('mousemove', onMouseMove)
+    window.removeEventListener('keydown', resetInactivityTimer)
+    stopInactivityTimer()
+  }
+}, []) 
+
+
+
+// If the user is not logged in it will redirect to login page
+const ProtectedRoute = ({children}) => {
+  console.log('🔒 ProtectedRoute - authReady:', authReady, 'isLoggedIn:', isLoggedIn())
+  if (!authReady) {
+    console.log('⏳ Auth not ready, showing loading...')
+    return <div style={{padding: '20px', fontSize: '18px', color: 'blue'}}>Loading... Please wait</div>
+  } else {
+    const loggedIn = isLoggedIn()
+    console.log('🔐 Auth ready, logged in:', loggedIn)
+    return loggedIn ? children : <Navigate to="/login" />
+  }
+}
+
+//public route
+const PublicOnlyRoute = ({ children }) => { 
+  if (!authReady) return <div>Loading...</div>
+  return isLoggedIn() ? <Navigate to="/Dashboard" replace /> : children
+}
   
   return (
     <Router>
       <Routes>
-        {/* Default Page */}
-        <Route path="/" element={<Navigate to="/Login" />}/>
-        <Route path="/Login" element={<Login />}/>
-
-        
+        <Route 
+        path="/login" 
+        element={
+          <PublicOnlyRoute>
+            <Login />
+          </PublicOnlyRoute>
+        }
+        />
         
         {/* These are the routes that needs authentication */}
         {/* MainLayout wraps other pages */}
@@ -54,6 +287,7 @@ function App() {
             <MainLayout />
           </ProtectedRoute>
           }>
+          <Route index element={<Navigate to="/Dashboard" replace />} />
           <Route path="/Dashboard" element={<Dashboard />} />
           <Route path="/Institutes" element={<Institutes />} />
           <Route path="/Programs" element={<Programs />} />
@@ -62,12 +296,11 @@ function App() {
           <Route path="/Tasks" element={<Tasks />} />
           <Route path="/Documents" element={<Documents />} />
 
-        {/* Profile page */}
+          {/* Profile page */}
          <Route path='/Profile' element={<Profile />}/>
          <Route path='/Notification' element={<Notification />}/>
          <Route path='/Messages' element={<Messages />} />
         </Route>
-
 
       </Routes>
     </Router>

@@ -14,7 +14,7 @@ import{
     faBuilding,
     faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
-
+import axios from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect } from 'react';
 import StatusModal from '../components/modals/StatusModal';
@@ -84,18 +84,23 @@ const Users = () => {
              if(profilePic?.file) formData.append("profilePic", profilePic.file); 
             formData.append("programID", programID);
             formData.append("areaID", areaID)
-            
+
+          console.log("Form data being sent:");
+            for (let [key, value] of formData.entries()) {
+                console.log(key, value);
+            }
+
         try{
 
             //Post request
 
-        const res = await apiPostForm('/api/user', formData,
-            {withCredentials: true});          
+            const res = await apiPostForm('/api/user', formData, {withCredentials: true});
+
             
             setStatusMessage(res.data.message);
             setShowStatusModal(true);
             setStatusType("success");
-
+        
             const selectedProgram = programOption.find(program => program.programID == programID);
             const selectedProgramName = selectedProgram ? selectedProgram.programName: "";
 
@@ -126,7 +131,7 @@ const Users = () => {
             setProgramID("")
             setAreaID("")
             setProfilePic(null)
-            
+        
         } catch(err){
             console.log("Full error object:", err);
             console.log("Error response:", err.response);
@@ -221,12 +226,17 @@ const Users = () => {
     }
     fetchArea();
     }, [])
-
+    
     function removeAndClose() {
         setRemoveUser(true); 
-        setRemoveConfirmation(false); 
-        exitShowDetails(); 
+        setRemoveUser(false); 
+        setShowDetails(false); 
     }
+
+    const handleQuery = (e) => {
+        makeVisible("searchList"); 
+        setSearchQuery(e.target.value); 
+    };
 
     const handleDeleteUser = async () => { 
         const id = selectedUser?.employeeID;
@@ -260,11 +270,6 @@ const Users = () => {
         setShowDetails(false); 
     }
 
-    const handleQuery = (e) => {
-        makeVisible("searchList"); 
-        setSearchQuery(e.target.value); 
-    };
-
     const filteredUsers = submittedUsers.filter(
         user =>
             user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -287,7 +292,7 @@ const Users = () => {
 
     return (
         <div className="min-h-screen p-6 border border-neutral-300 rounded-[20px] bg-neutral-200 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-800 dark:bg-gray-900">
-            {showStatusModal && (
+        {showStatusModal && (
                 <StatusModal message={statusMessage} type={statusType} showModal={showStatusModal} onClick={()=>setShowStatusModal(false)} />
             )}
 
@@ -317,7 +322,7 @@ const Users = () => {
                         <FontAwesomeIcon icon={faPlus} className="mr-2" />
                         Add User
                     </button>
-                </div>
+                        </div>
 
       <div className="relative">
         <FontAwesomeIcon 
@@ -387,8 +392,8 @@ const Users = () => {
               });
             }
           }}
-        />
-      </div>
+                            />
+                        </div>
 
       {/* Form Fields */}
       <div className="grid grid-cols-1 gap-6 lg:w-2/3 md:grid-cols-2">
@@ -497,7 +502,7 @@ const Users = () => {
           >
             <FontAwesomeIcon icon={!hidePassword ? faEye : faEyeSlash} />
           </button>
-        </div>
+                        </div>
 
         {/* Email */}
         <div className="relative">
@@ -517,7 +522,7 @@ const Users = () => {
           >
             Email Address
           </label>
-        </div>
+                        </div>
 
         {/* Contact Number */}
         <div className="relative">
@@ -549,14 +554,14 @@ const Users = () => {
             onChange={(e) => setProgramID(e.target.value)} 
             className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
           >
-            <option value="">Select Program</option>
+                                <option value="">Select Program</option>
             {programOption.map((program) => (
               <option key={program.programID} value={program.programID}>
                 {program.programName}
               </option>
             ))}
-          </select>
-        </div>
+                            </select>
+                        </div>
 
         {/* Area Select */}
         <div className="relative">
@@ -592,7 +597,7 @@ const Users = () => {
       </div>
     </form>
   </div>
-</div>
+                    </div>
 
 
     {/* Users List */}
@@ -639,19 +644,19 @@ const Users = () => {
                 </div>
             ))}
 
-            {showDetails && selectedUser && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                    
-                    <div className={`relative flex w-full max-w-3xl gap-2 p-8 bg-gray-200 border border-gray-200 shadow-xl dark:bg-gray-800 dark:border-gray-700 rounded-2xl ${showDetails ? "fade-in" : "fade-out"}`}>
-                        <div className='absolute flex gap-5 px-5 py-4 top-4 right-4'>
-                        
-                        <button className='text-lg' onClick={() => setRemoveConfirmation(true)}>
-                            <FontAwesomeIcon 
-                                icon={faTrash} 
-                                className='text-gray-500 transition-colors duration-300 cursor-pointer hover:text-red-700 dark:text-gray-400 dark:hover:text-red-500' 
-                                onClick={() => setRemoveConfirmation(true)} 
-                            />
-                        </button>
+                        {showDetails && selectedUser && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                                
+                                <div className={`relative flex w-full max-w-3xl gap-2 p-8 bg-gray-200 border border-gray-200 shadow-xl dark:bg-gray-800 dark:border-gray-700 rounded-2xl ${showDetails ? "fade-in" : "fade-out"}`}>
+                                    <div className='absolute flex gap-5 px-5 py-4 top-4 right-4'>
+                                    
+                                    <button className='text-lg' onClick={() => setRemoveConfirmation(true)}>
+                                        <FontAwesomeIcon 
+                                            icon={faTrash} 
+                                            className='text-gray-500 transition-colors duration-300 cursor-pointer hover:text-red-700 dark:text-gray-400 dark:hover:text-red-500' 
+                                            onClick={() => setRemoveConfirmation(true)} 
+                                        />
+                                    </button>
 
                         <button className='text-lg' onClick={exitShowDetails}>
                             <FontAwesomeIcon 
@@ -678,68 +683,70 @@ const Users = () => {
                         }                                
                     </div>
 
-                    <div className='flex flex-col w-full pl-5'>
-                        <h1 className='mt-5 text-3xl font-bold text-gray-800 dark:text-gray-400'>
-                            {selectedUser.name}
-                        </h1>
+                                <div className='flex flex-col w-full pl-5'>
+                                    <h1 className='mt-5 text-3xl font-bold text-gray-800 dark:text-gray-400'>
+                                        {selectedUser.name}
+                                    </h1>
 
-                        <p className='text-gray-600 text-md dark:text-gray-500'> 
-                            <span className='font-semibold'>Employee ID:</span> {selectedUser.employeeID}
-                        </p>
+                                    <p className='text-gray-600 text-md dark:text-gray-500'> 
+                                        <span className='font-semibold'>Employee ID:</span> {selectedUser.employeeID}
+                                    </p>
 
-                        <p className='mt-5 text-xl italic text-gray-600 text-md dark:text-gray-500'>
-                            <FontAwesomeIcon icon={faBuilding} className='mr-3'/> {selectedUser.programName}
-                        </p>
+                                    <p className='mt-5 text-xl italic text-gray-600 text-md dark:text-gray-500'>
+                                        <FontAwesomeIcon icon={faBuilding} className='mr-3'/> {selectedUser.programName}
+                                    </p>
 
-                        <p className='mt-5 text-xl italic text-gray-600 text-md dark:text-gray-500'>
-                            <FontAwesomeIcon icon={faBookOpen} className='mr-3'/> {selectedUser.areaName}
-                        </p>
+                                    <p className='mt-5 text-xl italic text-gray-600 text-md dark:text-gray-500'>
+                                        <FontAwesomeIcon icon={faBookOpen} className='mr-3'/> {selectedUser.areaName}
+                                    </p>
 
-                        <p className='mt-5 text-xl italic text-gray-600 text-md dark:text-gray-500'>
-                            <FontAwesomeIcon icon={faEnvelope} className='mr-3'/> {selectedUser.email}
-                        </p>
+                                    <p className='mt-5 text-xl italic text-gray-600 text-md dark:text-gray-500'>
+                                        <FontAwesomeIcon icon={faEnvelope} className='mr-3'/> {selectedUser.email}
+                                    </p>
 
-                        <p className='mt-5 text-xl italic text-gray-600 text-md dark:text-gray-500'>
-                            <FontAwesomeIcon icon={faPhone} className='mr-3'/> {selectedUser.contactNum}
-                        </p>
-                        
-                    </div>
-                    
-                </div>
-                    {removeConfirmation && (
-                        <div className='absolute flex flex-col items-center justify-center p-4 border border-gray-200 shadow-lg bg-red-50 w-100 rounded-xl dark:bg-gray-700 dark:border-gray-600 fade-in'>
-                            <div className='flex items-center justify-center mb-4 bg-red-200 rounded-full inset-shadow-sm w-18 h-18 inset-shadow-red-300'>
-                                <FontAwesomeIcon icon={faTriangleExclamation} className="m-auto text-4xl text-red-500"/>
+                                    <p className='mt-5 text-xl italic text-gray-600 text-md dark:text-gray-500'>
+                                        <FontAwesomeIcon icon={faPhone} className='mr-3'/> {selectedUser.contactNum}
+                                    </p>
+                                    
+                                </div>
+                                
                             </div>
-                            
-                            <p className='mb-4 text-lg font-semibold text-gray-800 dark:text-white'>
-                                Are you sure you want to delete this user? 
-                            </p>
-                            <div className='flex gap-4'>
-                                <button 
-                                    className='px-4 py-2 text-white bg-red-500 rounded-lg hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700' 
-                                    onClick={handleDeleteUser}
-                                >
-                                    Yes
-                                </button>
-                                <button 
-                                    className='px-4 py-2 text-gray-800 bg-gray-200 rounded-lg hover:bg-gray-300 dark:text-white dark:bg-gray-600 dark:hover:bg-gray-700' 
-                                    onClick={() => setRemoveConfirmation(false)}
-                                >
-                                    No
-                                </button>
-                            </div>                                    
-                        </div>
+                                {removeConfirmation && (
+                                            <div className='absolute flex flex-col items-center justify-center p-4 border border-gray-200 shadow-lg bg-red-50 w-100 rounded-xl dark:bg-gray-700 dark:border-gray-600 fade-in'>
+                                                <div className='flex items-center justify-center mb-4 bg-red-200 rounded-full inset-shadow-sm w-18 h-18 inset-shadow-red-300'>
+                                                    <FontAwesomeIcon icon={faTriangleExclamation} className="m-auto text-4xl text-red-500"/>
+                                                </div>
+                                                
+                                                <p className='mb-4 text-lg font-semibold text-gray-800 dark:text-white'>
+                                                    Are you sure you want to delete this user? 
+                                                </p>
+                                                <div className='flex gap-4'>
+                                                    <button 
+                                                        className='px-4 py-2 text-white bg-red-500 rounded-lg hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700' 
+                                                        onClick={handleDeleteUser}
+                                                    >
+                                                        Yes
+                                                    </button>
+                                                    <button 
+                                                        className='px-4 py-2 text-gray-800 bg-gray-200 rounded-lg hover:bg-gray-300 dark:text-white dark:bg-gray-600 dark:hover:bg-gray-700' 
+                                                        onClick={() => setRemoveConfirmation(false)}
+                                                    >
+                                                        No
+                                                    </button>
+                                                </div>                                    
+                                            </div>
+                                        )}
+                            </div>
+                        )}
+                        
+
+
+
+                    </div>
                     )}
                 </div>
-            )}
-                    </div>
-                )}
-    </div>
-  </div>
-);
-
-}
-           
+        </div>
+    );
+};
 
 export default Users;

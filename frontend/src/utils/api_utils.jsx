@@ -1,14 +1,21 @@
-import { getAccessToken, getRefreshToken, storeToken, clearTokens } from "./auth_utils"
+import { getRefreshToken, storeToken, clearTokens } from "./auth_utils"
 
 // Base API URL from environment variables for flexibility
 const API_URL = import.meta.env.VITE_APP_API_URL || 'http://localhost:5000'
 
+const getCookie = (name) => {
+    const m = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]+)'))
+    return m ? decodeURIComponent(m[2]) : null
+  }
+const toJson = async (res) => {
+    let data = null
+    try { data = await res.json() } catch {}
+    return { success: res.ok, status: res.status, data }
+}
+
 export const MakeApiCalls = async (endpoint, options = {}) => {
     // Combine base URL with endpoint
     const fullUrl = `${API_URL}${endpoint}`
-
-    // Get current access token for authentication
-    const accessToken = getAccessToken()
 
     // Default headers (don't set Content-Type for FormData)
     const defaultHeaders = {}
@@ -17,14 +24,10 @@ export const MakeApiCalls = async (endpoint, options = {}) => {
         defaultHeaders['Content-Type'] = 'application/json'
     }
 
-    // Add authorization header if token exists
-    if (accessToken) {
-        defaultHeaders['Authorization'] = `Bearer ${accessToken}`
-    }
-
     // Merge provided options with our defaults
     const finalOptions = {
         ...options,
+        credentials: 'include',
         headers: {
             ...defaultHeaders,
             ...options.headers // Allow overriding default headers
@@ -34,128 +37,78 @@ export const MakeApiCalls = async (endpoint, options = {}) => {
     try {
         const response = await fetch(fullUrl, finalOptions)
         
-        
-
-// Handle blob responses (for file downloads)
-if (options.responseType === 'blob') {
-    if (response.ok) {
-        const blob = await response.blob()
-        return {
-            success: true,
-            data: blob,
-            status: response.status,
-            headers: response.headers
-        }
-    }
-    
-    // Error Handling for non-JSON responses
-    let errorData
-    try {
-       
-        const errorText = await response.text()
-        
-        // Try to parse as JSON, but fallback to text
-        try {
-            errorData = JSON.parse(errorText)
-        } catch {
-            errorData = { 
-                message: errorText || `HTTP ${response.status}: ${response.statusText}`,
-                status: response.status 
+        // Handle blob responses (for file downloads)
+        if (options.responseType === 'blob') {
+            if (response.ok) {
+                const blob = await response.blob()
+                return {
+                    success: true,
+                    data: blob,
+                    status: response.status,
+                    headers: response.headers
+                }
             }
-        }
-    } catch {
-        errorData = { message: `HTTP ${response.status}: ${response.statusText}` }
-    }
-    
-    if (response.status === 401) {
-        const refreshToken = getRefreshToken()
-        if (refreshToken && endpoint !== '/api/refresh-token') {
+            
+            // For error responses with blob type, try to parse as JSON first
+            let errorData
             try {
-                const refreshResult = await refreshAccessToken()
-                if (refreshResult.success) {
-                    // Add a retry counter to prevent infinite loops
-                    const retryCount = (options._retryCount || 0) + 1
-                    if (retryCount <= 1) { // Only retry once
-                        return MakeApiCalls(endpoint, { ...options, _retryCount: retryCount })
+                errorData = await response.json()
+            } catch {
+                errorData = { message: `HTTP ${response.status}: ${response.statusText}` }
+            }
+            
+            // Handle authentication failures for blob requests
+            if (response.status === 401) {
+                const refreshToken = getRefreshToken()
+                if (refreshToken && endpoint !== '/api/refresh-token') {
+                    try {
+                        const refreshResult = await refreshAccessToken()
+                        if (refreshResult.success) {
+                            // Retry original request with new token
+                            return MakeApiCalls(endpoint, options)
+                        }
+                    } catch (refreshError) {
+                        console.error('Token refresh failed:', refreshError)
                     }
                 }
-            } catch (refreshError) {
-                console.error('Token refresh failed:', refreshError)
+
+                clearTokens()
+                window.location.href = '/login'
+                return {
+                    success: false,
+                    error: 'Authentication expired. Please login again.',
+                    status: 401
+                }
             }
-        }
-
-        
-        return {
-            success: false,
-            error: 'Authentication expired. Please login again.',
-            status: 401,
-            needsAuth: true // Flag to indicate auth is needed
-        }
-    }
-    
-    return {
-        success: false,
-        error: errorData.message || errorData.error || 'Request failed',
-        data: errorData,
-        status: response.status
-    }
-}
-
-        // Regular JSON response handling
-        const data = await response.json()
-
-        if (response.ok) {
+            
             return {
-                success: true,
-                data,
+                success: false,
+                error: errorData.message || errorData.error || 'Request failed',
+                data: errorData,
                 status: response.status
             }
         }
 
-        // Handle authentication failures
-        if (response.status === 401) {
-            const refreshToken = getRefreshToken()
-            if (refreshToken && endpoint !== '/api/refresh-token') {
-                try {
-                    const refreshResult = await refreshAccessToken()
-                    if (refreshResult.success) {
-                        // Retry original request with new token
-                        return MakeApiCalls(endpoint, options)
-                    }
-                } catch (refreshError) {
-                    console.error('Token refresh failed:', refreshError)
-                }
+        // Regular JSON response handling
+        const data = await response.json()
+
+            if (response.ok) {
+                return { success: true, data, status: response.status}
             }
 
-            clearTokens()
-            window.location.href = '/login'
             return {
                 success: false,
-                error: 'Authentication expired. Please login again.',
-                status: 401
+                error: data.message || data.error || 'Request failed',
+                data,
+                status: response.status
             }
-        }
-
-        // Handle other HTTP errors
-        return {
-            success: false,
-            error: data.message || data.error || 'Request failed',
-            data,
-            status: response.status
-        }
-
-    } catch (error) {
-        console.error('API call failed:', error)
-        return {
-            success: false,
-            error: 'Network error. Please check your connection.',
-            status: 0
-        }
+    }catch(error) {
+        return { success: false, error: 'Network error. Please check your connection.'}
     }
-}
 
+}
 const refreshAccessToken = async () => {
-    const refreshToken = getRefreshToken()
+const refreshToken = getRefreshToken()
     if (!refreshToken) {
         return { success: false, error: 'No refresh token available' }
     }
@@ -187,19 +140,28 @@ const refreshAccessToken = async () => {
     }
 }
 
+
+
 // GET request
 export const apiGet = (endpoint, additionalOptions = {}) => {
     return MakeApiCalls(endpoint, { method: 'GET', ...additionalOptions })
 }
 
 // POST request with JSON body
-export const apiPost = (endpoint, data = {}, additionalOptions = {}) => {
-    return MakeApiCalls(endpoint, {
-        method: 'POST',
-        body: JSON.stringify(data),
-        ...additionalOptions
+export const apiPost = async (url, body) => {
+    const csrf = getCookie('csrf_access_token')
+    const res = await fetch(`${API_URL}${url}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': csrf || ''
+      },
+      body: JSON.stringify(body || {})
     })
-}
+    return toJson(res)
+  }
+
 
 // PUT request with JSON body
 export const apiPut = (endpoint, data = {}, additionalOptions = {}) => {
@@ -211,8 +173,14 @@ export const apiPut = (endpoint, data = {}, additionalOptions = {}) => {
 }
 
 // DELETE request
-export const apiDelete = (endpoint, additionalOptions = {}) => {
-    return MakeApiCalls(endpoint, { method: 'DELETE', ...additionalOptions })
+export const apiDelete = async (url) => {
+  const csrf = getCookie('csrf_access_token')
+  const res = await fetch(`${API_URL}${url}`, {
+    method: 'DELETE',
+    credentials: 'include',
+    headers: { 'X-CSRF-TOKEN': csrf || '' }
+  })
+  return toJson(res)
 }
 
 // POST request with FormData (e.g. file uploads)
