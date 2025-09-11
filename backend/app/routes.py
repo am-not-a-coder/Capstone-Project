@@ -9,7 +9,7 @@ from flask_jwt_extended import create_access_token, create_refresh_token, get_jw
 from flask_jwt_extended import set_access_cookies, set_refresh_cookies, unset_jwt_cookies
 from flask_jwt_extended.exceptions import JWTExtendedException
 from datetime import datetime, timedelta
-from app.nextcloud_service import upload_to_nextcloud, download_from_nextcloud, check_directory, safe_path
+from app.nextcloud_service import upload_to_nextcloud, download_from_nextcloud, delete_from_nextcloud, check_directory, safe_path
 import os
 import re
 import time
@@ -269,6 +269,7 @@ def register_routes(app):
     def create_user():
         # get the user input 
         data = request.form
+        profilePic = request.files.get("profilePic")
         empID = data.get("employeeID").strip()
         password = data.get("password").strip()
         first_name = data.get("fName").strip()
@@ -301,27 +302,79 @@ def register_routes(app):
             return jsonify({'success': False, 'message': 'Contact number is required'}), 400
         elif not re.match(r'^\d{11}$', contactNum):
             return jsonify({'success': False, 'message': 'Contact number must be 11 digits'}), 400
-
-        # Get the profile picture file
-        profilePic = None
-        file = request.files.get("profilePic")
-
-        if file and file.filename:
-            try:
-                filename = secure_filename(file.filename)
+        
+        # === Validate the Profile Picture ===   
+        # Check if file exists
+        if not profilePic:
+            return jsonify({'success': False, 'message': 'No file provided'}), 400
+        
+        # Check if file has a valid name and extension
+        if not profilePic.filename or '.' not in profilePic.filename:        
+            return jsonify({'success': False, 'message': 'Invalid file name'}), 400
+        
+        allowed_extensions = {'jpg', 'png'}
+        file_extension = profilePic.filename.rsplit('.', 1)[1].lower()
+        
+        if file_extension not in allowed_extensions:            
+            return jsonify({'success': False, 'message': 'Invalid file format. Only jpg and png files are allowed.'}), 400
                 
-                # Make sure the folder exists
-                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+        # Get the profile picture file
+        path = f"UDMS_Repository/Profile_Pictures"
+        path = path.strip('/')
 
+<<<<<<< HEAD
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 file.save(file_path)
                 profilePic = f"/uploads/{filename}"
             except Exception as e:
                     print(f"File Upload Error: {e}")
                     return jsonify({'success': False, 'message': 'Failed to upload profile picture'}), 400
+=======
+        encoded_path = safe_path(path)
+>>>>>>> origin/main
 
+        check_directory(encoded_path)
+        
+        filename = f"{empID}.{file_extension}"
+        filename = secure_filename(filename)
 
+        if not filename:
+            return jsonify({'success': False, 'message': 'Invalid filename'}), 400
+        
+        
+        try:
+            # saves the file into repository (Nextcloud)
+            response = upload_to_nextcloud(profilePic, encoded_path)
+            if response.status_code not in (200, 201, 204):
+                return jsonify({
+                    'success': False,
+                    'message': 'Nextcloud profile picture upload failed.',
+                    'status': response.status_code,
+                    'details': response.text
+                }), 400
+            
+            
+            # Checks if the user already exists
+            user = Employee.query.filter_by(employeeID=empID).first()
+            if user:
+                return jsonify({'success': False, "message": "Employee already exists"}), 400
+            else:
+                new_user = Employee(
+                    employeeID = empID,
+                    password = generate_password_hash(password, method="pbkdf2:sha256"),
+                    fName = first_name,
+                    lName = last_name,
+                    suffix = suffix,
+                    email = email,
+                    contactNum = contactNum,
+                    profilePic = f"{path}/{filename}",
+                    programID = programID,
+                    areaID = areaID
+            )
+                db.session.add(new_user)
+                db.session.commit()
 
+<<<<<<< HEAD
         # Checks if the user already exists
         user = Employee.query.filter_by(employeeID=empID).first()
         if user:
@@ -347,6 +400,19 @@ def register_routes(app):
     @jwt_required()
     def get_conversations():
         current_user_id = get_jwt_identity()
+=======
+            return jsonify({
+                'success': True, 
+                'message': 'Employee created successfully!', 
+                'profilePic': f"{path}/{filename}",
+                'status': response.status_code, 
+            }), 200
+            
+        except Exception as e:    
+            return jsonify({'success': False, 'message': f'Failed to upload file: {str(e)}'}), 400                
+
+ 
+>>>>>>> origin/main
         
         # Get conversations where current user participates
         
@@ -594,7 +660,65 @@ def register_routes(app):
                 'success': False, 
                 'message': 'Failed to fetch profile'
             }), 500
+<<<<<<< HEAD
                                                             
+=======
+        
+    # Get profile picture
+    @app.route('/api/user/profile-pic/<string:employeeID>', methods=["GET"])
+    @jwt_required()
+    def get_profile_pic(employeeID):
+        token = request.args.get("token")
+
+        if token:
+            try:
+                decoded = decode_token(token) # validate the token manually
+            except exceptions.JWTDecodeError:
+                return jsonify({"success": False, "message": "Invalid token"}), 401
+            
+        else:
+            verify_jwt_in_request()  # fallback to Authorization header
+
+        NEXTCLOUD_URL = os.getenv("NEXTCLOUD_URL")
+        NEXTCLOUD_USER = os.getenv("NEXTCLOUD_USER")
+        NEXTCLOUD_PASSWORD = os.getenv("NEXTCLOUD_PASSWORD")
+        
+        print(f"Nextcloud config - URL: {NEXTCLOUD_URL is not None}, User: {NEXTCLOUD_USER is not None}, Password: {NEXTCLOUD_PASSWORD is not None}")
+
+
+        if not all([NEXTCLOUD_URL, NEXTCLOUD_USER, NEXTCLOUD_PASSWORD]):
+            return jsonify({
+                'success': False,
+                'message': 'Nextcloud Configuration missing'
+            }), 500
+
+        user = Employee.query.filter_by(employeeID=employeeID).first()
+        if not user or not user.profilePic:
+            print(f"User or profile pic not found for employee: {employeeID}")
+            return jsonify({'success': False, 'message': 'Profile Picture not found'}), 404
+        
+        print(f"Profile pic path: {user.profilePic}")
+
+        # Fetch from nextcloud
+        response = download_from_nextcloud(user.profilePic)
+        print(f"Nextcloud response status: {response.status_code}")        
+           
+        if response.status_code == 200:
+            return Response(
+                response.iter_content(chunk_size=8192),
+                content_type=response.headers.get("Content-Type", "image/jpeg"),
+                headers={
+                    "Content-Disposition": f'inline; filename="{employeeID}.jpg"'
+                }
+            )
+        else:
+            return jsonify({
+                'success': False,
+                'status': response.status_code,
+                'detail': response.text
+            }), response.status_code
+
+>>>>>>> origin/main
     #Get the users 
     @app.route('/api/users', methods=["GET"])
     @jwt_required()
@@ -615,10 +739,9 @@ def register_routes(app):
                       Employee.profilePic,
                       Employee.isAdmin,
                       Employee.isOnline,
-                  ).all()
-                  
-                )
-
+                  ).all()                
+                )        
+        
         user_list = []
         for user in users:
             user_data = {
@@ -629,21 +752,13 @@ def register_routes(app):
                 'name': f"{user.fName} {user.lName} {user.suffix or ''}",
                 'email': user.email,
                 'contactNum': user.contactNum,
-                'profilePic': user.profilePic,
+                'profilePic': f"/api/user/profile-pic/{user.employeeID}" if user.profilePic else None,
                 'isAdmin': user.isAdmin,
                 'isOnline': user.isOnline
             } 
+        
             user_list.append(user_data)
         return jsonify({"users" : user_list}), 200
-    
-    # Get the uploaded file by filename
-    @app.route('/uploads/<filename>', methods=["GET"])
-    def get_uploaded_file(filename):
-        try:
-            return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=False)
-        except FileNotFoundError:
-            return jsonify({'error': 'File not found'}), 404
-
     
                                         #PROGRAM PAGE ROUTES
     
@@ -967,6 +1082,7 @@ def register_routes(app):
                 Criteria.criteriaID,
                 Criteria.criteriaContent,
                 Criteria.criteriaType,
+                Criteria.rating,
                 Document.docID,
                 Document.docName,
                 Document.docType,
@@ -1004,7 +1120,8 @@ def register_routes(app):
                         'inputs': [],
                         'processes': [],
                         'outcomes': [],
-                }, 
+                },  
+                    
             }
             
             if row.criteriaContent:
@@ -1013,7 +1130,8 @@ def register_routes(app):
                     'content': row.criteriaContent,
                     'docID': row.docID,
                     'docName': row.docName,
-                    'docPath': row.docPath
+                    'docPath': row.docPath,
+                    'rating': row.rating
                 }
 
             match row.criteriaType:
@@ -1170,7 +1288,7 @@ def register_routes(app):
             file_url = f"/uploads/{filename}"
             
             # saves the file into repository (Nextcloud)
-            response = upload_to_nextcloud(file, path)
+            response = upload_to_nextcloud(file, encoded_path)
             if response.status_code not in (200, 201, 204):
                 return jsonify({
                     'success': False,
@@ -1244,6 +1362,173 @@ def register_routes(app):
             'users': users_data
         })
 
+    @app.route('/api/accreditation/delete_file/<int:criteriaID>', methods=["DELETE"])
+    @jwt_required()
+    def delete_file(criteriaID):
+        try:
+            criteria = Criteria.query.get(criteriaID)
+            if not criteria or not criteria.docID:
+                return jsonify({'success': False, 'message': 'No document linked to this criteria'}), 404
+            
+            document = Document.query.get(criteria.docID)
+            if not document:
+                return jsonify({'success': False, 'message': 'Document not found'}), 404
+            
+            # Delete from Nextcloud
+            response = delete_from_nextcloud(document.docPath)
+            if response.status_code not in (200, 204):
+                return jsonify({
+                    'success': False,
+                    'message': 'Nextcloud deletion failed.',
+                    'status': response.status_code,
+                    'details': response.text
+                }), 400
+            
+            # Remove link from criteria
+            criteria.docID = None
+            db.session.delete(document)  # Delete document record
+            db.session.commit()
+            
+            return jsonify({'success': True, 'message': 'Document deleted successfully'}), 200
+            
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': f'Failed to delete document: {str(e)}'}), 500
+
+
+
+    # Rate criteria
+    @app.route('/api/accreditation/rate/criteria', methods=["POST"])
+    def save_rating():
+        data = request.get_json()    
+        ratings = data.get("ratings", {})        
+
+        for criteriaID, rating in ratings.items():     
+            rating = float(rating)       
+            criteria = Criteria.query.get(criteriaID)
+            if not criteria:
+                return jsonify({'success': False, 'message': f'Criteria ID {criteriaID} not found'}), 404
+            criteria.rating = rating
+
+            db.session.add(criteria)
+            db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Criteria Rated Successfully!' }), 200
+    
+    # Get criteria ratings by program code and subarea ID
+    @app.route('/api/accreditation/rate/criteria/<string:programCode>/<string:subareaID>', methods=["GET"])
+    def get_criteria_ratings(programCode, subareaID):
+        criteria = (
+            db.session.query(
+                Criteria.criteriaID,
+                Criteria.criteriaContent,
+                Criteria.criteriaType,
+                Criteria.rating,
+                Document.docID,
+                Document.docName,
+                Document.docPath
+            )
+            .outerjoin(Document, Criteria.docID == Document.docID)
+            .join(Subarea, Criteria.subareaID == Subarea.subareaID)
+            .join(Area, Subarea.areaID == Area.areaID)
+            .join(Program, Area.programID == Program.programID)
+            .filter(Program.programCode == programCode, Subarea.subareaID == subareaID)
+            .all()
+        )
+
+        grouped = {
+            "inputs": [],
+            "processes": [],
+            "outcomes": []
+        }
+
+        for c in criteria:
+            criteria_data = {
+                "criteriaID": c.criteriaID,
+                "content": c.criteriaContent,
+                "docID": c.docID,
+                "docName": c.docName,
+                "docPath": c.docPath,
+                "rating": c.rating
+            }
+
+            match c.criteriaType:
+                case "Inputs":
+                    grouped["inputs"].append(criteria_data)
+                case "Processes":
+                    grouped["processes"].append(criteria_data)
+                case "Outcomes":
+                    grouped["outcomes"].append(criteria_data)
+
+        return jsonify(grouped), 200
+
+    # Save subarea rating
+    
+    @app.route('/api/accreditation/rate/subarea', methods=["POST"])
+    def save_subarea_rate():
+        data = request.get_json()        
+        subareaID = data.get("subareaID")
+        rating = float(data.get("rating"))
+
+        subarea = Subarea.query.get(subareaID)
+        if not subarea: 
+            return jsonify({'success': False, 'message': 'Subarea not found'}), 404
+
+        subarea.rating = rating
+
+        db.session.add(subarea)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Subarea rating saved!' }), 200
+
+
+    # Get subarea ratings by program code and area ID
+    @app.route('/api/accreditation/rate/subarea/<string:programCode>/<string:areaID>', methods=["GET"])
+    def get_subarea_ratings(programCode, areaID):
+        subareas = (
+            db.session.query(
+                Subarea.subareaID,
+                Subarea.subareaName,
+                Subarea.rating            
+            )
+            .join(Area, Subarea.areaID == Area.areaID)
+            .join(Program, Area.programID == Program.programID)
+            .filter(Program.programCode == programCode, Area.areaID == areaID)
+            .all()
+        )
+        subarea_list = []
+
+        for sa in subareas:
+            subarea_data = {
+                'subareaID': sa.subareaID,
+                'subareaName': sa.subareaName,
+                'rating': sa.rating,
+            }
+            subarea_list.append(subarea_data)        
+
+        return jsonify(subarea_list), 200
+
+    
+    @app.route('/api/accreditation/rate/area', methods=["POST"])
+    def save_area_rate():
+        data = request.get_json()        
+        areaID = data.get("areaID")
+        rating = float(data.get("rating"))
+
+        area = Area.query.get(areaID)
+        if not area: 
+            return jsonify({'success': False, 'message': 'Area not found'}), 404
+
+        area.rating = rating
+
+        db.session.add(area)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Area rating saved!' }), 200
+
+        
+
+        
+
+    
             
     @app.route('/api/conversations/<int:conversation_id>/message', methods =['GET'])
     @jwt_required()

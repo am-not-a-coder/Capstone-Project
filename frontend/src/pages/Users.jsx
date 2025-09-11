@@ -19,7 +19,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect } from 'react';
 import StatusModal from '../components/modals/StatusModal';
 
-import { apiDelete, apiGet, apiPostForm } from '../utils/api_utils';
+import { apiDelete, apiGet, apiPostForm, apiGetBlob } from '../utils/api_utils';
 
 const Users = () => {
     // user info
@@ -33,7 +33,10 @@ const Users = () => {
     const [email, setEmail] = useState("");  
     const [contactNum, setContactNum] = useState("");  
     const [profilePic, setProfilePic] = useState(null); 
+    
 
+    const [allAreas, setAllAreas] = useState([]);
+    const [filteredAreaOptions, setFilteredAreaOptions] = useState([]);
     const [programOption, setProgramOption] = useState([]);    
     const [areaOption, setAreaOption] = useState([]);    
     const [visible, makeVisible] = useState("list");  
@@ -51,6 +54,7 @@ const Users = () => {
     const [statusMessage, setStatusMessage] = useState(null); // status message
     const [statusType, setStatusType] = useState("success"); // status type (success/error)
 
+    const accessToken = localStorage.getItem('access_token')
 
     if (removeUser) {
         setSubmittedUsers(submittedUsers.filter(user => user !== selectedUser)); 
@@ -61,12 +65,9 @@ const Users = () => {
 
     const detailsAndSelectedUser = (user) => {
         setSelectedUser(user); 
-        setShowDetails(true); 
+        setShowDetails(true);        
     }
 
-    const previewURL = (file) => {
-        return file ? URL.createObjectURL(file) : "";
-    };
 
     const handleCreateUser = async (e) => {
         e.preventDefault(); 
@@ -112,7 +113,7 @@ const Users = () => {
                     name: `${fName} ${lName} ${suffix}`,
                     email,
                     contactNum,
-                    profilePic,
+                    profilePic: profilePic?.file ? `/api/user/profile-pic/${employeeID}` : null,
                     programID,
                     areaID,
                     programName: selectedProgramName,
@@ -146,28 +147,56 @@ const Users = () => {
 
     useEffect(() => {
     const fetchUsers = async () => {
-        try{                
+        try {                
+            // Get the users
+            const res = await apiGet('/api/users');            
 
-            const res = await apiGet('/api/users');
-            //checking the users before setting
+            if (Array.isArray(res.data.users)) {
+                // Get profile pictures for each user
+                const usersWithPics = await Promise.all(
+                    res.data.users.map(async (user) => {
+                        try {
+                            if (user.profilePic) {
+                                const picRes = await apiGetBlob(`/api/user/profile-pic/${user.employeeID}`);
+                                
+                                // Check if the request was successful
+                                if (picRes.success && picRes.data) {
+                                    console.log("Blob type:", picRes.data.type);
+                                    const objectURL = URL.createObjectURL(picRes.data);
+                                    return { ...user, profilePicUrl: objectURL };
+                                } else {
+                                    console.error(`Failed to load profile pic for ${user.employeeID}:`, picRes.error);
+                                    return { ...user, profilePicUrl: null };
+                                }
+                            }
+                            return { ...user, profilePicUrl: null };
 
-            (Array.isArray(res.data.users)) ? setSubmittedUsers(res.data.users) : setSubmittedUsers([]); 
-        } catch (err){
+                        } catch (error) {
+                            console.error(`Error loading profile pic for ${user.employeeID}:`, error);
+                            return { ...user, profilePicUrl: null };
+                        }
+                    })          
+                );  
+                
+                setSubmittedUsers(usersWithPics);
+            } else {
+                setSubmittedUsers([]);
+            }
+        } catch (err) {
             console.error("Error occurred during user fetching", err);
+            setSubmittedUsers([]); // Set empty array on error
         }
     };
 
     fetchUsers();
+}, []);
 
-    }, [])
-
+   
     useEffect(() => {
     const fetchProgram = async () =>{
 
-
         const res = await apiGet('/api/program', 
             {withCredentials: true}
-
         )
 
         try{
@@ -190,9 +219,9 @@ const Users = () => {
        )
 
        try{
-            Array.isArray(res.data.area) ? setAreaOption(res.data.area) : setAreaOption([]);
+            Array.isArray(res.data.area) ? (setAreaOption(res.data.area), setAllAreas(res.data.area)) : (setAreaOption([]), setAllAreas([]));
         } catch (err) {
-            console.error("Error occurred during area fetching", err)
+            console.error("Error occurred during area fetching", err);
         }
     }
     fetchArea();
@@ -247,6 +276,20 @@ const Users = () => {
             user.email.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    // Filter area options depending on the program
+    useEffect(()=> {
+            if(programID){
+                const filteredAreas = allAreas.filter(
+                (area) => String(area.programID) === String(programID)
+                );
+                setFilteredAreaOptions(filteredAreas);
+                setAreaID("");
+            } else {
+                setFilteredAreaOptions([]);
+            }
+        }, [programID, allAreas]);
+
+
     return (
         <div className="min-h-screen p-6 border border-neutral-300 rounded-[20px] bg-neutral-200 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-800 dark:bg-gray-900">
         {showStatusModal && (
@@ -288,7 +331,7 @@ const Users = () => {
                     />
                     <input 
                         type="text" 
-                        className='py-3 pl-12 pr-4 text-gray-800 placeholder-gray-400 transition-all duration-300 bg-white border border-gray-300 shadow-lg outline-none w-80 dark:bg-gray-800 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white dark:placeholder-gray-500' 
+                        className='py-3 pl-12 pr-4 text-gray-800 placeholder-gray-400 transition-all duration-300 bg-gray-100 border border-gray-300 shadow-lg outline-none w-80 dark:bg-gray-800 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white dark:placeholder-gray-500'
                         onChange={handleQuery} 
                         value={searchQuery} 
                         placeholder='Search users...'
@@ -298,7 +341,7 @@ const Users = () => {
 
     {/* Add User Form */}
     <div className={`${visible === "add" ? "block" : "hidden"} mb-8`}>
-  <div className="p-8 bg-white border border-gray-200 shadow-xl dark:bg-gray-800 rounded-2xl dark:border-gray-700">
+  <div className="p-8 bg-gray-100 border border-gray-200 shadow-xl dark:bg-gray-800 rounded-2xl dark:border-gray-700">
     <h2 className="mb-6 text-2xl font-bold text-gray-800 dark:text-white">Create New User</h2>
     
     <form onSubmit={handleCreateUser} className="flex flex-col gap-8 lg:flex-row">
@@ -306,7 +349,7 @@ const Users = () => {
       {/* Profile Picture Section */}
       <div className="flex flex-col items-center lg:w-1/3">
         <div className="mb-6">
-          {profilePic ? (
+          {profilePic?.preview ? (
             <div className="relative w-48 h-48 group">
               <img 
                 src={profilePic.preview} 
@@ -364,12 +407,12 @@ const Users = () => {
             onChange={(e) => setEmployeeID(e.target.value)} 
             name="employeeID" 
             id="employeeID"
-            className="peer w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
+            className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white peer-valid:top-0 peer-valid:text-xs peer-valid:text-blue-500"
             placeholder=" "
           />
           <label 
             htmlFor="employeeID" 
-            className="absolute left-4 top-3 text-gray-500 dark:text-gray-400 transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-0 peer-focus:text-xs peer-focus:text-blue-500"
+            className="absolute text-gray-500 transition-all left-4 top-3 dark:text-gray-400 peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-0 peer-focus:text-xs peer-focus:text-blue-500 peer-valid:top-0 peer-valid:text-xs peer-valid:text-blue-500"
           >
             Employee ID
           </label>
@@ -384,12 +427,12 @@ const Users = () => {
             onChange={(e) => setFName(e.target.value)} 
             name="fName" 
             id="fName"
-            className="peer w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
+            className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
             placeholder=" "
           />
           <label 
             htmlFor="fName" 
-            className="absolute left-4 top-3 text-gray-500 dark:text-gray-400 transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-0 peer-focus:text-xs peer-focus:text-blue-500"
+            className="absolute text-gray-500 transition-all left-4 top-3 dark:text-gray-400 peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-0 peer-focus:text-xs peer-focus:text-blue-500 peer-valid:top-0 peer-valid:text-xs peer-valid:text-blue-500"
           >
             First Name
           </label>
@@ -404,12 +447,12 @@ const Users = () => {
             onChange={(e) => setLName(e.target.value)} 
             name="lName" 
             id="lName"
-            className="peer w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
+            className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
             placeholder=" "
           />
           <label 
             htmlFor="lName" 
-            className="absolute left-4 top-3 text-gray-500 dark:text-gray-400 transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-0 peer-focus:text-xs peer-focus:text-blue-500"
+            className="absolute text-gray-500 transition-all left-4 top-3 dark:text-gray-400 peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-0 peer-focus:text-xs peer-focus:text-blue-500 peer-valid:top-0 peer-valid:text-xs peer-valid:text-blue-500"
           >
             Last Name
           </label>
@@ -423,12 +466,12 @@ const Users = () => {
             onChange={(e) => setSuffix(e.target.value)} 
             name="suffix" 
             id="suffix"
-            className="peer w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
-            placeholder=" "
+            className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
+            placeholder=" "            
           />
           <label 
             htmlFor="suffix" 
-            className="absolute left-4 top-3 text-gray-500 dark:text-gray-400 transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-0 peer-focus:text-xs peer-focus:text-blue-500"
+            className="absolute text-gray-500 transition-all left-4 top-3 dark:text-gray-400 peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-0 peer-focus:text-xs peer-focus:text-blue-500 peer-valid:top-0 peer-valid:text-xs peer-valid:text-blue-500"
           >
             Suffix (Optional)
           </label>
@@ -443,19 +486,19 @@ const Users = () => {
             onChange={(e) => setPassword(e.target.value)} 
             name="password" 
             id="password"
-            className="peer w-full px-4 py-3 pr-10 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
+            className="w-full px-4 py-3 pr-10 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
             placeholder=" "
           />
           <label 
             htmlFor="password" 
-            className="absolute left-4 top-3 text-gray-500 dark:text-gray-400 transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-0 peer-focus:text-xs peer-focus:text-blue-500"
+            className="absolute text-gray-500 transition-all left-4 top-3 dark:text-gray-400 peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-0 peer-focus:text-xs peer-focus:text-blue-500 peer-valid:top-0 peer-valid:text-xs peer-valid:text-blue-500"
           >
             Password
           </label>
           <button
             type="button"
             onClick={() => setHidePassword(!hidePassword)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+            className="absolute text-gray-500 -translate-y-1/2 right-4 top-1/2 hover:text-gray-700 dark:hover:text-gray-300"
           >
             <FontAwesomeIcon icon={!hidePassword ? faEye : faEyeSlash} />
           </button>
@@ -470,12 +513,12 @@ const Users = () => {
             id="email"
             value={email} 
             onChange={(e) => setEmail(e.target.value)}  
-            className="peer w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
+            className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
             placeholder=" "
           />
           <label 
             htmlFor="email" 
-            className="absolute left-4 top-3 text-gray-500 dark:text-gray-400 transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-0 peer-focus:text-xs peer-focus:text-blue-500"
+            className="absolute text-gray-500 transition-all left-4 top-3 dark:text-gray-400 peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-0 peer-focus:text-xs peer-focus:text-blue-500 peer-valid:top-0 peer-valid:text-xs peer-valid:text-blue-500"
           >
             Email Address
           </label>
@@ -490,12 +533,12 @@ const Users = () => {
             id="contactNum"
             value={contactNum} 
             onChange={(e) => setContactNum(e.target.value)}  
-            className="peer w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
+            className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
             placeholder=" "
           />
           <label 
             htmlFor="contactNum" 
-            className="absolute left-4 top-3 text-gray-500 dark:text-gray-400 transition-all peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-0 peer-focus:text-xs peer-focus:text-blue-500"
+            className="absolute text-gray-500 transition-all left-4 top-3 dark:text-gray-400 peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-0 peer-focus:text-xs peer-focus:text-blue-500 peer-valid:top-0 peer-valid:text-xs peer-valid:text-blue-500"
           >
             Contact Number
           </label>
@@ -509,7 +552,7 @@ const Users = () => {
             value={programID}  
             required 
             onChange={(e) => setProgramID(e.target.value)} 
-            className="peer w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
+            className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
           >
                                 <option value="">Select Program</option>
             {programOption.map((program) => (
@@ -528,14 +571,16 @@ const Users = () => {
             value={areaID} 
             required 
             onChange={(e) => setAreaID(e.target.value)} 
-            className="peer w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
+            className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
           >
                                 <option value="">Select Area</option>
-            {areaOption.map((area) => (
-              <option key={area.areaID} value={area.areaID}>
-                {area.areaNum}
-              </option>
-            ))}
+            {filteredAreaOptions.filter((area, index, self) => 
+              index === self.findIndex(a => a.areaID === area.areaID))
+              .map((area) => (
+                  <option key={area.areaID} value={area.areaID}>
+                  {area.areaName}
+                  </option>
+              ))}
                             </select>
                         </div>
 
@@ -569,14 +614,14 @@ const Users = () => {
                             <div 
                                 key={index}  
                                 onClick={() => detailsAndSelectedUser(user)} 
-                                className="overflow-hidden transition-all duration-300 transform bg-white border border-gray-200 shadow-lg cursor-pointer dark:bg-gray-800 rounded-2xl hover:shadow-2xl hover:scale-105 dark:border-gray-700 group"
+                                className="overflow-hidden transition-all duration-300 transform bg-gray-100 border border-gray-200 shadow-lg cursor-pointer dark:bg-gray-800 rounded-2xl hover:shadow-2xl hover:scale-105 dark:border-gray-700 group"
                             >
                                 <div className="p-6 text-center">
                                     <div className="mb-4">
-                            {user.profilePic ? 
+                            {user.profilePicUrl ? 
                                             <img 
-                                                src={`http://localhost:5000${user.profilePic}`} 
-                                                alt="Profile" 
+                                                src={user.profilePicUrl} 
+                                                alt="Profile"                                                                     
                                                 className='object-cover w-20 h-20 mx-auto transition-colors duration-300 border-gray-200 rounded-full shadow-lg border-3 dark:border-gray-600 group-hover:border-blue-400'
                                             /> : 
                                             <div className="flex items-center justify-center w-20 h-20 mx-auto transition-all duration-300 rounded-full shadow-lg bg-gradient-to-br from-blue-100 to-blue-200 dark:from-gray-600 dark:to-gray-700 group-hover:from-blue-200 group-hover:to-blue-300">
@@ -624,14 +669,14 @@ const Users = () => {
                             </div>
 
                                 <div className="my-auto">
-                                    {selectedUser.profilePic ? 
+                                    {selectedUser.profilePicUrl ? 
                                         <div className="relative w-40 h-40 mx-auto group">
                                         <img 
-                                            src={`http://localhost:5000/${selectedUser.profilePic}`} 
-                                            alt="Profile" 
-                                            className='object-cover mx-auto transition-colors duration-300 border-blue-400 rounded-full shadow-lg border-3 dark:border-gray-600'
+                                            src={selectedUser.profilePicUrl} 
+                                            alt="Profile"                                                   
+                                            className='object-cover mx-auto transition-colors duration-300 border-blue-400 rounded-full shadow-lg aspect-square border-3 dark:border-gray-600'
                                         /> 
-                                        </div>: 
+                                        </div> : 
                                         <div className="flex items-center justify-center w-40 h-40 mx-auto transition-all duration-300 rounded-full shadow-lg bg-gradient-to-br from-blue-200 to-blue-300">
                                             <FontAwesomeIcon icon={faCircleUser} className="text-blue-500 text-7xl " />
                                         </div>

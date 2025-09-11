@@ -2,14 +2,15 @@
   import {
   faStarHalfStroke,
   faCircleXmark,
-  faHouse 
+  faHouse,
+  faStar
   } from '@fortawesome/free-solid-svg-icons';
   import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
   import {useCallback, useEffect, useState} from 'react'
-  import AreaCont from '../components/AreaCont';
+  import AreaContForm from '../components/AreaContForm';
   import SubContForm from '../components/SubContForm';
-  import SelfRateModal from '../components/modals/SelfRateModal';
-  import { apiGet, apiGetBlob } from '../utils/api_utils';
+  
+  import { apiGet, apiGetBlob, apiPost } from '../utils/api_utils';
   import ProgramCard from '../components/ProgramCard'
 
   import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer";
@@ -28,14 +29,16 @@
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [docViewerKey, setDocViewerKey] = useState(0); // Force re-render key
-    const [showSelfRateModal, setShowSelfRateModal] = useState(false);
-    const [showWord, setShowWord] = useState(false); 
-    
-  const [visible, setVisible] = useState("programs");
-  const [selectedProgram, setSelectedProgram] = useState(null);
-  const [selectedArea, setSelectedArea] = useState(null);
-  const [selectedSubarea, setSelectedSubarea] = useState(null);
 
+    const [selfRateMode, setSelfRateMode] = useState(false);   
+    
+    const [visible, setVisible] = useState("programs");
+    const [selectedProgram, setSelectedProgram] = useState(null);
+    const [selectedArea, setSelectedArea] = useState(null);
+    const [selectedSubarea, setSelectedSubarea] = useState(null);
+
+    const [areaRatings, setAreaRatings] = useState({});
+    
     useEffect(() => {
       const fetchProgram = async () => {
         try {
@@ -74,14 +77,14 @@
         const response = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`, 
         {withCredentials: true})
         Array.isArray(response.data) ? setArea(response.data) : setArea([]);
+        console.log("Refreshing areas...")
       } catch(err) {
         console.error('Error refreshing areas:', err);
       }
     }
 
-    const handleFilePreview = useCallback(async (docName, docPath) => {
-      try {
-        console.log('Preview requested for:', docName, docPath);
+    const handleFilePreview = useCallback(async (docName) => {
+      try {        
         
         setIsLoading(true);
         setError(null);
@@ -172,6 +175,7 @@
     setSelectedArea(null);
     setSelectedSubarea(null);
     setShowPreview(false);
+    setSelfRateMode(false);
   }
 
   const handleAreaBreadcrumbClick = () =>{
@@ -190,6 +194,66 @@
   const handleSubareaSelect = (subarea) => {
     setSelectedSubarea(subarea);
   }
+
+      const fetchAreaRating = async (programCode, areaID) => {
+      try {
+        const res = await apiGet(`/api/accreditation/rate/subarea/${programCode}/${areaID}`);
+
+        let total = 0;
+        let count = 0;
+
+        for (const sub of res.data) {
+          if (sub.rating && sub.rating > 0) { // Only count subareas that have been rated
+            total += sub.rating;
+            count++;
+          }
+        }
+
+        const areaAvg = count > 0 ? total / count : 0;
+        
+        // Store rating per area
+        setAreaRatings(prev => ({
+          ...prev,
+          [areaID]: areaAvg
+        }));        
+
+      } catch (err) {
+        console.error("Failed to fetch area rating:", err);
+      }
+    };
+
+    const refreshAreaRating = useCallback(async (programCode, areaID) => {      
+      await fetchAreaRating(programCode, areaID);
+    }, []);
+
+    // Add this to your SubContForm component's rating save function:
+    const onSubareaRatingUpdate = useCallback(() => {
+      if (selectedProgram && selectedArea) {
+        setTimeout(() => {
+          refreshAreaRating(selectedProgram.programCode, selectedArea.areaID);
+        }, 1000); // Small delay to ensure backend is updated
+      }
+    }, [selectedProgram, selectedArea, refreshAreaRating]);
+
+    const computeProgramRating = () => {
+        const ratings = Object.values(areaRatings);
+        if (ratings.length === 0) return 0;
+        const sum = ratings.reduce((acc, r) => acc + r, 0);
+
+        return sum / ratings.length;
+    };
+
+    useEffect(() => {
+      if (selectedProgram && area.length > 0) {        
+        setAreaRatings({}); // Clear existing ratings first
+        
+        // Calculate ratings for all areas
+        area.forEach(a => {
+          fetchAreaRating(selectedProgram.programCode, a.areaID);
+        });
+      }
+    }, [selectedProgram, area]);
+    
 
     return(
     <>
@@ -282,28 +346,17 @@
                   
                 </nav>
               </div>
-               <button
-                onMouseEnter={() => setShowWord(true)}
-                onMouseLeave={() => setShowWord(false)}
-                onClick={() => setShowSelfRateModal(true)}
-                className={`p-3 px-4 text-xl flex items-center transition-all duration-300 cursor-pointer rounded-xl text-neutral-600 bg-gray-300/90 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 inset-shadow-sm inset-shadow-gray-400 dark:text-white dark:bg-gray-950/50`}
-              >
-                <span
-                  className={`transition-all duration-500 overflow-hidden whitespace-nowrap ${ showWord ? "opacity-100 max-w-[150px] mr-2" : "opacity-0 max-w-0 mr-0"}`}
-                >
-                  Self-Rate
-                </span>
+              {visible === "areas" && (
+              <button
+                title='Self Rate'               
+                onClick={() => setSelfRateMode(prev => !prev)}
+                className={`p-3 px-4 text-xl flex items-center transition-all duration-300 cursor-pointer rounded-xl dark:hover:text-zuccini-500/70 inset-shadow-sm inset-shadow-gray-400 dark:text-white dark:bg-gray-950/50 ${selfRateMode ? 'bg-zuccini-500 hover:text-white text-white' : 'bg-gray-300/90 text-neutral-600 hover:text-zuccini-500'}`}
+              >                
 
                 <FontAwesomeIcon icon={faStarHalfStroke} className="z-10" />
               </button>
-
-                {showSelfRateModal && (
-                  <SelfRateModal 
-                    onCreate={refreshAreas} 
-                    setShowSelfRateModal={setShowSelfRateModal} 
-                    onClick={() => setShowSelfRateModal(false)}
-                  />
-                )}
+              )}
+                              
             </div>
 
             {/* Area Containers */}
@@ -332,23 +385,32 @@
                         {area.sort((a, b) => a.areaID - b.areaID)
                         .map((area) => (
                               <div key={area.areaID} className='flex flex-col'>
-                                <AreaCont 
+                                <AreaContForm
                                   title={area.areaName} 
                                   onClick={() => handleDropDown(area)}
                                   onIconClick={() => handleDropDown(area)}
                                   isExpanded={expandedAreaIndex === area.areaID}
-                                  
+                                  selfRateMode={selfRateMode}        
+                                  areaID={area.areaID}    
+                                  programCode={selectedProgram.programCode}     
+                                  areaRating = {areaRatings[area.areaID] ?? 0}   
+                                  onSaveAreaRating={(programCode, areaID) => refreshAreaRating(programCode, areaID)}                                                         
                                 /> 
+                              
                                 <div className={`list-upper-alpha list-inside overflow-hidden transition-all duration-500 ease-in-out ${expandedAreaIndex === area.areaID ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
                                 {Array.isArray(area.subareas) && area.subareas.length > 0 ? (area.subareas.filter(sa => sa.subareaID != null).map((subarea) => (
                                   <SubContForm 
                                     key={subarea.subareaID} 
                                     title={subarea.subareaName} 
                                     criteria={subarea.criteria} 
-                                    onClick={() => {handleSubareaSelect(subarea)}}                           
-                                    onCreate={() => {setShowSelfRateModal(true)}}
-                                    onRefresh={refreshAreas}
+                                    onClick={() => {handleSubareaSelect(subarea)}}                                                               
+                                    onRefresh={() => refreshAreas(selectedProgram.programCode)}
                                     onFilePreview={handleFilePreview}
+                                    programCode = {selectedProgram.programCode} // passes program code
+                                    selfRateMode = {selfRateMode} // passes the self rate mode
+                                    subareaID={subarea.subareaID}                 
+                                    onSubareaRatingUpdate={onSubareaRatingUpdate}                                              
+                                    
                                   />))
                                   ) : (
                                   <div className='flex flex-col items-center justify-center min-h-[150px] p-5 mb-3 text-neutral-800 bg-neutral-300/50 dark:bg-gray-800/50 dark:text-white rounded-2xl'>
@@ -356,9 +418,31 @@
                                   </div>
                                   )
                                 }
-                                </div>
+                                  {selfRateMode && (
+                                    <div 
+                                    className='flex flex-row items-center justify-end p-3 mb-2 ml-5 transition-all duration-300 border shadow-md cursor-pointer rounded-2xl border-neutral-400 text-neutral-800 dark:text-white dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 '>
+                                      <h1 className='mr-3 text-xl italic font-semibold'>Overall Area Rating: </h1>
+                                        <button                                        
+                                          className={`relative flex flex-row items-center align-center p-3 px-15 mr-3 text-sm font-semibold overflow-hidden transition-all duration-300 text-gray-600 bg-gray-200 cursor-pointer rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-900 dark:text-gray-200`} >
+                                          <FontAwesomeIcon icon={faStar} className='mr-3'/>        
+                                          <h1 className='transition-all duration-300 text-xl'>{(areaRatings[area.areaID] ?? 0 ).toFixed(1)}</h1> {/* Rating */}     
+                                        </button>    
+                                    </div>
+                                  )}  
+                                </div>                                
                               </div>
-                            ))}            
+                            ))}          
+                              {selfRateMode && (
+                                  <div 
+                                  className='flex flex-row items-center justify-end min-w-full p-3 mb-2 transition-all duration-300 border shadow-md cursor-pointer border-neutral-400 rounded-2xl text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600'>
+                                    <h1 className='mr-3 text-xl font-semibold'>Overall Rating: </h1>
+                                      <button                                        
+                                        className={`relative flex flex-row items-center align-center p-3 px-15 mr-3 text-sm font-semibold overflow-hidden transition-all duration-300 text-gray-600 bg-gray-200 cursor-pointer rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-900 dark:text-gray-200`} >
+                                        <FontAwesomeIcon icon={faStar} className='mr-3'/>        
+                                        <h1 className='transition-all duration-300 text-xl'>{computeProgramRating().toFixed(1)}</h1> {/* Rating */}     
+                                      </button>    
+                                  </div>
+                                )}  
                       </div>
                     </div>
                   )}

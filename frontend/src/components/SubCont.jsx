@@ -8,7 +8,7 @@ import { useState} from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import UploadModal from './modals/UploadModal';
 
-const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate, onClick, onRefresh, onFilePreview}) => {
+const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate, onClick, onRefresh, onFilePreview, done, toggleDone}) => {
     const [expanded, setExpanded] = useState(false);
     const [criteriaExpand, setCriteriaExpand] = useState(null);
     const [showUpload, setShowUpload] = useState(false);
@@ -19,7 +19,7 @@ const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate,
     const [selectedCriteriaType, setSelectedCriteriaType] = useState(null);
     const [selectedSubareaName, setSelectedSubareaName] = useState(null);
 
-    const [done, setDone] = useState(false);
+    // const [done, setDone] = useState(false);
     // Function to close the modal
     const handleCloseModal = () => {
         setShowUpload(false);
@@ -82,9 +82,11 @@ const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate,
                     </div>
 
                     <div className='flex items-center justify-between gap-5 mr-3'>
-                        <FontAwesomeIcon icon={faCircleCheck}
-                            onClick={() => setDone(!done)}
-                        className={`text-xl ${done ? 'text-zuccini-600' : 'text-neutral-500 '} cursor-pointer`} />
+                        <FontAwesomeIcon
+                        icon={faCircleCheck}
+                        onClick={() => toggleDone(item.criteriaID)}
+                        className={`text-xl ${done[item.criteriaID] ? 'text-zuccini-600' : 'text-neutral-500'} cursor-pointer`}
+                        />
                         <FontAwesomeIcon 
                             icon={faPlus} 
                             onClick={(e) => { 
