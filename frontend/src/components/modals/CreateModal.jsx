@@ -220,7 +220,7 @@ const [statusType, setStatusType] = useState("success"); // status type (success
 
         setCriteria('');
         setCriteriaType('');
-        if (onCreate) onCreate(); // refreshes the areas
+        if (onCreate) onCreate(programCode); // refreshes the areas
 
     }
 

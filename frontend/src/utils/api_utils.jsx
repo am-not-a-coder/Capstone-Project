@@ -1,3 +1,5 @@
+import { getRefreshToken, storeToken, clearTokens } from "./auth_utils"
+
 // Base API URL from environment variables for flexibility
 const API_URL = import.meta.env.VITE_APP_API_URL || 'http://localhost:5000'
 
@@ -104,6 +106,38 @@ export const MakeApiCalls = async (endpoint, options = {}) => {
         return { success: false, error: 'Network error. Please check your connection.'}
     }
 
+}
+const refreshAccessToken = async () => {
+const refreshToken = getRefreshToken()
+    if (!refreshToken) {
+        return { success: false, error: 'No refresh token available' }
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/refresh-token`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${refreshToken}`
+            }
+        })
+
+        const data = await response.json()
+
+        if (response.ok && data.access_token) { 
+            storeToken({
+                access_token: data.access_token,
+                refresh_token: data.refresh_token || refreshToken,
+                user: data.user || JSON.parse(localStorage.getItem('user'))
+            })
+            return { success: true }
+        }
+
+        return { success: false, error: data.message || 'Token refresh failed' }
+
+    } catch (error) {
+        return { success: false, error: 'Network error during token refresh' }
+    }
 }
 
 
