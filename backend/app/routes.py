@@ -376,55 +376,7 @@ def register_routes(app):
             return jsonify({'success': False, 'message': f'Failed to upload file: {str(e)}'}), 400                
 
  
->>>>>>> origin/main
         
-        # Get conversations where current user participates
-        
-        user_conversation_ids = db.session.query(
-            ConversationParticipant.conversationID
-        ).filter(
-            ConversationParticipant.employeeID == current_user_id
-        ).subquery()
-        
-        # Get other participants in those conversations
-        conversations = db.session.query(
-            Conversation.conversationID,
-            Conversation.conversationType,
-            Conversation.createdAt,
-            ConversationParticipant.employeeID.label('other_participant_id'),
-            Employee.fName,
-            Employee.lName,
-            Employee.profilePic
-        ).join(
-            ConversationParticipant, 
-            Conversation.conversationID == ConversationParticipant.conversationID
-        ).join(
-            Employee, 
-            ConversationParticipant.employeeID == Employee.employeeID
-        ).filter(
-            Conversation.conversationID.in_(user_conversation_ids),
-            ConversationParticipant.employeeID != current_user_id
-        ).all()
-        
-        # Format results (same as before)
-        conversations_data = []
-        for conv in conversations:
-            conversations_data.append({
-                'conversationID': conv.conversationID,
-                'otherParticipant': {
-                    'employeeID': conv.other_participant_id,
-                    'name': f"{conv.fName} {conv.lName}",
-                    'profilePic': conv.profilePic
-                },
-                'conversationType': conv.conversationType,
-                'createdAt': conv.createdAt.isoformat() if conv.createdAt else None
-            })
-        
-        return jsonify({
-            'success': True,
-            'conversations': conversations_data
-        }), 200
-
 
     #Reset user password (for fixing invalid password hashes)
     @app.route('/api/user/<string:employeeID>/reset-password', methods=["POST"])
@@ -624,6 +576,9 @@ def register_routes(app):
                 'success': False, 
                 'message': 'Failed to fetch profile'
             }), 500
+        
+    # Get profile picture
+    @app.route('/api/user/profile-pic/<string:employeeID>', methods=["GET"])
     @jwt_required()
     def get_profile_pic(employeeID):
         token = request.args.get("token")
@@ -676,7 +631,6 @@ def register_routes(app):
                 'detail': response.text
             }), response.status_code
 
->>>>>>> origin/main
     #Get the users 
     @app.route('/api/users', methods=["GET"])
     @jwt_required()
@@ -1294,31 +1248,49 @@ def register_routes(app):
     @app.route('/api/accreditation/preview/<filename>', methods=["GET"])   
     @jwt_required()   
     def preview_file(filename):   
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-    
-    @app.route('/api/users/online-status', methods=['GET'])
-    @jwt_required()
-    def get_users_with_status():
-        empID = get_jwt_identity()
-        users = Employee.query.all()
-        online_users = {user.decode('utf-8') for user in redis_client.smembers('online_users')}
-        users_data = []
-        for user in users:
-            status = redis_client.hget('user_status', user.employeeID)
-            status_str = status.decode('utf-8') if status else 'active'
-            users_data.append({
-                'employeeID': user.employeeID,
-                'fName': user.fName,
-                'lName': user.lName,
-                'profilePic': user.profilePic,
-                'online_status': user.employeeID in online_users,
-                'status': status_str
-            })
+        token = request.args.get("token")
+
+        if token:
+            try:
+                decoded = decode_token(token) # validate the token manually
+            except exceptions.JWTDecodeError:
+                return jsonify({"success": False, "message": "Invalid token"}), 401
+            
+        else:
+            verify_jwt_in_request()  # fallback to Authorization header
+
+        NEXTCLOUD_URL = os.getenv("NEXTCLOUD_URL")
+        NEXTCLOUD_USER = os.getenv("NEXTCLOUD_USER")
+        NEXTCLOUD_PASSWORD = os.getenv("NEXTCLOUD_PASSWORD")
         
-        return jsonify({
-            'success': True,
-            'users': users_data
-        })
+
+        if not all([NEXTCLOUD_URL, NEXTCLOUD_USER, NEXTCLOUD_PASSWORD]):
+            return jsonify({
+                'success': False,
+                'message': 'Nextcloud Configuration missing'
+            }), 500
+
+        doc = Document.query.filter_by(docName=filename).first()
+        if not doc:
+            return jsonify({'success': False, 'message': 'File not found.'}), 404    
+
+        # Get the file
+        response = download_from_nextcloud(doc.docPath)
+        
+        if response.status_code == 200:
+            return Response(
+                response.iter_content(chunk_size=8192),
+                content_type = response.headers.get("Content-Type", "application/octet-stream"),
+                headers={
+                    "Content-Disposition": f'inline; filename="{filename}"'
+                }
+            ) 
+        else:
+            return jsonify({
+                'success': False,
+                'status': response.status_code,
+                'detail': response.text 
+            }), response.status_code
 
     @app.route('/api/accreditation/delete_file/<int:criteriaID>', methods=["DELETE"])
     @jwt_required()
@@ -1482,11 +1454,32 @@ def register_routes(app):
         db.session.commit()
         return jsonify({'success': True, 'message': 'Area rating saved!' }), 200
 
-        
 
-        
 
-    
+    @app.route('/api/users/online-status', methods=['GET'])
+    @jwt_required()
+    def get_users_with_status():
+        empID = get_jwt_identity()
+        users = Employee.query.all()
+        online_users = {user.decode('utf-8') for user in redis_client.smembers('online_users')}
+        users_data = []
+        for user in users:
+            status = redis_client.hget('user_status', user.employeeID)
+            status_str = status.decode('utf-8') if status else 'active'
+            users_data.append({
+                'employeeID': user.employeeID,
+                'fName': user.fName,
+                'lName': user.lName,
+                'profilePic': user.profilePic,
+                'online_status': user.employeeID in online_users,
+                'status': status_str
+            })
+        
+        return jsonify({
+            'success': True,
+            'users': users_data
+        })
+
             
     @app.route('/api/conversations/<int:conversation_id>/message', methods =['GET'])
     @jwt_required()
@@ -1581,5 +1574,12 @@ def register_routes(app):
 
         socketio.emit('conversation_deleted', {'conversationID': conversation_id}, room=f'conversation:{conversation_id}')
         return jsonify({'success': True}), 200
+           
+
+
+
+        
+                    
+        
 
     
