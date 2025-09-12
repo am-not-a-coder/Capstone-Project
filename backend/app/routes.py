@@ -322,16 +322,7 @@ def register_routes(app):
         path = f"UDMS_Repository/Profile_Pictures"
         path = path.strip('/')
 
-<<<<<<< HEAD
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(file_path)
-                profilePic = f"/uploads/{filename}"
-            except Exception as e:
-                    print(f"File Upload Error: {e}")
-                    return jsonify({'success': False, 'message': 'Failed to upload profile picture'}), 400
-=======
         encoded_path = safe_path(path)
->>>>>>> origin/main
 
         check_directory(encoded_path)
         
@@ -374,33 +365,6 @@ def register_routes(app):
                 db.session.add(new_user)
                 db.session.commit()
 
-<<<<<<< HEAD
-        # Checks if the user already exists
-        user = Employee.query.filter_by(employeeID=empID).first()
-        if user:
-            return jsonify({'success': False, "message": "Employee already exists"}), 400
-        else:
-            new_user = Employee(
-                employeeID = empID,
-                password = generate_password_hash(password, method="pbkdf2:sha256"),
-                fName = first_name,
-                lName = last_name,
-                suffix = suffix,
-                email = email,
-                contactNum = contactNum,
-                profilePic = profilePic,
-                programID = programID,
-                areaID = areaID
-        )
-            db.session.add(new_user)
-            db.session.commit()
-            return jsonify({'success': True, "message": "Employee created successfully"}), 201  
-
-    @app.route('/api/conversations', methods=['GET'])
-    @jwt_required()
-    def get_conversations():
-        current_user_id = get_jwt_identity()
-=======
             return jsonify({
                 'success': True, 
                 'message': 'Employee created successfully!', 
@@ -660,12 +624,6 @@ def register_routes(app):
                 'success': False, 
                 'message': 'Failed to fetch profile'
             }), 500
-<<<<<<< HEAD
-                                                            
-=======
-        
-    # Get profile picture
-    @app.route('/api/user/profile-pic/<string:employeeID>', methods=["GET"])
     @jwt_required()
     def get_profile_pic(employeeID):
         token = request.args.get("token")
