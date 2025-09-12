@@ -1511,6 +1511,59 @@ def register_routes(app):
             'messages': messages_data
         }), 200
 
+    @app.route('/api/conversations', methods=['GET'])
+    @jwt_required()
+    def get_conversations():
+        current_user_id = get_jwt_identity()
+        
+        # Get conversations where current user participates
+        
+        user_conversation_ids = db.session.query(
+            ConversationParticipant.conversationID
+        ).filter(
+            ConversationParticipant.employeeID == current_user_id
+        ).subquery()
+        
+        # Get other participants in those conversations
+        conversations = db.session.query(
+            Conversation.conversationID,
+            Conversation.conversationType,
+            Conversation.createdAt,
+            ConversationParticipant.employeeID.label('other_participant_id'),
+            Employee.fName,
+            Employee.lName,
+            Employee.profilePic
+        ).join(
+            ConversationParticipant, 
+            Conversation.conversationID == ConversationParticipant.conversationID
+        ).join(
+            Employee, 
+            ConversationParticipant.employeeID == Employee.employeeID
+        ).filter(
+            Conversation.conversationID.in_(user_conversation_ids),
+            ConversationParticipant.employeeID != current_user_id
+        ).all()
+        
+        # Format results (same as before)
+        conversations_data = []
+        for conv in conversations:
+            conversations_data.append({
+                'conversationID': conv.conversationID,
+                'otherParticipant': {
+                    'employeeID': conv.other_participant_id,
+                    'name': f"{conv.fName} {conv.lName}",
+                    'profilePic': conv.profilePic
+                },
+                'conversationType': conv.conversationType,
+                'createdAt': conv.createdAt.isoformat() if conv.createdAt else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'conversations': conversations_data
+        }), 200
+
+
     @app.route('/api/conversations/<int:conversation_id>/message', methods=['POST'])
     @jwt_required()
     def send_message(conversation_id):
