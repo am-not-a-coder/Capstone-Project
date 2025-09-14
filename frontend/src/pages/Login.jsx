@@ -64,10 +64,8 @@ const Login = () => {
                 const payload = { type: 'login', ts: Date.now()}
                 ch.postMessage(payload)
                 
-                // Store session ID from backend response
-                if (response.data.user.sessionID) {
-                    localStorage.setItem('session_id', response.data.user.sessionID)
-                }
+                // JWT tokens are automatically stored in HttpOnly cookies by the backend
+                // No need to manually store session data
                 
                 // Clear any previous errors
                 setError(null)

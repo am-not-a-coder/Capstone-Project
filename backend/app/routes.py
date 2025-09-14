@@ -53,17 +53,13 @@ def register_routes(app):
                 
             if is_valid_password: 
                 
-                #remove this 
+                # Update online status
                 user.isOnline = True
                 db.session.commit()
 
-                session_id = f'{empID}:{int(time.time())}'
-                
-                # Store in Redis
-                redis_client.setex(f'session:{session_id}', 3600, 'active')
+                # Store in Redis for real-time features (optional)
                 redis_client.sadd('online_users', empID)
                 redis_client.hset('user_status', empID, 'active')
-                print(f"Session created: session:{session_id}")  # Debug log
                 try:
                     # Create both access token (15 minutes) and refresh token (7 days)
 
@@ -94,8 +90,7 @@ def register_routes(app):
                         'contactNum': user.contactNum,
                         'profilePic': user.profilePic,
                         'isAdmin': user.isAdmin,
-                        'role': 'admin' if user.isAdmin else 'user',
-                        'sessionID': session_id
+                        'role': 'admin' if user.isAdmin else 'user'
                     }
                     
                     resp = jsonify({

@@ -24,19 +24,10 @@ const writeCache = (user) => {
 }
 
 export const isLoggedIn = () => {
-    const token = readCache()
+    const user = readCache()
     // Check if user exists and has required fields
-    if (!token || !token.employeeID) {
-        return false
-    }
-    
-    // Also check if session ID exists in localStorage
-    const sessionId = localStorage.getItem('session_id')
-    if (!sessionId) {
-        return false
-    }
-    
-    return true
+    // JWT tokens are in HttpOnly cookies, so we rely on cached user data
+    return !!(user && user.employeeID)
 }
 
 /**
@@ -71,7 +62,6 @@ export const logoutAcc = async () => {
         // Clear all storage
         localStorage.removeItem('user')
         localStorage.removeItem('LoggedIn')
-        localStorage.removeItem('session_id')
         sessionStorage.removeItem('user')
         sessionStorage.removeItem('LoggedIn')
         sessionStorage.removeItem('welcomeShown')

@@ -35,7 +35,28 @@ export const MakeApiCalls = async (endpoint, options = {}) => {
     try {
         const response = await fetch(fullUrl, finalOptions)
         
-        
+        // Handle 401 Unauthorized - try to refresh token
+        if (response.status === 401 && !endpoint.includes('/login') && !endpoint.includes('/refresh-token')) {
+            try {
+                const refreshResponse = await fetch(`${API_URL}/api/refresh-token`, {
+                    method: 'POST',
+                    credentials: 'include'
+                })
+                
+                if (refreshResponse.ok) {
+                    // Token refreshed, retry original request
+                    return await fetch(fullUrl, finalOptions)
+                } else {
+                    // Refresh failed, redirect to login
+                    window.location.href = '/login'
+                    return { success: false, status: 401, data: { message: 'Session expired' } }
+                }
+            } catch (refreshError) {
+                console.error('Token refresh failed:', refreshError)
+                window.location.href = '/login'
+                return { success: false, status: 401, data: { message: 'Session expired' } }
+            }
+        }
 
 // Handle blob responses (for file downloads)
 if (options.responseType === 'blob') {
