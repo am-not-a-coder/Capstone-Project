@@ -1,5 +1,6 @@
 from app import db
 from datetime import datetime
+from sqlalchemy.dialects.postgresql import TSVECTOR
 
 class Employee(db.Model):
     __tablename__ = 'employee'
@@ -77,9 +78,11 @@ class Document(db.Model):
     employeeID = db.Column(db.Integer, nullable=False)
     docName = db.Column(db.String(150), nullable=False)
     docType = db.Column(db.String(50), nullable=False)
-    docTag = db.Column(db.String(50), nullable=False)
+    docTag = db.Column(db.String(50))
     docPath = db.Column(db.Text)
     isApproved = db.Column(db.Boolean, default=False)
+    content = db.Column(db.Text)
+    search_vector = db.Column(TSVECTOR)
 
     criteria = db.relationship("Criteria", back_populates="document")
 

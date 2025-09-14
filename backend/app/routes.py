@@ -1,15 +1,15 @@
 import json
-from flask import jsonify, request, session, send_from_directory, current_app, Response
-from flask_migrate import current
+from flask import jsonify, request, current_app, Response
 from app.models import Employee
 from app import db, redis_client, socketio
-from werkzeug.security import check_password_hash, generate_password_hash, _hash_internal
+from werkzeug.security import check_password_hash, generate_password_hash, _hash_internal                        
 from werkzeug.utils import secure_filename
-from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, decode_token, exceptions, verify_jwt_in_request
+from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, decode_token, exceptions, verify_jwt_in_request                                
 from flask_jwt_extended import set_access_cookies, set_refresh_cookies, unset_jwt_cookies
 from flask_jwt_extended.exceptions import JWTExtendedException
-from datetime import datetime, timedelta
-from app.nextcloud_service import upload_to_nextcloud, download_from_nextcloud, delete_from_nextcloud, check_directory, safe_path
+from datetime import timedelta
+from smart_search import extract_pdf, extract_docs, extract_excel
+from app.nextcloud_service import upload_to_nextcloud, preview_from_nextcloud, delete_from_nextcloud, check_directory,safe_path, list_files_from_nextcloud, preview_file_nextcloud, download_file_nextcloud, rename_file_nextcloud
 import os
 import re
 import time
@@ -613,7 +613,7 @@ def register_routes(app):
         print(f"Profile pic path: {user.profilePic}")
 
         # Fetch from nextcloud
-        response = download_from_nextcloud(user.profilePic)
+        response = preview_from_nextcloud(user.profilePic)
         print(f"Nextcloud response status: {response.status_code}")        
            
         if response.status_code == 200:
@@ -1138,10 +1138,7 @@ def register_routes(app):
         file_type = request.form.get("fileType")
         file_name = request.form.get("fileName")
         criteria_id = request.form.get("criteriaID")
-        
-        file_type = data.get("fileType")
-        file_name = data.get("fileName")
-        criteria_id = data.get("criteriaID")
+               
         program_code = data.get("programCode")
         area_name = data.get("areaName")
         subarea_name = data.get("subareaName")
@@ -1160,7 +1157,8 @@ def register_routes(app):
         file_extension = file.filename.rsplit('.', 1)[1].lower()
         
         if file_extension not in allowed_extensions:            
-            return jsonify({'success': False, 'message': 'Invalid file format. Only PDF files are allowed.'}), 400
+            return jsonify({'success': False, 'message': 'Invalid file format. Only PDF files are allowed.'}), 400                
+        
         
         # Get uploader info
         try:
@@ -1188,18 +1186,11 @@ def register_routes(app):
         if not filename:
             return jsonify({'success': False, 'message': 'Invalid filename'}), 400
         
-        try:
-            # Create upload directory
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-
-            # Save file
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            print("Saving file to:", file_path)
-            file.save(file_path)
-            
-            file_url = f"/uploads/{filename}"
-            
-            # saves the file into repository (Nextcloud)
+       
+        
+        
+        try:                   
+            # === Save file to Nextcloud ===
             response = upload_to_nextcloud(file, encoded_path)
             if response.status_code not in (200, 201, 204):
                 return jsonify({
@@ -1208,21 +1199,36 @@ def register_routes(app):
                     'status': response.status_code,
                     'details': response.text
                 }), 400
+                                    
+            # === Extract the text from file ===
+
+            temp_path = f"/tmp/{filename}"
+
+            file.save(temp_path) 
+                # Extract text then remove the file
+            try:
+                text = extract_pdf(temp_path)
+            finally:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            
                                    
             # ==== Create document record ====
 
             # Create database record
             new_document = Document(
-                docName=file_name,
-                docType=file_type,
-                docPath=f"{path}/{filename}",
-                employeeID=uploader.employeeID  
+                docName = file_name,
+                docType = file_type,
+                docPath = f"{path}/{filename}",
+                content = text,
+                employeeID = uploader.employeeID  
             )
             
             db.session.add(new_document)
             db.session.flush() # Get the docID after adding to session
 
             # ==== Link document to criteria ====
+            
             criteria = Criteria.query.get(criteria_id)
 
             if not criteria:
@@ -1230,6 +1236,10 @@ def register_routes(app):
                 return jsonify({'success': False, 'message': 'Criteria not found'}), 404
             
             criteria.docID = new_document.docID  # Link document to criteria
+
+            db.session.execute(
+                f"UPDATE document SET search_vector = to_tsvector('english', docName || ' ' || content) WHERE docID = {new_document.docID}"
+            )
 
             db.session.commit()
             
@@ -1275,7 +1285,7 @@ def register_routes(app):
             return jsonify({'success': False, 'message': 'File not found.'}), 404    
 
         # Get the file
-        response = download_from_nextcloud(doc.docPath)
+        response = preview_from_nextcloud(doc.docPath)
         
         if response.status_code == 200:
             return Response(
@@ -1290,44 +1300,92 @@ def register_routes(app):
                 'success': False,
                 'status': response.status_code,
                 'detail': response.text 
-            }), response.status_code
+            }), response.status_code    
 
-    @app.route('/api/accreditation/delete_file/<int:criteriaID>', methods=["DELETE"])
-    @jwt_required()
-    def delete_file(criteriaID):
+       
+    # === Documents Section ===
+
+    # display all the documents inside nextcloud repo
+    @app.route('/api/documents', methods=["GET"])
+    def list_files():
         try:
-            criteria = Criteria.query.get(criteriaID)
-            if not criteria or not criteria.docID:
-                return jsonify({'success': False, 'message': 'No document linked to this criteria'}), 404
+            tree = list_files_from_nextcloud()
+            return jsonify(tree)
             
-            document = Document.query.get(criteria.docID)
-            if not document:
-                return jsonify({'success': False, 'message': 'Document not found'}), 404
-            
-            # Delete from Nextcloud
-            response = delete_from_nextcloud(document.docPath)
-            if response.status_code not in (200, 204):
+        except Exception as e:
+            return jsonify({"Error": str(e)}), 500
+
+    
+    @app.route('/api/documents/preview/<path:file_path>', methods=["GET"])
+    def preview_file_documents(file_path):
+        return preview_file_nextcloud(file_path)
+    
+    @app.route('/api/documents/download/<path:file_path>', methods=["GET"])
+    def download_file_documents(file_path):
+        return download_file_nextcloud(file_path)
+    
+    @app.route('/api/documents/delete_file/<path:file_path>', methods=["DELETE"])
+    @jwt_required()
+    def delete_file(file_path):
+        try:
+            print(f"Deleting request for: {file_path}")
+
+            response = delete_from_nextcloud(file_path)
+            if response.status_code in (200, 204):
+                Document.query.filter_by(docPath=file_path).delete()
+                db.session.commit()
+                return jsonify({'success': True, 'message': 'File deleted successfully.'}), 200
+            else:
                 return jsonify({
                     'success': False,
-                    'message': 'Nextcloud deletion failed.',
+                    'message': 'Nextcloud deletion failed. Please try again.',
                     'status': response.status_code,
                     'details': response.text
                 }), 400
-            
-            # Remove link from criteria
-            criteria.docID = None
-            db.session.delete(document)  # Delete document record
-            db.session.commit()
-            
-            return jsonify({'success': True, 'message': 'Document deleted successfully'}), 200
-            
         except Exception as e:
-            db.session.rollback()
-            return jsonify({'success': False, 'message': f'Failed to delete document: {str(e)}'}), 500
+            return jsonify({'success': False, 'message': f'Failed to delete document {str(e)}'}), 500
+
+    @app.route('/api/documents/rename', methods=["PUT"])
+    def rename_file():        
+        data = request.get_json()
+        old_path = data.get("oldPath")
+        new_path = data.get("newPath")
+
+        try:
+            response = rename_file_nextcloud(old_path, new_path)
+
+            if response.status_code in (200, 201, 204, 207):
+                # Skip folders                
+                if os.path.splitext(new_path)[1] == "":
+                    return jsonify({
+                        'success': True,
+                        'message': 'Folder renamed in Nextcloud but not tracked in DB.'
+                    }), 200
+
+                # Update DB only if it's a file
+                doc = Document.query.filter_by(docPath=old_path).first()
+                if doc:
+                    doc.docPath = new_path
+                    db.session.commit()
+                else:
+                    new_doc = Document(docPath=new_path, fileName=os.path.basename(new_path))
+                    db.session.add(new_doc)
+                    db.session.commit()
+
+                return jsonify({'success': True, 'message': 'File renamed successfully.'}), 200
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': 'Nextcloud rename failed. Please try again.',
+                    'status': response.status_code,
+                    'details': response.text
+                }), 400
+        except Exception as e:
+            return jsonify({'success': False, 'message': f'Failed to rename document {str(e)}'}), 500
 
 
 
-    # Rate criteria
+    # === Rate criteria ===
     @app.route('/api/accreditation/rate/criteria', methods=["POST"])
     def save_rating():
         data = request.get_json()    
@@ -1479,6 +1537,58 @@ def register_routes(app):
             'success': True,
             'users': users_data
         })
+
+    @app.route('/api/conversations', methods=['GET'])
+    @jwt_required()
+    def get_conversations():
+        current_user_id = get_jwt_identity()
+        
+        # Get conversations where current user participates
+        
+        user_conversation_ids = db.session.query(
+            ConversationParticipant.conversationID
+        ).filter(
+            ConversationParticipant.employeeID == current_user_id
+        ).subquery()
+        
+        # Get other participants in those conversations
+        conversations = db.session.query(
+            Conversation.conversationID,
+            Conversation.conversationType,
+            Conversation.createdAt,
+            ConversationParticipant.employeeID.label('other_participant_id'),
+            Employee.fName,
+            Employee.lName,
+            Employee.profilePic
+        ).join(
+            ConversationParticipant, 
+            Conversation.conversationID == ConversationParticipant.conversationID
+        ).join(
+            Employee, 
+            ConversationParticipant.employeeID == Employee.employeeID
+        ).filter(
+            Conversation.conversationID.in_(user_conversation_ids),
+            ConversationParticipant.employeeID != current_user_id
+        ).all()
+        
+        # Format results (same as before)
+        conversations_data = []
+        for conv in conversations:
+            conversations_data.append({
+                'conversationID': conv.conversationID,
+                'otherParticipant': {
+                    'employeeID': conv.other_participant_id,
+                    'name': f"{conv.fName} {conv.lName}",
+                    'profilePic': conv.profilePic
+                },
+                'conversationType': conv.conversationType,
+                'createdAt': conv.createdAt.isoformat() if conv.createdAt else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'conversations': conversations_data
+        }), 200
 
             
     @app.route('/api/conversations/<int:conversation_id>/message', methods =['GET'])

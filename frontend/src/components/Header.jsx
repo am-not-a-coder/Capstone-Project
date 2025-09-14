@@ -17,10 +17,7 @@ import { getCurrentUser } from '../utils/auth_utils';
 
 
 
-const Header = ({title}) => {
-    //location detection
-    const location = useLocation();
-
+const Header = ({title}) => {    
     const [showProfile , setShowProfile] = useState(false);
     const [showNotification, setShowNotification] = useState(false);
     const [showMessages, setShowMessages] = useState(false);

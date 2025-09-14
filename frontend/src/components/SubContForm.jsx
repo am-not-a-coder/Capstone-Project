@@ -132,7 +132,7 @@ const SubContForm = ({title,  selfRateMode, onClick, onFilePreview, subareaID, p
         {item.docName ? (
             <button
                 onClick={() => {onFilePreview(item.docName, item.docPath)}}
-                className='text-sm font-light text-center cursor-pointer hover:underline break-words whitespace-normal leading-tight w-full'
+                className='w-full text-sm font-light leading-tight text-center break-words whitespace-normal cursor-pointer hover:underline'
             >
                 {item.docName}
             </button>
