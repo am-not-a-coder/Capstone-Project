@@ -10,14 +10,14 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import StatusModal from './StatusModal';
 import { apiPostForm, apiGet } from '../../utils/api_utils';
 
-const UploadModal = ({ onClose, showModal, programCode, areaName, subareaName, criteriaType, criteriaID, onUploadSuccess}) => {
+const UploadModal = ({ onClose, showModal, programCode, areaName, subareaName, criteriaType, criteriaID, onUploadSuccess, setAreas}) => {
 
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
   const fileInputRef = useRef(null);
 
   const [fileType, setFileType] = useState('');
-  const [fileName, setFileName] = useState('');
+  const [fileName, setFileName] = useState('');  
   
   const errorMessage = useRef(null);
 
@@ -107,8 +107,8 @@ const UploadModal = ({ onClose, showModal, programCode, areaName, subareaName, c
     }
   };
 
-  const closeModal = () => {
-    refreshAreas();
+  const closeModal = () => {  
+    refreshAreas(programCode);  
     resetUpload();
     if (onClose) {
       onClose();
@@ -131,7 +131,7 @@ const UploadModal = ({ onClose, showModal, programCode, areaName, subareaName, c
 
   const handleUpload = async () => {
     setIsUploading(true)
-    setUploadProgress(0)
+    setUploadProgress(0)    
 
     const progressInterval = startProgress();
     

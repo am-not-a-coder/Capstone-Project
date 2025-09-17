@@ -3,9 +3,10 @@ import os
 from urllib.parse import quote
 from requests.auth import HTTPBasicAuth
 from io import BytesIO
+from werkzeug.utils import secure_filename
 from flask import Response, stream_with_context, send_file, jsonify
 
-NEXTCLOUD_URL = os.getenv('NEXTCLOUD_URL')
+NEXTCLOUD_URL = os.getenv('HOME_NEXTCLOUD_URL') or os.getenv('NEXTCLOUD_URL')
 NEXTCLOUD_USER = os.getenv('NEXTCLOUD_USER')
 NEXTCLOUD_PASSWORD = os.getenv('NEXTCLOUD_PASSWORD')
 
@@ -13,27 +14,85 @@ def safe_path(path :str):
     # Encode each segment separately to keep `/` intact
     return "/".join(quote(p.strip()) for p in path.split('/'))
 
+
+def build_nextcloud_url(doc_path: str):
+    # Ensure consistent encoding for directories & filename
+    encoded_path = "/".join(quote(p) for p in doc_path.strip("/").split("/"))
+    return f"{NEXTCLOUD_URL.rstrip('/')}/{encoded_path}"
+
+
 # Create folder if it doesn't exists
-def check_directory(path):
-    url = f"{NEXTCLOUD_URL}/{path.strip('/')}"
-    # returns 405 if already exists and 201 if the folder is created
-    response = requests.request("MKCOL", url, auth=(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD))
-    if response.status_code in [201, 405]:
+created_dirs = set()
+def ensure_directories(path: str):   
+    # Remove leading/trailing slashes and split into segments
+    path = path.strip("/")
+    if not path:
         return True
-    else:
-        print("Error in making directory:", response.text)
-        return False
+    
+    segments = path.split("/")
+    current_path = ""
+    
+    for segment in segments:
+        if not segment.strip():  # Skip empty segments
+            continue
+            
+        current_path += "/" + segment.strip()
+        
+        # Skip if we've already created this directory
+        if current_path in created_dirs:
+            continue
+            
+        # Construct the full URL for this directory
+        url = f"{NEXTCLOUD_URL.rstrip('/')}{current_path}"
+        
+        print(f"Creating directory: {url}")
+        
+        try:
+            resp = requests.request(
+                "MKCOL", 
+                url, 
+                auth=(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD),
+                timeout=30
+            )
+            
+            if resp.status_code == 201:
+                # Directory created successfully
+                created_dirs.add(current_path)
+                print(f"Directory created: {current_path}")
+            elif resp.status_code == 405:
+                # Directory already exists
+                created_dirs.add(current_path)
+                print(f"Directory already exists: {current_path}")
+            else:
+                print(f"Error creating directory {current_path}: {resp.status_code} - {resp.text}")
+                return False
+                
+        except requests.exceptions.RequestException as e:
+            print(f"Network error creating directory {current_path}: {e}")
+            return False
+            
+    return True
 
-def upload_to_nextcloud(file, path):
-    target_url = f"{NEXTCLOUD_URL}{path.strip('/')}/{file.filename}"
 
-    response = requests.put(target_url, auth=HTTPBasicAuth(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD), data=file.stream)
+def upload_to_nextcloud(file, path):    
+    filename = secure_filename(file.filename)  # normalized filename
+    target_url = build_nextcloud_url(f"{path}/{filename}")
+
+
+    file_bytes = file.read()
+    file.seek(0)
+    response = requests.put(
+        target_url,
+        auth=HTTPBasicAuth(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD),
+        data=file_bytes
+    )
     return response
+
 
 
 def preview_from_nextcloud(doc_path):
     try:
-        target_url = f"{NEXTCLOUD_URL.rstrip('/')}/{doc_path.strip('/')}"
+        target_url = build_nextcloud_url(doc_path)
 
         response = requests.get(
                 target_url, 

@@ -28,7 +28,7 @@ export const MakeApiCalls = async (endpoint, options = {}) => {
         credentials: 'include',
         headers: {
             ...defaultHeaders,
-            ...options.headers // Allow overriding default headers
+            ...(options.headers || {}) // Allow overriding default headers
         }
     }
 
@@ -144,58 +144,80 @@ const refreshToken = getRefreshToken()
 export const apiGet = (endpoint, additionalOptions = {}) => {
     return MakeApiCalls(endpoint, { method: 'GET', ...additionalOptions })
 }
+// === Common fetch wrapper ===
+const authHeaders = () => {
+  const csrf = getCookie('csrf_access_token');  
+  return {
+    'X-CSRF-TOKEN': csrf || '',    
+  };
+};
 
-// POST request with JSON body
+
+// === POST request with JSON body ===
 export const apiPost = async (url, body) => {
-    const csrf = getCookie('csrf_access_token')
-    const res = await fetch(`${API_URL}${url}`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': csrf || ''
-      },
-      body: JSON.stringify(body || {})
-    })
-    return toJson(res)
-  }
+  const res = await fetch(`${API_URL}${url}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders(),
+    },
+    body: JSON.stringify(body || {})
+  });
+  return toJson(res);
+};
 
+// === PUT request with JSON body ===
+export const apiPut = async (url, body = {}) => {
+  const res = await fetch(`${API_URL}${url}`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders(),
+    },
+    body: JSON.stringify(body || {})
+  });
+  return toJson(res);
+};
 
-// PUT request with JSON body
-export const apiPut = (endpoint, data = {}, additionalOptions = {}) => {
-    return MakeApiCalls(endpoint, {
-        method: 'PUT',
-        body: JSON.stringify(data),
-        ...additionalOptions
-    })
-}
-
-// DELETE request
+// === DELETE request ===
 export const apiDelete = async (url) => {
-  const csrf = getCookie('csrf_access_token')
   const res = await fetch(`${API_URL}${url}`, {
     method: 'DELETE',
     credentials: 'include',
-    headers: { 'X-CSRF-TOKEN': csrf || '' }
-  })
-  return toJson(res)
-}
+    headers: {
+      ...authHeaders(),
+    }
+  });
+  return toJson(res);
+};
 
-// POST request with FormData (e.g. file uploads)
-export const apiPostForm = (endpoint, formData, additionalOptions = {}) => {
-    return MakeApiCalls(endpoint, {
-        method: 'POST',
-        body: formData,
-        ...additionalOptions
-    })
-}
+// === POST request with FormData (e.g. file uploads) ===
+export const apiPostForm = async (url, formData) => {
+  const res = await fetch(`${API_URL}${url}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      ...authHeaders(), // don't set Content-Type manually, browser does it for FormData
+    },
+    body: formData
+  });
+  return toJson(res);
+};
 
+// === GET request for blob/file downloads ===
+export const apiGetBlob = async (url) => {
+  const res = await fetch(`${API_URL}${url}`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: {
+      ...authHeaders(),
+    }
+  });
 
-// GET request for blob/file downloads
-export const apiGetBlob = (endpoint, additionalOptions = {}) => {
-    return MakeApiCalls(endpoint, { 
-        method: 'GET', 
-        responseType: 'blob',
-        ...additionalOptions 
-    })
-}
+  if (!res.ok) {
+    throw new Error(`Download failed: ${res.status}`);
+  }
+  return await res.blob();
+};

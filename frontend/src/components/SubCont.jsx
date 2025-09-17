@@ -8,7 +8,7 @@ import { useState} from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import UploadModal from './modals/UploadModal';
 
-const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate, onClick, onRefresh, onFilePreview, done, toggleDone}) => {
+const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate, onClick, onRefresh, onFilePreview, done, toggleDone, setAreas}) => {
     const [expanded, setExpanded] = useState(false);
     const [criteriaExpand, setCriteriaExpand] = useState(null);
     const [showUpload, setShowUpload] = useState(false);
@@ -18,6 +18,7 @@ const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate,
     const [selectedAreaName, setSelectedAreaName] = useState(null); // State to hold the selected area ID
     const [selectedCriteriaType, setSelectedCriteriaType] = useState(null);
     const [selectedSubareaName, setSelectedSubareaName] = useState(null);
+    
 
     // const [done, setDone] = useState(false);
     // Function to close the modal
@@ -25,6 +26,7 @@ const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate,
         setShowUpload(false);
         setSelectedCriteriaID(null)
         setSelectedProgramCode(null)
+        
     };
 
       const handleUploadTrigger = (criteriaID, criteriaType) => {
@@ -124,6 +126,7 @@ const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate,
         <li className='flex flex-col list-inside'>
             <button 
                 onClick={() => {setExpanded(prev => !prev); if (onClick) onClick();}}
+                
                 className='flex flex-row justify-between p-3 mb-2 ml-5 transition-all duration-300 border shadow-md cursor-pointer rounded-2xl border-neutral-400 text-neutral-800 hover:scale-101 dark:text-white hover:border-neutral-500 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 '>   
                 <h1 className='font-semibold text-md'>{title}</h1>
                 <div className='mr-3'>
@@ -153,6 +156,7 @@ const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate,
                     criteriaType={selectedCriteriaType}
                     subareaName={selectedSubareaName}
                     onUploadSuccess={onRefresh}
+                    setAreas={setAreas}
                 />
             )}
         </li>

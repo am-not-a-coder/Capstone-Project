@@ -51,9 +51,6 @@ def create_app():
     # Import socket handlers to register events
     from . import socket_handlers
 
-    upload_folder = os.path.join(os.getcwd(), 'uploads')
-    app.config['UPLOAD_FOLDER'] = upload_folder
-
     
     return app, socketio
     

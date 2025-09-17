@@ -1,25 +1,29 @@
-#USE python as base image
-FROM python:3.11
+FROM python:3.11-slim
 
-# Install system dependencies (for OCR)
-RUN apt-get update && apt-get install -y \
-    libpq-dev gcc \
-    tesseract-ocr \
-    && rm -rf /var/lib/apt/lists/*
-
-#Set the working directory
 WORKDIR /app
 
-#Copy the required files
-COPY requirements.txt ./
+ 
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    libopenblas-dev \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-#Install the dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+    # Install Basic system dependencies
+COPY requirements-base.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements-base.txt
 
-#Copy the rest of the code
+
+    # Install Machine Learning dependencies
+COPY requirements-ml.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \    
+    pip install --no-cache-dir -r requirements-ml.txt
+
 COPY . .
 
-#Expose the port 
 EXPOSE 5000
 
 CMD ["python", "run.py"]

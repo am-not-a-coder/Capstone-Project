@@ -83,70 +83,66 @@
       }
     }
 
-    const handleFilePreview = useCallback(async (docName) => {
-      try {        
-        
-        setIsLoading(true);
-        setError(null);
-        setDocs([]); // Clear previous documents
-        setShowPreview(true); 
-
-        const response = await apiGetBlob(`/api/accreditation/preview/${encodeURIComponent(docName)}`)
-        if(!response.success) {
-          throw new Error(response.error || "Failed to download the file")
-        }
-
-        // Construct the full URL
-        const fileURL = URL.createObjectURL(response.data);
+  const handleFilePreview = useCallback(async (docName, docPath) => {
+    try {
+      console.log('Preview requested for:', docName, docPath);
       
-        
-        // Helper function to determine file type from filename
-        const getFileType = (fileName) => {
-          const extension = fileName.split('.').pop()?.toLowerCase();
-          const typeMap = {
-            'pdf': 'pdf',
-            'doc': 'doc',
-            'docx': 'docx',
-            'xls': 'xls',
-            'xlsx': 'xlsx',
-            'ppt': 'ppt',
-            'pptx': 'pptx',
-            'txt': 'txt',
-            'csv': 'csv',
-            'jpg': 'jpg',
-            'jpeg': 'jpeg',
-            'png': 'png',
-            'gif': 'gif'
-          };
-          return typeMap[extension] || extension;
-        };
+      setIsLoading(true);
+      setError(null);
+      setDocs([]); // Clear previous documents
+      setShowPreview(true); 
 
-        const newDocument = {
-          uri: fileURL,
-          fileName: docName,
-          fileType: getFileType(docName)
+      const blob = await apiGetBlob(`/api/accreditation/preview/${encodeURIComponent(docName)}`);
+
+      // Construct the full URL
+      const fileURL = URL.createObjectURL(blob);
+
+      // Helper function to determine file type from filename
+      const getFileType = (fileName) => {
+        const extension = fileName.split('.').pop()?.toLowerCase();
+        const typeMap = {
+          'pdf': 'pdf',
+          'doc': 'doc',
+          'docx': 'docx',
+          'xls': 'xls',
+          'xlsx': 'xlsx',
+          'ppt': 'ppt',
+          'pptx': 'pptx',
+          'txt': 'txt',
+          'csv': 'csv',
+          'jpg': 'jpg',
+          'jpeg': 'jpeg',
+          'png': 'png',
+          'gif': 'gif'
         };
-        
-        
-        // Delay to ensure proper state transitions
+        return typeMap[extension] || extension;
+      };
+
+      const newDocument = {
+        uri: fileURL,
+        fileName: docName,
+        fileType: getFileType(docName)
+      };
+
+      // Delay to ensure proper state transitions
+      setTimeout(() => {
+        setDocs([newDocument]);
+        setShowPreview(true);
+        setDocViewerKey(prev => prev + 1);
+
         setTimeout(() => {
-          setDocs([newDocument]);
-          setShowPreview(true);
-          setDocViewerKey(prev => prev + 1); // Force re-render
-          
-          // Force re-render after a short delay
-          setTimeout(() => {
-            setIsLoading(false);
-          }, 500);
-        }, 100);
-        
-      } catch(err){
-        console.error('Preview error:', err);
-        setError(`Failed to load document: ${err.message}`);
-        setIsLoading(false);
-        setShowPreview(false);
-      } 
-    }, []);
+          setIsLoading(false);
+        }, 500);
+      }, 100);
+
+      
+    } catch(err){
+      console.error('Preview error:', err);
+      setError(`Failed to load document: ${err.message}`);
+      setIsLoading(false);
+      setShowPreview(false);
+    } 
+  }, []);
 
     
   const handleDropDown = (area) => {
@@ -425,7 +421,7 @@
                                         <button                                        
                                           className={`relative flex flex-row items-center align-center p-3 px-15 mr-3 text-sm font-semibold overflow-hidden transition-all duration-300 text-gray-600 bg-gray-200 cursor-pointer rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-900 dark:text-gray-200`} >
                                           <FontAwesomeIcon icon={faStar} className='mr-3'/>        
-                                          <h1 className='transition-all duration-300 text-xl'>{(areaRatings[area.areaID] ?? 0 ).toFixed(1)}</h1> {/* Rating */}     
+                                          <h1 className='text-xl transition-all duration-300'>{(areaRatings[area.areaID] ?? 0 ).toFixed(1)}</h1> {/* Rating */}     
                                         </button>    
                                     </div>
                                   )}  
@@ -439,7 +435,7 @@
                                       <button                                        
                                         className={`relative flex flex-row items-center align-center p-3 px-15 mr-3 text-sm font-semibold overflow-hidden transition-all duration-300 text-gray-600 bg-gray-200 cursor-pointer rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-900 dark:text-gray-200`} >
                                         <FontAwesomeIcon icon={faStar} className='mr-3'/>        
-                                        <h1 className='transition-all duration-300 text-xl'>{computeProgramRating().toFixed(1)}</h1> {/* Rating */}     
+                                        <h1 className='text-xl transition-all duration-300'>{computeProgramRating().toFixed(1)}</h1> {/* Rating */}     
                                       </button>    
                                   </div>
                                 )}  

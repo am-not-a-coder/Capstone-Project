@@ -236,15 +236,11 @@ import "../../index.css"
       setDocs([]); // Clear previous documents
       setShowPreview(true); 
 
-      const response = await apiGetBlob(`/api/accreditation/preview/${encodeURIComponent(docName)}`)
-      if(!response.success) {
-        throw new Error(response.error || "Failed to download the file")
-      }
+      const blob = await apiGetBlob(`/api/accreditation/preview/${encodeURIComponent(docName)}`);
 
       // Construct the full URL
-      const fileURL = URL.createObjectURL(response.data);
-    
-      
+      const fileURL = URL.createObjectURL(blob);
+
       // Helper function to determine file type from filename
       const getFileType = (fileName) => {
         const extension = fileName.split('.').pop()?.toLowerCase();
@@ -271,19 +267,18 @@ import "../../index.css"
         fileName: docName,
         fileType: getFileType(docName)
       };
-      
-      
+
       // Delay to ensure proper state transitions
       setTimeout(() => {
         setDocs([newDocument]);
         setShowPreview(true);
-        setDocViewerKey(prev => prev + 1); // Force re-render
-        
-        // Force re-render after a short delay
+        setDocViewerKey(prev => prev + 1);
+
         setTimeout(() => {
           setIsLoading(false);
         }, 500);
       }, 100);
+
       
     } catch(err){
       console.error('Preview error:', err);
@@ -481,6 +476,7 @@ import "../../index.css"
                                     onFilePreview={handleFilePreview}
                                     done={done}
                                     setDone={setDone}
+                                    setAreas={setAreas}
                                     toggleDone={toggleDone}
                                   />))
                                   ) : (

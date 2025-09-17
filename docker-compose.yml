@@ -1,7 +1,7 @@
 services:
   frontend:
     build: ./frontend
-    ports: 
+    ports:
       - "5173:5173"
     environment:
       - REACT_APP_API_URL=http://localhost:5000/api
@@ -11,27 +11,48 @@ services:
       watch:
       - path: ./frontend
         target: /app
-        action: sync 
-    stdin_open: true #for the live reload in react to work
+        action: sync
+    stdin_open: true
     tty: true
+
   backend:
     build: ./backend
     ports:
       - "5000:5000"
-
-    env_file: 
+    env_file:
       - ./backend/.env
-
     develop:
       watch:
       - path: ./backend
         target: /app
         action: sync
+    volumes:
+      - ./uploads:/app/uploads        
+
+  # Comment this out or you're going to build your own nextcloud
+  nextcloud_app:
+    image: nextcloud:29-apache
+    container_name: nextcloud_app
+    restart: always
+    ports:
+      - 8080:80
+    environment:
+      - POSTGRES_HOST=47.84.86.131
+      - POSTGRES_DB=capstone_db
+      - POSTGRES_USER=udm1
+      - POSTGRES_PASSWORD=udmcapstone1!
+      - NEXTCLOUD_ADMIN_USER=admin
+      - NEXTCLOUD_ADMIN_PASSWORD=admin123
+      - NEXTCLOUD_TRUSTED_DOMAINS=localhost
+      - PGID=33
+      - PUID=33
 
     volumes:
-      - ./uploads:/app/uploads
+      - nextcloud_data:/var/www/html  # Named volume instead of bind mount
 
-  redis:
+          
+
+  redis:    
     image: redis:alpine
     ports:
       - '6379:6379'
@@ -40,5 +61,6 @@ services:
     command: redis-server --appendonly yes
 
 volumes:
-    redis_data:
-  
+  nextcloud_data:
+  redis_data:
+  pip-cache:

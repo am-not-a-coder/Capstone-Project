@@ -2,14 +2,15 @@ import json
 from flask import jsonify, request, current_app, Response
 from app.models import Employee
 from app import db, redis_client, socketio
+from sqlalchemy import text
 from werkzeug.security import check_password_hash, generate_password_hash, _hash_internal                        
 from werkzeug.utils import secure_filename
 from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, decode_token, exceptions, verify_jwt_in_request                                
 from flask_jwt_extended import set_access_cookies, set_refresh_cookies, unset_jwt_cookies
 from flask_jwt_extended.exceptions import JWTExtendedException
 from datetime import timedelta
-from smart_search import extract_pdf, extract_docs, extract_excel
-from app.nextcloud_service import upload_to_nextcloud, preview_from_nextcloud, delete_from_nextcloud, check_directory,safe_path, list_files_from_nextcloud, preview_file_nextcloud, download_file_nextcloud, rename_file_nextcloud
+from app.utils.file_extractor import extract_pdf, extract_docs, extract_excel
+from app.nextcloud_service import upload_to_nextcloud, preview_from_nextcloud, delete_from_nextcloud, ensure_directories, safe_path, list_files_from_nextcloud, preview_file_nextcloud, download_file_nextcloud, rename_file_nextcloud
 import os
 import re
 import time
@@ -324,7 +325,7 @@ def register_routes(app):
 
         encoded_path = safe_path(path)
 
-        check_directory(encoded_path)
+        ensure_directories(encoded_path)
         
         filename = f"{empID}.{file_extension}"
         filename = secure_filename(filename)
@@ -1176,22 +1177,23 @@ def register_routes(app):
         path = f"UDMS_Repository/Accreditation/Programs/{program_code}/{area_name}/{subarea_name}/{criteria_type}/{criteria_id}"
         path = path.strip('/')
 
-        encoded_path = safe_path(path)
-
-        check_directory(encoded_path)             
 
         # Generates a secure filename
         filename = secure_filename(file.filename)
 
         if not filename:
             return jsonify({'success': False, 'message': 'Invalid filename'}), 400
-        
-       
-        
-        
-        try:                   
+                       
+        try:            
+             # === Ensures that the directory exists in Nextcloud ===
+            if not ensure_directories(path):
+                return jsonify({
+                    'success': False,
+                    'message': 'Failed to create directory structure in Nextcloud'
+                }), 400
+
             # === Save file to Nextcloud ===
-            response = upload_to_nextcloud(file, encoded_path)
+            response = upload_to_nextcloud(file, path)
             if response.status_code not in (200, 201, 204):
                 return jsonify({
                     'success': False,
@@ -1207,42 +1209,54 @@ def register_routes(app):
             file.save(temp_path) 
                 # Extract text then remove the file
             try:
-                text = extract_pdf(temp_path)
+                extracted_text = extract_pdf(temp_path)
             finally:
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
             
                                    
-            # ==== Create document record ====
+           # ==== Create or update document record ====
+            doc = Document.query.filter_by(docName=file_name).first()
 
-            # Create database record
-            new_document = Document(
-                docName = file_name,
-                docType = file_type,
-                docPath = f"{path}/{filename}",
-                content = text,
-                employeeID = uploader.employeeID  
-            )
-            
-            db.session.add(new_document)
-            db.session.flush() # Get the docID after adding to session
+            if doc:
+                # Update existing doc
+                doc.docPath = f"{path}/{filename}"
+                doc.docName = file_name
+                doc.content = extracted_text
+            else:
+                # Create new doc
+                doc = Document(
+                    docName=file_name,
+                    docType=file_type,
+                    docPath=f"{path}/{filename}",
+                    content=extracted_text,
+                    employeeID=uploader.employeeID
+                )
+                db.session.add(doc)
+                db.session.flush()  # Assign docID before linking
 
             # ==== Link document to criteria ====
-            
             criteria = Criteria.query.get(criteria_id)
 
             if not criteria:
                 db.session.rollback()
                 return jsonify({'success': False, 'message': 'Criteria not found'}), 404
-            
-            criteria.docID = new_document.docID  # Link document to criteria
 
+            criteria.docID = doc.docID  # Always safe, since doc exists now
+
+            # ==== Update search vector ====
             db.session.execute(
-                f"UPDATE document SET search_vector = to_tsvector('english', docName || ' ' || content) WHERE docID = {new_document.docID}"
+                text("""
+                    UPDATE document
+                    SET search_vector = to_tsvector('english', "docName" || ' ' || content)
+                    WHERE "docID" = :doc_id
+                """),
+                {"doc_id": doc.docID}
             )
 
+            # Final commit
             db.session.commit()
-            
+
             return jsonify({
                 'success': True, 
                 'message': 'File uploaded successfully!', 
@@ -1257,30 +1271,14 @@ def register_routes(app):
 
     @app.route('/api/accreditation/preview/<filename>', methods=["GET"])   
     @jwt_required()   
-    def preview_file(filename):   
-        token = request.args.get("token")
-
-        if token:
-            try:
-                decoded = decode_token(token) # validate the token manually
-            except exceptions.JWTDecodeError:
-                return jsonify({"success": False, "message": "Invalid token"}), 401
-            
-        else:
-            verify_jwt_in_request()  # fallback to Authorization header
-
-        NEXTCLOUD_URL = os.getenv("NEXTCLOUD_URL")
-        NEXTCLOUD_USER = os.getenv("NEXTCLOUD_USER")
-        NEXTCLOUD_PASSWORD = os.getenv("NEXTCLOUD_PASSWORD")
+    def preview_file(filename):                       
         
-
-        if not all([NEXTCLOUD_URL, NEXTCLOUD_USER, NEXTCLOUD_PASSWORD]):
-            return jsonify({
-                'success': False,
-                'message': 'Nextcloud Configuration missing'
-            }), 500
-
         doc = Document.query.filter_by(docName=filename).first()
+        if doc:
+            print("DB docPath:", doc.docPath)
+        else:
+            print("No document found with this name")
+
         if not doc:
             return jsonify({'success': False, 'message': 'File not found.'}), 404    
 
