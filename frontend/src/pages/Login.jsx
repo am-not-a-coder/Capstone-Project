@@ -13,8 +13,7 @@ import {
     faEyeSlash
 } from '@fortawesome/free-solid-svg-icons';
 import { cacheUserAfterLogin } from '../utils/auth_utils';
-import { logoutAcc } from '../utils/auth_utils';
-import { initPresenceListeners, getSocket } from '../utils/websocket_utils'
+import OtpInput from '../components/otpInput';
 
 
 const Login = () => {
@@ -27,7 +26,41 @@ const Login = () => {
     const [showPassword, setShowPassword] = useState();
     const [loading, setLoading] = useState(false);
     const EMP_ID_REGEX = /^\d{2}-\d{2}-\d{3}$/
+    //otp
+    const [showOtpModal, setShowOtpModal] = useState(false)
+    const [otpCode, setOtpCode] = useState('')
+    const [otpError, setOtpError] = useState(null)
+    const [otpLoading, setOtpLoading] = useState(false)
+    const [resendCooldown, setResendCooldown] = useState(0);
+    const cooldownSeconds = 30;
 
+    useEffect(() => {
+        if (showOtpModal) setTimeout(() => document.getElementById('otp-0')?.focus(), 0);
+
+        if (!showOtpModal) return;
+        setResendCooldown(cooldownSeconds);
+        const id = setInterval(() => {
+          setResendCooldown((s) => {
+            if (s <= 1) {
+              clearInterval(id);
+              return 0;
+            }
+            return s - 1;
+          });
+        }, 1000);
+        if (!showOtpModal) return;
+        const onKeyDown = (e) => {
+            if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            }
+        };
+        window.addEventListener('keydown', onKeyDown, true);
+        return () => {
+            clearInterval(id);
+            window.removeEventListener('keydown', onKeyDown, true);
+        }
+    }, [showOtpModal]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -61,23 +94,26 @@ const Login = () => {
             const ch = new BroadcastChannel('auth')
 
             if (response.success && response.data.success) {
+                if (response.success && response.data.message === 'OTP email sent succesfully') {
+                    //show otp
+                    setShowOtpModal(true);
+                    setOtpCode('');
+                    setOtpError(null);
+                    toast.dismiss(toastId);
+                    toast.success('OTP sent to your email');
+                    setLoading(false);
+                    ch.close()
+                    return;
+                }
                 const payload = { type: 'login', ts: Date.now()}
                 ch.postMessage(payload)
-                
-                // JWT tokens are automatically stored in HttpOnly cookies by the backend
-                // No need to manually store session data
-                
                 // Clear any previous errors
                 setError(null)
                 await cacheUserAfterLogin()
                 // Navigate to dashboard after successful login
                 toast.dismiss(toastId)
+                toast.success('Logged in successfully');
                 ch.close()
-
-                //call websocket connection
-
-                
-
                 navigate('/Dashboard', {replace: true });
                 
             } else { 
@@ -97,6 +133,57 @@ const Login = () => {
             toast.dismiss(toastId)
         }
     }
+    
+    
+
+    const handleOtpSubmit = async () => {
+        const otp = (otpCode || '').trim();
+        if (otp.length !== 6) {
+          setOtpError('Please enter all 6 digits');
+          return;
+        }
+        setOtpLoading(true);
+        setOtpError('');
+        try {
+          const response = await apiPost('/api/verify-otp', {
+            employeeID: employeeID.trim(),
+            otp
+          });
+          if (response.success && response.data?.success) {
+            setShowOtpModal(false);
+            toast.success('OTP verified. Logging you in...');
+            await cacheUserAfterLogin();
+            navigate('/Dashboard', { replace: true });
+          } else {
+            setOtpError(response.error || response.data?.message || 'Invalid OTP');
+          }
+        } catch {
+          setOtpError('Server error. Please try again.');
+        } finally {
+          setOtpLoading(false);
+        }
+      };
+    
+    const handleResendOtp = async () => {
+        if (resendCooldown > 0) return;
+        try {
+            setOtpError('');
+            const res = await apiPost('/api/login', {
+            employeeID: employeeID.trim(),
+            password: password.trim()
+            });
+            if (res.success && res.data?.success && res.data?.message?.includes('OTP')) {
+            toast.success('New OTP sent to your email');
+            setOtpCode('');
+            setResendCooldown(cooldownSeconds);
+            } else {
+            setOtpError(res.data?.message || 'Could not resend OTP');
+            }
+        } catch {
+            setOtpError('Network error. Try again.');
+        }
+    };
+
 
     const formatEmployeeId = (raw) => {
         const digits = raw.replace(/\D/g, '').slice(0, 7)        // up to 7 digits
@@ -187,9 +274,55 @@ const Login = () => {
                 </form>
             </div>
         </div>
-       
-       
+        {showOtpModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center text-black">
+            <div className="absolute inset-0 bg-black/50" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }} />
+            <div className="relative bg-white dark:bg-gray-700 shadow-2xl rounded-3xl w-full max-w-md overflow-hidden transform transition-transform duration-200"
+         onClick={(e) => e.stopPropagation()}>
+            <div className="p-8 text-center">
+                <div className="mx-auto mb-6 w-40 h-40">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" className="w-full h-full">
+                    <circle cx="200" cy="200" r="150" fill="#3B82F6" />
+                    <circle cx="200" cy="200" r="120" fill="#FFFFFF" />
+                    <circle cx="200" cy="200" r="90" fill="#3B82F6" />
+                    <circle cx="200" cy="200" r="60" fill="#FFFFFF" />
+                    <text x="200" y="200" textAnchor="middle" fill="#2563EB" fontSize="40" fontWeight="bold" dy=".3em">OTP</text>
+                </svg>
+                </div>
 
+                <h2 className="text-2xl font-bold mb-2 text-gray-800 dark:text-white">Verify OTP</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
+                Enter the 6-digit code sent to your email
+                </p>
+
+                <OtpInput value={otpCode} onChange={setOtpCode} />
+
+                {otpError && <div className="text-red-500 text-sm mt-4">{otpError}</div>}
+
+                <div className="text-sm text-gray-600 dark:text-gray-300 my-6">
+                Didn’t receive code?{' '}
+                <button
+                type="button"
+                onClick={handleResendOtp}
+                className={`text-blue-600 hover:underline dark:text-blue-400 ${resendCooldown ? 'opacity-60 cursor-not-allowed' : ''}`}
+                disabled={otpLoading || resendCooldown > 0}
+                >
+                {resendCooldown ? `Resend in ${resendCooldown}s` : 'Resend OTP'}
+                </button>
+                </div>
+
+                <button
+                type="button"
+                onClick={handleOtpSubmit}
+                disabled={otpLoading}
+                className="w-full py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-60"
+                >
+                {otpLoading ? 'Verifying...' : 'Verify OTP'}
+                </button>
+            </div>
+            </div>
+        </div>
+        )}
     </>
     )
 }

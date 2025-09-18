@@ -1,19 +1,23 @@
 import json
-from flask import jsonify, request, session, send_from_directory, current_app, Response
+from tkinter import FALSE
+from flask import jsonify, request, session, send_from_directory, current_app, Response, render_template
 from flask_migrate import current
 from app.models import Employee
-from app import db, redis_client, socketio
+from app import db, redis_client, socketio, mail
 from werkzeug.security import check_password_hash, generate_password_hash, _hash_internal
 from werkzeug.utils import secure_filename
 from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, decode_token, exceptions, verify_jwt_in_request
 from flask_jwt_extended import set_access_cookies, set_refresh_cookies, unset_jwt_cookies
 from flask_jwt_extended.exceptions import JWTExtendedException
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app.nextcloud_service import upload_to_nextcloud, download_from_nextcloud, delete_from_nextcloud, check_directory, safe_path
 import os
 import re
 import time
 import redis
+from app.otp_utils import generate_random
+from flask_mail import Message as MailMessage
+from app.login_handlers import complete_user_login
 from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message
 
 
@@ -52,65 +56,78 @@ def register_routes(app):
                 return jsonify({'success': False, 'message': 'User account has invalid password format. Contact administrator.'}), 400
                 
             if is_valid_password: 
-                
-                # Update online status
-                user.isOnline = True
+                bypass = redis_client.get(f'otp_bypass:{empID}')
+                if bypass:
+                    return complete_user_login(user, empID)
+                else:
+                    otp_code = generate_random()
+                    otp_expiry = datetime.now(timezone.utc) + timedelta(minutes=2)
+                    user.otpcode = otp_code
+                    user.otpexpiry = otp_expiry
                 db.session.commit()
 
-                # Store in Redis for real-time features (optional)
-                redis_client.sadd('online_users', empID)
-                redis_client.hset('user_status', empID, 'active')
-                try:
-                    # Create both access token (15 minutes) and refresh token (7 days)
-
-
-                    access_token = create_access_token(
-                        identity=empID,
-                        expires_delta=timedelta(minutes=15),  # Short-lived for security
-                        additional_claims={
-                            'role': 'admin' if user.isAdmin else 'user',
-                            'firstName': user.fName,
-                            'lastName': user.lName
-                        }
+                    html_body = render_template(
+                        'email/otp.html',
+                        otp=str(otp_code),
+                        user_name=user.fName,
+                        app_name='UDMS',
+                        recipients=user.email,
+                        logo_url='https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fudmwebsite.udm.edu.ph%2Fwp-content%2Fuploads%2F2023%2F11%2Fudm-logo-1.png&f=1&nofb=1&ipt=a0799b507adde1d83ee8939c52524c6fb2053df034c369f55787f6b1d5db7574'
                     )
-                    
-                    refresh_token = create_refresh_token(
-                        identity=empID,
-                        expires_delta=timedelta(days=7)
-                    )
-                    
-                    
-                    user_data = {
-                        'employeeID': user.employeeID,
-                        'name': f"{user.fName} {user.lName}{user.suffix or ''}",
-                        'firstName': user.fName,
-                        'lastName': user.lName,
-                        'suffix': user.suffix,
-                        'email': user.email,
-                        'contactNum': user.contactNum,
-                        'profilePic': user.profilePic,
-                        'isAdmin': user.isAdmin,
-                        'role': 'admin' if user.isAdmin else 'user'
-                    }
-                    
-                    resp = jsonify({
-                        'success': True,
-                        'message': f"Welcome!, {user_data['lastName']}",
-                        'user': user_data
-                    })
-                    set_access_cookies(resp, access_token)
-                    set_refresh_cookies(resp, refresh_token)
-                    return resp
-                
-                except Exception as jwt_error:
-                    current_app.logger.error(f"JWT Error: {jwt_error}")
-                    return jsonify({'success': False, 'message': 'Token generation failed'}), 500
+                    msg = MailMessage('Your UDMS Login OTP Code', recipients=[user.email])
+                    msg.html = html_body
 
+                    redis_client.hset('pending_otps', empID, 'waiting')
+                    mail.send(msg)
+
+                    return jsonify({'success': True, 'message': 'OTP email sent succesfully'})
             else:
-                return jsonify({'success': False,'message': "Invalid password"})
+                return jsonify({'success': False, 'message': 'Invalid password'}), 401
         except Exception as e:
             current_app.logger.error(f"Login error: {e}")
             return jsonify({'success': False, 'message': 'Internal server error'}), 500
+    
+    @app.route('/api/verify-otp', methods=['POST'])
+    def verify_otp():
+        data = request.get_json()
+        otp = data.get('otp')
+        employeeID = data.get('employeeID')
+
+        if not employeeID:
+            return jsonify({'success': False, 'message': 'Employee ID are required.'}), 400
+        if not otp:
+            return jsonify({'success': False, 'message': 'OTP are required'}), 400
+        if not otp.isdigit() or not len(otp) == 6:
+            return jsonify({'success': False, 'message': 'OTP "ONLY" contains number and MUST be 6 digits.'}), 400
+        pending_status = redis_client.hget('pending_otps', employeeID)
+        if not pending_status:
+            return jsonify({'success': False, 'message': 'No pending OTP request for this user.'}), 400
+        #why this?
+        user = Employee.query.filter_by(employeeID=employeeID).first()
+        if not user:
+            return jsonify({'success': False, 'message': 'User not found in database.'}), 400
+        current_time = datetime.now(timezone.utc)
+        otp_expiry = user.otpexpiry
+        if otp_expiry is None:
+            return jsonify({'success': False, 'message': 'No OTP expiry set. Please request a new OTP.'}), 400
+        if otp_expiry.tzinfo is None:
+            otp_expiry = otp_expiry.replace(tzinfo=timezone.utc)
+        if current_time > otp_expiry:
+            return jsonify({'success': False, 'message': 'OTP has expired'}), 400
+            #main check
+        if not str(otp) == str(user.otpcode):
+            return jsonify({'success': False, 'message': "OTP Doesn't match!"}), 400
+        else:
+            #clean up redis otp:
+            redis_client.hdel('pending_otps', employeeID)
+            #set otp_bypass for 24hrs
+            redis_client.setex(f'otp_bypass:{employeeID}', 24*60*60, '1')
+            #clean otp storage
+            user.otpcode = None
+            user.otpexpiry = None
+            db.session.commit()
+            return complete_user_login(user, employeeID)
+
         
     @app.route('/api/me', methods=['GET'])
     @jwt_required()
@@ -625,7 +642,7 @@ def register_routes(app):
                 'status': response.status_code,
                 'detail': response.text
             }), response.status_code
-
+                                                            
     #Get the users 
     @app.route('/api/users', methods=["GET"])
     @jwt_required()
@@ -1629,5 +1646,4 @@ def register_routes(app):
         
                     
         
-
     

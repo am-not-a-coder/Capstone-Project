@@ -72,3 +72,13 @@ export const logoutAcc = async () => {
 export const updateCurrentUser = (updatedUser) => {
     localStorage.setItem('user', JSON.stringify(updatedUser))
 }
+
+export const adminHelper = () => {
+    const user = getCurrentUser()
+
+    if (!user) {
+        return false
+    }
+    
+    return !!user?.isAdmin
+}

@@ -57,6 +57,16 @@ export const MakeApiCalls = async (endpoint, options = {}) => {
                 return { success: false, status: 401, data: { message: 'Session expired' } }
             }
         }
+        if (response.status === 403) {
+            let data = null
+            try { data = await response.json() } catch {}
+            const msg = (data && (data.message || data.error)) || 'Admins only'
+            window.dispatchEvent(new CustomEvent('app:toast', { detail: { type: 'error', msg: 'Session expired' } }))
+            window.location.href = '/login'
+            window.dispatchEvent(new CustomEvent('app:toast', { detail: { type: 'error', msg } }))
+            return { success: false, status: 403, error: msg, data }
+            
+        }
 
 // Handle blob responses (for file downloads)
 if (options.responseType === 'blob') {

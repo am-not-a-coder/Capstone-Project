@@ -18,9 +18,9 @@ class Employee(db.Model):
     isOnline = db.Column(db.Boolean, default=False)
     
     # MFA/OTP fields
-    otpCode = db.Column(db.String(6))
-    otpExpiry = db.Column(db.DateTime)
-    otpVerified = db.Column(db.Boolean, default=False)
+    otpcode = db.Column(db.String(6))
+    otpexpiry = db.Column(db.DateTime(timezone=True))
+    otpverified = db.Column(db.Boolean, default=False)
 
 class Area(db.Model):
     __tablename__ = 'area'

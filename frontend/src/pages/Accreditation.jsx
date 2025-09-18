@@ -10,12 +10,14 @@
   import AreaContForm from '../components/AreaContForm';
   import SubContForm from '../components/SubContForm';
   
-  import { apiGet, apiGetBlob, apiPost } from '../utils/api_utils';
+  import { apiGet, apiGetBlob } from '../utils/api_utils';
+  import { adminHelper } from '../utils/auth_utils';
   import ProgramCard from '../components/ProgramCard'
 
   import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer";
   import "@cyntler/react-doc-viewer/dist/index.css";
   import "../../index.css"
+import { Navigate } from 'react-router-dom';
 
   
   const Accreditation = () => {
@@ -38,9 +40,13 @@
     const [selectedSubarea, setSelectedSubarea] = useState(null);
 
     const [areaRatings, setAreaRatings] = useState({});
+    const isAdmin = adminHelper()
+
+    if (!isAdmin) return <Navigate to="/Dashboard" replace />
     
     useEffect(() => {
       const fetchProgram = async () => {
+        if (!isAdmin) return
         try {
           // Use our centralized API utility - no manual token handling!
           const response = await apiGet('/api/program');
@@ -59,7 +65,7 @@
           }
         }
           fetchProgram()
-        }, []);
+        }, [isAdmin]);
 
      //Fetch areas from specific programs
         const fetchAreasForProgram = async (programCode) => {
@@ -244,6 +250,7 @@
     };
 
     useEffect(() => {
+      if (!isAdmin) return
       if (selectedProgram && area.length > 0) {        
         setAreaRatings({}); // Clear existing ratings first
         
@@ -252,7 +259,7 @@
           fetchAreaRating(selectedProgram.programCode, a.areaID);
         });
       }
-    }, [selectedProgram, area]);
+    }, [selectedProgram, area, isAdmin]);
     
 
     return(

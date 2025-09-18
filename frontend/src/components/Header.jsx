@@ -14,7 +14,8 @@ import avatar3 from '../assets/avatar3.png';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentUser } from '../utils/auth_utils';
-
+import { apiGet } from '../utils/api_utils';
+import { getSocket } from '../utils/websocket_utils';
 
 
 const Header = ({title}) => {
@@ -24,6 +25,9 @@ const Header = ({title}) => {
     const [showProfile , setShowProfile] = useState(false);
     const [showNotification, setShowNotification] = useState(false);
     const [showMessages, setShowMessages] = useState(false);
+    const [messages, setMessages] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     //state for message read status
     const [messageReadStatus, setMessageReadStatus] = useState({});
@@ -79,6 +83,64 @@ const Header = ({title}) => {
         mainScroll.removeEventListener('scroll', handleScroll)
         }
     },[])
+
+    useEffect(() => {
+        let alive = true;
+        (async () => {
+          try {
+            setLoading(true);
+            const res = await apiGet('/api/conversations');
+            if (!alive) return;
+            const conversations = res?.data?.conversations ?? [];
+            const withLast = await Promise.all(
+                conversations.map(async (c) => {
+                    try {
+                        const mRes = await apiGet(`/api/conversations/${c.conversationID}/message`);
+                        const msgs = mRes?.data?.messages || [];
+                        const last = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+                        return { ...c, lastMessage: last };
+                    } catch {
+                        return { ...c, lastMessage: null };
+                    }
+                })
+            );
+            setMessages(withLast.map(c => ({ ...c, alert: false })));
+          } catch (err) {
+            if (!alive) return;
+            setError('Failed to load messages');
+            console.error(err);
+          } finally {
+            if (alive) setLoading(false);
+          }
+        })();
+        return () => { alive = false; };
+    }, []);
+
+    useEffect(() => {
+        const socket = getSocket();
+        const currentId = getCurrentUser()?.employeeID;
+        const onNewMessage = ({ conversationID, message }) => {
+            setMessages(prev => {
+                const idx = prev.findIndex(p => String(p.conversationID) === String(conversationID));
+                if (idx === -1) return prev;
+                const copy = [...prev];
+                const conv = { ...copy[idx] };
+                const isOwn = String(message.senderID) === String(currentId);
+                conv.lastMessage = {
+                    id: message.id,
+                    content: isOwn ? `You: ${message.content}` : message.content,
+                    createdAt: message.createdAt
+                };
+                if (!isOwn && !showMessages) {
+                    conv.alert = true
+                }
+                copy.splice(idx, 1);
+                return [conv, ...copy];
+            });
+        };
+        socket.on('new_message', onNewMessage);
+        return () => { socket.off('new_message', onNewMessage); };
+    }, []);
         
 
 
@@ -109,33 +171,6 @@ const Header = ({title}) => {
             link: "/Documents"
         }
     ]
-    //static message data
-    const messages = [
-        {
-            id: 1,
-            profilePic: avatar1,
-            user: 'Miguel Derick Pangindian',
-            message: 'WHY DID YOU REDEEM IT?!?!?',
-            time: '3m',
-            alert: !messageReadStatus[1] //check if read
-        },
-        {
-            id: 2,
-            profilePic: avatar2,
-            user: 'Jayson Permejo',
-            message: "Hello? How are you, I'm under the water, I'm so much drowning, bulululul",
-            time: '5h',
-            alert: !messageReadStatus[2]
-        },
-        {
-            id: 3,
-            profilePic: avatar3,
-            user: 'Rafael Caparic',
-            message: "Nothing beats a jet2 holiday!",
-            time: '4d',
-            alert: false
-        }
-    ]
 
     return(
         <header className="fixed z-10 flex items-center w-full col-span-5 col-start-2 p-4 pl-10 mb-3 -mt-5 lg:relative lg:pl-5">
@@ -150,7 +185,14 @@ const Header = ({title}) => {
                     icon={faComment} 
                     className="p-2 text-lg transition-all duration-500 rounded-lg cursor-pointer inset-shadow-sm inset-shadow-gray-400 bg-neutral-300 text-zuccini-800 lg:text-xl dark:text-zuccini-700 dark:bg-gray-800 dark:shadow-sm dark:shadow-zuccini-800"
                     onClick={() => {
-                        setShowMessages((current) => !current);
+                        setShowMessages((current) => {
+                            const next = !current
+                            if (next) {
+                                setMessages(prev => prev.map(m => ({ ...m, alert: false })))
+                                setMessageReadStatus({})
+                            }
+                            return next
+                        });
                         setShowNotification(false);
                         setShowProfile(false);
                     }} 
@@ -261,9 +303,23 @@ const Header = ({title}) => {
                         </Link>
                     </div>    
                     <div className='flex flex-col p-3 min-h-[300px] bg-neutral-300 w-full rounded-xl dark:text-white dark:bg-gray-950 dark:inset-shadow-xs dark:inset-shadow-zuccini-800'>
-                        {messages && messages.length > 0 ? (
-                            messages.map((message, index) => (
-                                <Messages key={index} picture={message.profilePic} userName={message.user} message={message.message} time={message.time} alert={message.alert} messagesId={message.id} onMarkAsRead={(id) => setMessageReadStatus(prev => ({...prev, [id]: true}))} onClose={() => setShowMessages(false)}/>
+                        {loading ? (
+                            <h1 className='text-xl text-center text-neutral-600'>Loading…</h1>
+                        ) : error ? (
+                            <h1 className='text-xl text-center text-red-500'>{error}</h1>
+                        ) : messages && messages.length > 0 ? (
+                            messages.map((conv) => (
+                                <Messages
+                                    key={conv.conversationID}
+                                    picture={conv.otherParticipant?.profilePic || avatar1}
+                                    userName={conv.otherParticipant?.name || 'Conversation'}
+                                    message={conv.lastMessage?.content || ''}
+                                    time={conv.lastMessage?.createdAt ? new Date(conv.lastMessage.createdAt).toLocaleString() : ''}
+                                    alert={!!conv.alert}
+                                    messagesId={conv.conversationID}
+                                    onMarkAsRead={(id) => setMessageReadStatus(prev => ({...prev, [id]: true}))}
+                                    onClose={() => setShowMessages(false)}
+                                />
                             ))
                         ) : (
                             <h1 className='text-xl text-center text-neutral-600'>No new messages</h1>
