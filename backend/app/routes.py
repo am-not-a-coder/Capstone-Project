@@ -18,7 +18,8 @@ import redis
 from app.otp_utils import generate_random
 from flask_mail import Message as MailMessage
 from app.login_handlers import complete_user_login
-from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message
+from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message, MessageDeletion
+from sqlalchemy import cast, String, func
 
 
 def register_routes(app):
@@ -64,7 +65,7 @@ def register_routes(app):
                     otp_expiry = datetime.now(timezone.utc) + timedelta(minutes=2)
                     user.otpcode = otp_code
                     user.otpexpiry = otp_expiry
-                db.session.commit()
+                    db.session.commit()
 
                     html_body = render_template(
                         'email/otp.html',
@@ -136,12 +137,15 @@ def register_routes(app):
         user = Employee.query.filter_by(employeeID=emp_id).first()
         if not user:
             return jsonify({'success': False, 'message': 'User not found'})
+        program_name = user.program.programCode if user.program else None
         return jsonify({
             'success': True,
             'user': {
                 'employeeID': user.employeeID,
                 'firstName': user.fName,
                 'lastName': user.lName,
+                'programID': user.programID,
+                'programCode': program_name,
                 'suffix' : user.suffix,
                 'email': user.email,
                 'contactNum': user.contactNum,
@@ -642,6 +646,60 @@ def register_routes(app):
                 'status': response.status_code,
                 'detail': response.text
             }), response.status_code
+
+    @app.route('/api/profile', methods=['POST'])
+    @jwt_required()
+    def change_profile():
+        current_user = get_jwt_identity()
+        user = Employee.query.filter_by(employeeID=current_user).first()
+
+        if not user:
+            return jsonify({'success': False, 'message': 'you cannot edit this user.'}), 404
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({'success': False, 'message': 'no data passed.'}), 400
+
+            suffix = data.get('suffix')
+            email = data.get('email')
+            contactNum = data.get('contactNum')
+            experience = data.get('experience')
+            password = data.get('password')
+
+            if email and not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+                return jsonify({'success': False, 'message': 'Invalid email format'}), 400
+        
+            if password and len(password) < 6:
+                return jsonify({'success': False, 'message': 'Password must be at least 6 characters'}), 400
+            if suffix is not None:
+                user.suffix = suffix
+            if email is not None:
+                user.email = email
+            if contactNum is not None:
+                user.contactNum = contactNum
+            if experience is not None:
+                user.experiences = experience
+            if password is not None:
+                user.password = generate_password_hash(password, method="pbkdf2:sha256")
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': 'Profile updated successfully',
+                'updated_user_data': {
+                    'firstName': user.fName,
+                    'lastName': user.lName,
+                    'suffix': user.suffix,
+                    'email': user.email,
+                    'experience': user.experiences,
+                    'contactNum': user.contactNum,
+                }
+            }), 200
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': 'Failed to update profile.'})
+
+
                                                             
     #Get the users 
     @app.route('/api/users', methods=["GET"])
@@ -833,30 +891,47 @@ def register_routes(app):
             current_app.logger.error(f"Delete program error: {str(e)}")
             return jsonify({'error': 'Database error occurred'}), 500
         
-
-    #Get the program
-    @app.route('/api/program', methods=["GET"])
-    def get_program():
-        programs = Program.query.all()
+    @app.route('/api/program', methods=['GET'])
+    @jwt_required()
+    def get_user_program():
+        try:
+            current_user_id = get_jwt_identity()
+            current_user = Employee.query.filter_by(employeeID=current_user_id).first()
+            
+            if not current_user:
+                return jsonify({'success': False, 'message': 'User not found'}), 404
+            
+            # If user is admin, return all programs
+            if current_user.isAdmin:
+                programs = Program.query.all()
+            else:
+                # If regular user, return only their assigned program
+                programs = Program.query.filter_by(programID=current_user.programID).all()
                     
-        program_list = []
+            program_list = []
+            for program in programs:
+                dean = program.dean
+                program_data = {
+                    'programID': program.programID,
+                    'programDean': f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A",
+                    'programCode': program.programCode,
+                    'programName': program.programName,
+                    'programColor': program.programColor,
+                    'employeeID': program.employeeID
+                }
+                program_list.append(program_data)
 
-        for program in programs:
+            return jsonify({
+                'success': True,
+                'programs': program_list,
+                'isAdmin': current_user.isAdmin
+            }), 200
+            
+        except Exception as e:
+            current_app.logger.error(f"Get user program error: {e}")
+            return jsonify({'success': False, 'message': 'Failed to fetch programs'}), 500
 
-            dean = program.dean
 
-            program_data = {
-                'programID': program.programID,
-
-                'programDean': f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A",
-
-                'programCode': program.programCode,
-                'programName': program.programName,
-                'programColor': program.programColor,
-                'employeeID': program.employeeID  # Include the foreign key ID
-            } 
-            program_list.append(program_data)
-        return jsonify({"programs": program_list}), 200
 
     #Get the area for displaying in tasks
     @app.route('/api/area', methods=["GET"])
@@ -1506,7 +1581,15 @@ def register_routes(app):
         if not participants:
             return jsonify({'success': False, 'message': 'Access Denied.'}), 403
 
-        messages = Message.query.filter_by(conversationID=conversation_id).order_by(Message.sentAt.asc()).all()
+        # Exclude messages the current user chose to hide
+        hidden_ids_subq = db.session.query(MessageDeletion.messageID).filter(
+            MessageDeletion.employeeID == str(current_user_id)
+        ).subquery()
+
+        messages = db.session.query(Message).filter(
+            Message.conversationID == conversation_id,
+            ~Message.messageID.in_(hidden_ids_subq)
+        ).order_by(Message.sentAt.asc()).all()
 
         messages_data = []
         for msg in messages:
@@ -1575,6 +1658,98 @@ def register_routes(app):
             'conversations': conversations_data
         }), 200
 
+    @app.route('/api/conversations/start', methods=['POST'])
+    @jwt_required()
+    def conversations_start():
+        try:
+            current_user_id = get_jwt_identity()
+            data = request.get_json() or {}
+            participant_id = data.get('participantID')
+
+            if not participant_id:
+                return jsonify({'success': False, 'message': 'participantID is required'}), 400
+            # Accept IDs that may contain non-digits (e.g., formatted IDs like 22-16-075)
+            raw_pid = str(participant_id).strip()
+            normalized_pid = re.sub(r'\D', '', raw_pid)
+            if not raw_pid:
+                return jsonify({'success': False, 'message': 'participantID is required'}), 400
+            # Prevent self-conversation (compare after stripping non-digits)
+            if re.sub(r'\D', '', str(current_user_id).strip()) == normalized_pid:
+                return jsonify({'success': False, 'message': 'Cannot start a conversation with yourself'}), 400
+
+            # Validate participant exists
+            # Try exact string match, or match on digits-only using regexp_replace
+            target_user = db.session.query(Employee).filter(
+                (cast(Employee.employeeID, String) == raw_pid) |
+                (func.regexp_replace(cast(Employee.employeeID, String), '[^0-9]', '', 'g') == normalized_pid)
+            ).first()
+            if not target_user:
+                return jsonify({'success': False, 'message': 'Participant not found'}), 404
+            
+            # Find existing direct conversation between both users
+            current_user_id_str = str(current_user_id).strip()
+            participant_id_str = raw_pid
+
+            user_conv_ids = db.session.query(
+                ConversationParticipant.conversationID
+            ).filter(
+                ConversationParticipant.employeeID == current_user_id_str
+            ).subquery()
+
+            other_conv_ids = db.session.query(
+                ConversationParticipant.conversationID
+            ).filter(
+                ConversationParticipant.employeeID == participant_id_str
+            ).subquery()
+
+            existing_conv = db.session.query(Conversation).filter(
+                Conversation.conversationType == 'direct',
+                Conversation.conversationID.in_(user_conv_ids),
+                Conversation.conversationID.in_(other_conv_ids)
+            ).first()
+
+            if existing_conv:
+                return jsonify({
+                    'success': True,
+                    'conversationID': existing_conv.conversationID,
+                    'conversationType': existing_conv.conversationType,
+                    'createdAt': existing_conv.createdAt.isoformat() if existing_conv.createdAt else None,
+                    'otherParticipant': {
+                        'employeeID': str(target_user.employeeID),
+                        'name': f"{target_user.fName} {target_user.lName}",
+                        'profilePic': target_user.profilePic
+                    }
+                }), 200
+
+            # Create new direct conversation
+            new_conv = Conversation(
+                conversationType='direct',
+                createdBy=current_user_id_str
+            )
+            db.session.add(new_conv)
+            db.session.flush()
+
+            # Add both participants
+            db.session.add_all([
+                ConversationParticipant(conversationID=new_conv.conversationID, employeeID=current_user_id_str),
+                ConversationParticipant(conversationID=new_conv.conversationID, employeeID=participant_id_str)
+            ])
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'conversationID': new_conv.conversationID,
+                'conversationType': new_conv.conversationType,
+                'createdAt': new_conv.createdAt.isoformat() if new_conv.createdAt else None,
+                'otherParticipant': {
+                    'employeeID': str(target_user.employeeID),
+                    'name': f"{target_user.fName} {target_user.lName}",
+                    'profilePic': target_user.profilePic
+                }
+            }), 201
+        except Exception as e:
+            current_app.logger.error(f"Start conversation error: {e}")
+            return jsonify({'success': False, 'message': 'Internal server error'}), 500
 
     @app.route('/api/conversations/<int:conversation_id>/message', methods=['POST'])
     @jwt_required()
@@ -1618,6 +1793,43 @@ def register_routes(app):
             'success': True,
             'message': 'Message sent successfully'
         }), 201
+
+    @app.route('/api/messages/<int:message_id>', methods=['DELETE'])
+    @jwt_required()
+    def hide_message_for_user(message_id):
+        try:
+            current_user_id = get_jwt_identity()
+            # Ensure the message exists and user is a participant of the conversation
+            msg = Message.query.filter_by(messageID=message_id).first()
+            if not msg:
+                return jsonify({'success': False, 'message': 'Message not found'}), 404
+
+            is_participant = ConversationParticipant.query.filter_by(
+                conversationID=msg.conversationID,
+                employeeID=str(current_user_id)
+            ).first() is not None
+            if not is_participant:
+                return jsonify({'success': False, 'message': 'Forbidden'}), 403
+
+            # Idempotent insert: if already hidden, return success
+            already = MessageDeletion.query.filter_by(
+                messageID=message_id,
+                employeeID=str(current_user_id)
+            ).first()
+            if already:
+                return jsonify({'success': True}), 200
+
+            deletion = MessageDeletion(
+                messageID=message_id,
+                employeeID=str(current_user_id)
+            )
+            db.session.add(deletion)
+            db.session.commit()
+            return jsonify({'success': True}), 200
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Hide message error: {e}")
+            return jsonify({'success': False, 'message': 'Internal server error'}), 500
                     
     @app.route('/api/conversations/<int:conversation_id>', methods=['DELETE'])
     @jwt_required()

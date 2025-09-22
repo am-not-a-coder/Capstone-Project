@@ -23,7 +23,11 @@ def get_engine():
         # this works with Flask-SQLAlchemy>=3
         return current_app.extensions['migrate'].db.engine
 
-
+def include_object(object, name, type_, reflected, compare_to):
+    if name and name.startswith('oc_'):
+        return False
+    return True
+    
 def get_engine_url():
     try:
         return get_engine().url.render_as_string(hide_password=False).replace(

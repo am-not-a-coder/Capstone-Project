@@ -329,7 +329,11 @@ const PublicOnlyRoute = ({ children }) => {
             <AdminRoute>
               <Accreditation isAdmin={isAdmin}/>
             </AdminRoute>} />
-          <Route path="/Users" element={<Users />} />
+          <Route path="/Users" element={
+            <AdminRoute>
+              <Users isAdmin={isAdmin}/>
+            </AdminRoute>
+            } />
           <Route path="/Tasks" element={<Tasks />} />
           <Route path="/Documents" element={<Documents />} />
 

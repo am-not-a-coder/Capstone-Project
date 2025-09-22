@@ -18,10 +18,15 @@ import axios from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect } from 'react';
 import StatusModal from '../components/modals/StatusModal';
-
+import { adminHelper } from '../utils/auth_utils';
 import { apiDelete, apiGet, apiPostForm, apiGetBlob } from '../utils/api_utils';
+import { Navigate } from 'react-router-dom';
 
 const Users = () => {
+    //check admin
+    const isAdmin = adminHelper()
+    if (!isAdmin) return <Navigate to='/Dashboard' replace />
+  
     // user info
     const [employeeID, setEmployeeID] = useState("");  
     const [fName, setFName] = useState("");  
@@ -147,6 +152,7 @@ const Users = () => {
 
     useEffect(() => {
     const fetchUsers = async () => {
+      if (!isAdmin) return
         try {                
             // Get the users
             const res = await apiGet('/api/users');            
@@ -189,10 +195,11 @@ const Users = () => {
     };
 
     fetchUsers();
-}, []);
+}, [isAdmin]);
 
    
-    useEffect(() => {
+  useEffect(() => {
+    if (!isAdmin) return 
     const fetchProgram = async () =>{
 
         const res = await apiGet('/api/program', 
@@ -208,7 +215,7 @@ const Users = () => {
 
     fetchProgram();
 
-    }, [])
+  }, [isAdmin])
 
     useEffect(() => {
     const fetchArea = async () => {

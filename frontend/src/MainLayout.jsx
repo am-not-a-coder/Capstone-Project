@@ -80,12 +80,12 @@ const MainLayout = () => {
                   active={activePage === 'Accreditation'}
                   onClick={() => navigate('/Accreditation')}
                 />)}
-                <SidebarLinks
+                { isAdmin && (<SidebarLinks
                   icon={faUsers}
                   text="Users"
                   active={activePage === 'Users'}
                   onClick={() => navigate('/Users')}
-                />
+                />)}
                 <SidebarLinks
                   icon={faCircleCheck}
                   text="Tasks"

@@ -17,7 +17,7 @@
   import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer";
   import "@cyntler/react-doc-viewer/dist/index.css";
   import "../../index.css"
-import { Navigate } from 'react-router-dom';
+  import { Navigate } from 'react-router-dom';
 
   
   const Accreditation = () => {
