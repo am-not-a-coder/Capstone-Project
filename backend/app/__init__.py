@@ -1,3 +1,4 @@
+from operator import truediv
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
@@ -7,13 +8,14 @@ from flask_jwt_extended import JWTManager
 from flask_socketio import SocketIO
 import os
 import redis
+from flask_mail import Mail
 
 redis_client = redis.Redis(host='redis', port=6379, db=0)
 
 db = SQLAlchemy()
 migrate = Migrate()
 socketio = SocketIO()
-
+mail = Mail()
 
 
 def create_app():
@@ -33,11 +35,22 @@ def create_app():
     app.config['JWT_ACCESS_COOKIE_NAME'] = 'access_token'
     app.config['JWT_REFRESH_COOKIE_NAME'] = 'refresh_token'
 
+    #email configuration
+    app.config['MAIL_SERVER'] = os.getenv('SMTP_SERVER')
+    app.config['MAIL_PORT'] = int(os.getenv('SMTP_PORT'))
+    app.config['MAIL_USERNAME'] = os.getenv('EMAIL_USER')
+    app.config['MAIL_PASSWORD'] = os.getenv('EMAIL_PASSWORD')
+    app.config['MAIL_USE_TLS'] = True
+    app.config['MAIL_USE_SSL'] = False
+    app.config['MAIL_DEFAULT_SENDER'] = os.getenv('EMAIL_USER')
+
 
     db.init_app(app)
     migrate.init_app(app, db)
     socketio.init_app(app, cors_allowed_origins=["http://localhost:5173"], async_mode='threading', logger=True, engineio_logger=True)
     JWTManager(app)
+    mail.init_app(app)
+
 
     CORS(app, origins=['http://localhost:5173'], supports_credentials=True)
 

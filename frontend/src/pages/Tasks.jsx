@@ -12,9 +12,12 @@ import EventModal from '../components/modals/EventModal';
 import StatusModal from '../components/modals/StatusModal';
 import DeadlineModal from '../components/modals/DeadlineModal';
 import { apiGet, apiPost } from '../utils/api_utils';
+import { adminHelper } from '../utils/auth_utils';
 // the progress bar is currently static  
 
 const Tasks = () => {
+    //admin
+    const isAdmin = adminHelper()
 
     const [deadLines, setDeadLines] = useState([]); // used to list the deadlines 
     const [event, setEvent] = useState([]); //used for the calendar
@@ -125,7 +128,7 @@ const Tasks = () => {
     // Creates the deadline
     const handleCreateDeadline = async (e) => {
         e.preventDefault()
-
+        if (!isAdmin) return 
         const formData = new FormData()
             formData.append("program", program)
             formData.append("area", selectedArea)
@@ -266,8 +269,9 @@ const Tasks = () => {
 {/* Reports */}
 <h1 className="mx-3 mt-5 mb-3 text-xl font-semibold dark:text-white">Reports</h1>
     <section className="grid grid-cols-2 grid-rows-[auto_1fr] relative p-3 gap-5 text-neutral-800 border-1 border-neutral-300 rounded-lg shadow-xl transition-all duration-500 dark:shadow-sm dark:shadow-zuccini-800">
-    {/* Create Deadlines */}
-    <div className="col-span-2 transition-all duration-500 dark:text-white">
+    {/* Create Deadlines */} {/* admin */}
+    
+    { isAdmin &&(<div className="col-span-2 transition-all duration-500 dark:text-white">
         
             <div className="col-span-2 pt-3 min-h-[100px] border border-neutral-300 rounded-md transition-all duration-500 inset-shadow-sm inset-shadow-gray-400 dark:shadow-sm dark:shadow-zuccini-900 dark:bg-gray-900">
                 <h1 className="mx-3 my-1 font-medium text-md">
@@ -355,7 +359,7 @@ const Tasks = () => {
                 
                 </form>
             </div>
-    </div>
+    </div>)}
         
     {/* Deadlines */}
         <div className="relative flex flex-col items-center row-start-2 p-3 border rounded-md inset-shadow-sm border-neutral-300 inset-shadow-gray-400 dark:bg-gray-900 dark:shadow-sm dark:shadow-zuccini-900">                    

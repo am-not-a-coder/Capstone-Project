@@ -18,8 +18,11 @@ import CreateModal from '../components/modals/CreateModal';
 import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer";
 import "@cyntler/react-doc-viewer/dist/index.css";
 import "../../index.css"
+import { adminHelper } from '../utils/auth_utils';
 
   const Programs = () => {
+    //admin
+    const isAdmin = adminHelper()
     // use state function
   const [programs, setPrograms] = useState([]);
   const [employees, setEmployees] = useState([]); 
@@ -40,32 +43,27 @@ import "../../index.css"
   const [showPreview, setShowPreview] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [docViewerKey, setDocViewerKey] = useState(0); // Force re-render key
+  const [docViewerKey, setDocViewerKey] = useState(0); // 
 
-  
-    // Get user info using our centralized utility
-    const currentUser = getCurrentUser();
+  useEffect(() => {
+    const fetchProgram = async () => {
+      try {
+        const response = await apiGet('/api/program');
 
-    useEffect(() => {
-  const fetchProgram = async () => {
-    try {
-      // Use our centralized API utility - no manual token handling!
-      const response = await apiGet('/api/program');
+            if (response.success) {
+              Array.isArray(response.data.programs) ? setPrograms(response.data.programs) : setPrograms([]);
+            } else {
+              console.error('Failed to fetch programs:', response.error);
+              setPrograms([]); // Set empty array on error
+            }
+            
 
-          if (response.success) {
-            Array.isArray(response.data.programs) ? setPrograms(response.data.programs) : setPrograms([]);
-          } else {
-            console.error('Failed to fetch programs:', response.error);
-            setPrograms([]); // Set empty array on error
-          }
-          
+        } catch (err){
+          console.error("Error occurred when fetching programs", err)
 
-      } catch (err){
-        console.error("Error occurred when fetching programs", err)
-
+        }
       }
-    }
-      fetchProgram()
+        fetchProgram()
     }, []);
 
     useEffect(() => {
@@ -292,13 +290,7 @@ import "../../index.css"
       setShowPreview(false);
     } 
   }, []);
-  
-  // Count number of checked files
-  // const doneCount = Object.values(done).filter(value => value).length;
-  // const allCriteria = areas.subareas.flatMap(sub => sub.criteria);
-  // const doneCount = allCriteria.filter(c => done[c.id]).length;
-  // const doneTotal = allCriteria.length;
-      const [done, setDone] = useState({});
+    const [done, setDone] = useState({});
 
     return (
       <>
@@ -393,7 +385,7 @@ import "../../index.css"
                   
                 </nav>
               </div>
-              <button onMouseEnter={() => setShowWord(true)}
+              { isAdmin && (<button onMouseEnter={() => setShowWord(true)}
                 onMouseLeave={() => setShowWord(false)}
                 onClick={() => setShowCreateModal(true)}
                 className={`p-3 px-4 text-xl flex items-center transition-all duration-300 cursor-pointer rounded-xl text-neutral-600 bg-gray-300/90 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 inset-shadow-sm inset-shadow-gray-400 dark:text-white dark:bg-gray-950/50`}>
@@ -402,7 +394,7 @@ import "../../index.css"
                     >
                       Create</span>
                     <FontAwesomeIcon icon={faPlus} className='z-10'/>
-                </button>
+                </button>)}
               {showCreateModal && (
                 <CreateModal 
                   onCreate={refreshAreas} 
@@ -420,7 +412,7 @@ import "../../index.css"
                   
                   {/* Program Cards Section */}
                   <div className={`${visible == "programs" ? 'block' : 'hidden'} flex flex-wrap gap-4`}>
-                    <CreateCard form={form} handleChange={handleChange} setShowForm={setShowForm} />
+                    { isAdmin && (<CreateCard form={form} handleChange={handleChange} setShowForm={setShowForm} />)}
                     
             {programs.map(program=> (
                       <ProgramCard 

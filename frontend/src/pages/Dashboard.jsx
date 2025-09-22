@@ -12,20 +12,22 @@ import {useNavigate} from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useState } from 'react';
 import { apiGet } from '../utils/api_utils';
-import toast, { Toaster } from 'react-hot-toast'
-import { getCurrentUser } from '../utils/auth_utils';
+import toast from 'react-hot-toast'
+import { getCurrentUser, adminHelper } from '../utils/auth_utils';
 import AnnouncementModal from '../components/modals/AnnouncementModal';
 
 const Dashboard = () => {
 
     const [showAnnounceModal, setShowAnnounceModal] = useState(false);
-    
+    const isAdmin = adminHelper()
     const [count, setCount] = useState({
         employees: 0,
         programs: 0,
         institutes: 0,
         deadlines: 0
     })
+    const user = getCurrentUser()
+    const key = user?.employeeID ? `welcomeShown:${user.employeeID}` : 'WelcomeShown'
     useEffect(()=> {
         const fetchCounts = async () => {
             try{
@@ -38,18 +40,11 @@ const Dashboard = () => {
         fetchCounts();
 
         // Check if this is a fresh login (not a page refresh or navigation)
-        const hasShownWelcome = sessionStorage.getItem('welcomeShown')
-        if (!hasShownWelcome) {
-            const currentUser = getCurrentUser()
-            if (currentUser?.employeeID) {
-                toast.success(`Welcome, ${currentUser.lastName} | ${currentUser.employeeID}!`, {
-                    duration: 2000,
-                    icon: '🎊'
-                })
-                // Mark that welcome has been shown for this session
-                sessionStorage.setItem('welcomeShown', 'true')
-            }
-        }
+        const hasShownWelcome = sessionStorage.getItem(key)
+        if (!hasShownWelcome && user?.employeeID) {
+            toast.success(`Welcome, ${user.lastName} | ${user.employeeID}!`, { duration: 2000, icon: '🎊' })    
+            sessionStorage.setItem(key, 'true')
+          }  
     }, [])
 
     const handleCreateAnnouncement = (announcement) => {
@@ -60,7 +55,6 @@ const Dashboard = () => {
     
     return (
         <>
-        <Toaster />
             {/* Dashboard links */}
             <section className='grid grid-rows-4 gap-1 mt-20 mb-5 lg:mt-8 lg:grid-cols-4 lg:grid-rows-1'>   
                 <DashboardLinks icon={faUsers} text="Users" count={count.employees}/>            
@@ -76,12 +70,15 @@ const Dashboard = () => {
                     <h2 className="mb-4 text-xl font-semibold text-neutral-800 dark:text-white">Announcements</h2>
                 </div>
 
-                <div 
-                onClick={() => setShowAnnounceModal(true)}
+                { isAdmin &&(<div 
+                onClick={() => {
+                    if (!isAdmin) { toast.error('Admins only'); return }
+                    setShowAnnounceModal(true)
+                }}
                 className="absolute flex flex-row items-center justify-around px-5 py-1 transition-all duration-500 cursor-pointer top-5 right-5 rounded-3xl hover:bg-zuccini-600 active:bg-zuccini-500" >
                     <FontAwesomeIcon icon={faPlus} className="mr-2 dark:text-white" />
                     <h1 className="text-lg dark:text-white">New</h1>
-                </div>
+                </div>)}
                 
                 <div className="p-4 transition-all duration-500 rounded-lg bg-neutral-300 dark:bg-gray-950/50">
                     <p className="p-5 font-light text-center text-gray-700 transition-all duration-500 dark:text-white">No new announcements</p>
@@ -92,32 +89,33 @@ const Dashboard = () => {
                 <AnnouncementModal setShowModal={setShowAnnounceModal} onCreate={handleCreateAnnouncement}/>
             )}
 
-            <section className='grid grid-rows-2 gap-4 mt-4 lg:grid-cols-2 lg:grid-rows-1'>
+            { isAdmin && (
+                <section className='grid grid-rows-2 gap-4 mt-4 lg:grid-cols-2 lg:grid-rows-1'>
 
-            {/* Pending Documents */}
-            <div className="p-5 mb-8 transition-all duration-500 shadow-xl text-neutral-800 border-1 border-neutral-300 rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:border-gray-900 dark:bg-gray-900" >
-                <div className='flex flex-row'>
-                    <FontAwesomeIcon icon={faHourglassHalf}  className="p-2 transition-all duration-500 dark:text-white" />
-                    <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Pending Documents</h2>
+                {/* Pending Documents */}
+                <div className="p-5 mb-8 transition-all duration-500 shadow-xl text-neutral-800 border-1 border-neutral-300 rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:border-gray-900 dark:bg-gray-900" >
+                    <div className='flex flex-row'>
+                        <FontAwesomeIcon icon={faHourglassHalf}  className="p-2 transition-all duration-500 dark:text-white" />
+                        <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Pending Documents</h2>
+                    </div>
+                    <div className="flex items-center justify-center p-5 transition-all duration-500 rounded-lg h-60 bg-neutral-300 dark:bg-gray-950/50">
+                        <p className="p-5 m-auto text-center text-gray-700 transition-all duration-500 dark:text-white">No pending documents.</p>
+                    </div>
                 </div>
-                <div className="flex items-center justify-center p-5 transition-all duration-500 rounded-lg h-60 bg-neutral-300 dark:bg-gray-950/50">
-                    <p className="p-5 m-auto text-center text-gray-700 transition-all duration-500 dark:text-white">No pending documents.</p>
-                </div>
-            </div>
-            {/* Audit Logs */}
-            
-            <div className="p-5 mb-10 transition-all duration-500 shadow-xl text-neutral-800 border-1 dark:border-gray-900 border-neutral-300 rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-900">
-                <div className='flex flex-row'>
-                    <FontAwesomeIcon icon={faGears}  className="p-2 transition-all duration-500 dark:text-white" />
-                    <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Audit Logs</h2>
-                </div>
+                {/* Audit Logs */}
+                
+                <div className="p-5 mb-10 transition-all duration-500 shadow-xl text-neutral-800 border-1 dark:border-gray-900 border-neutral-300 rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-900">
+                    <div className='flex flex-row'>
+                        <FontAwesomeIcon icon={faGears}  className="p-2 transition-all duration-500 dark:text-white" />
+                        <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Audit Logs</h2>
+                    </div>
 
-                <div className="flex items-center justify-center p-4 rounded-lg h-60 bg-neutral-300 dark:border-gray-900 dark:bg-gray-950/50">
-                    <p className="p-5 text-center text-gray-700 transition-all duration-500 dark:text-white">No logs at the moment.</p>
-                </div> 
-            </div>
-            </section>
-
+                    <div className="flex items-center justify-center p-4 rounded-lg h-60 bg-neutral-300 dark:border-gray-900 dark:bg-gray-950/50">
+                        <p className="p-5 text-center text-gray-700 transition-all duration-500 dark:text-white">No logs at the moment.</p>
+                    </div> 
+                </div>
+                </section>
+            )}
 
         
         </>

@@ -15,18 +15,25 @@ import Notification from './pages/Notification';
 import Messages from './pages/Messages';
 import { fetchCurrentUser, getCurrentUser } from './utils/auth_utils';
 import { useEffect, useRef, useState } from 'react';
-import { logoutAcc } from './utils/auth_utils';
+import { logoutAcc, adminHelper } from './utils/auth_utils';
 import { apiPost } from './utils/api_utils';
 import { initPresenceListeners, getSocket } from './utils/websocket_utils';
-
-
-
+import toast, { Toaster } from 'react-hot-toast'
 
 function App() {
+  
+  const AdminRoute = ({ isAdmin, children }) => {
+    useEffect(() => {
+      if (!isAdmin) toast.error('You have no permission to access this page.')
+    }, [isAdmin])
+    return isAdmin ? children : <Navigate to="/Dashboard" replace />
+  }
+
   console.log('🚀 App component rendering...')
 
   const [authReady, setAuthReady] = useState(false)
   const [authTick, setAuthTick] = useState(0)
+  const isAdmin = adminHelper()
   
   console.log('🔍 Current state - authReady:', authReady, 'authTick:', authTick)
   const awayTimeRef = useRef(null)
@@ -62,6 +69,10 @@ function App() {
             localStorage.removeItem('LoggedIn')
             sessionStorage.removeItem('user')
             sessionStorage.removeItem('LoggedIn')
+            sessionStorage.removeItem('welcomeShown')
+            for (const k of Object.keys(sessionStorage)) {
+              if (k.startsWith('welcomeShown:')) sessionStorage.removeItem(k)
+            }
             
             // Broadcast logout to other tabs
             const ch = new BroadcastChannel('auth')
@@ -89,7 +100,11 @@ const loadUser = async () => {
       console.log('Found session_id, validating with backend...')
 
       try {
-        await fetchCurrentUser() // This will call /api/me and validate the session
+        await fetchCurrentUser() 
+        sessionStorage.removeItem('welcomeShown')
+        for (const k of Object.keys(sessionStorage)) {
+          if (k.startsWith('welcomeShown:')) sessionStorage.removeItem(k)
+        }
         console.log('Session valid, initializing WebSocket...')
         initPresenceListeners()
         const socket = getSocket()
@@ -108,6 +123,10 @@ const loadUser = async () => {
         localStorage.removeItem('LoggedIn')
         sessionStorage.removeItem('user')
         sessionStorage.removeItem('LoggedIn')
+        sessionStorage.removeItem('welcomeShown')
+        for (const k of Object.keys(sessionStorage)) {
+          if (k.startsWith('welcomeShown:')) sessionStorage.removeItem(k)
+        }
       }
     } else {
       console.log('No session_id found, user not logged in')
@@ -183,6 +202,10 @@ useEffect(() => {
       localStorage.removeItem('session_id')
       localStorage.removeItem('user')
       localStorage.removeItem('LoggedIn')
+      sessionStorage.removeItem('welcomeShown')
+      for (const k of Object.keys(sessionStorage)) {
+        if (k.startsWith('welcomeShown:')) sessionStorage.removeItem(k)
+      }
     }
 
   const ch = new BroadcastChannel('auth');
@@ -203,6 +226,11 @@ useEffect(() => {
     const { type } = e.data || {};
     if (type === 'login') {
       console.log('login')
+      // Clear any stale welcome flags before showing dashboard
+      sessionStorage.removeItem('welcomeShown')
+      for (const k of Object.keys(sessionStorage)) {
+        if (k.startsWith('welcomeShown:')) sessionStorage.removeItem(k)
+      }
       initPresenceListeners()
       await fetchCurrentUser()
       setAuthTick(t => t + 1)
@@ -220,6 +248,10 @@ useEffect(() => {
       localStorage.removeItem('session_id')
       localStorage.removeItem('user')
       localStorage.removeItem('LoggedIn')
+      sessionStorage.removeItem('welcomeShown')
+      for (const k of Object.keys(sessionStorage)) {
+        if (k.startsWith('welcomeShown:')) sessionStorage.removeItem(k)
+      }
       // Force logout
       logoutAcc()
       setAuthTick(t => t + 1);
@@ -234,7 +266,15 @@ useEffect(() => {
     console.log('⏰ Fallback timeout - setting authReady to true')
     setAuthReady(true)
   }, 3000) // 3 second timeout
-  
+
+  const handler = (e) => {
+    const { type, msg } = e.detail || {}
+    if (type === 'error') toast.error(msg || 'Error')
+    else if (type === 'success') toast.success(msg || 'Success')
+    else toast(msg || 'Notice')
+  }
+  window.addEventListener('app:toast', handler)
+
   return () => {
     clearTimeout(fallbackTimeout)
     isComponentMounted = false
@@ -243,8 +283,10 @@ useEffect(() => {
     window.removeEventListener('click', resetInactivityTimer)
     window.removeEventListener('mousemove', onMouseMove)
     window.removeEventListener('keydown', resetInactivityTimer)
+    window.removeEventListener('app:toast', handler)
     stopInactivityTimer()
   }
+  
 }, []) 
 
 
@@ -270,6 +312,7 @@ const PublicOnlyRoute = ({ children }) => {
   
   return (
     <Router>
+      <Toaster />
       <Routes>
         <Route 
         path="/login" 
@@ -291,8 +334,15 @@ const PublicOnlyRoute = ({ children }) => {
           <Route path="/Dashboard" element={<Dashboard />} />
           <Route path="/Institutes" element={<Institutes />} />
           <Route path="/Programs" element={<Programs />} />
-          <Route path="/Accreditation" element={<Accreditation />} />
-          <Route path="/Users" element={<Users />} />
+          <Route path="/Accreditation" element={
+            <AdminRoute>
+              <Accreditation isAdmin={isAdmin}/>
+            </AdminRoute>} />
+          <Route path="/Users" element={
+            <AdminRoute>
+              <Users isAdmin={isAdmin}/>
+            </AdminRoute>
+            } />
           <Route path="/Tasks" element={<Tasks />} />
           <Route path="/Documents" element={<Documents />} />
 

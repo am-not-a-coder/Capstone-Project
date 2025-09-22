@@ -8,14 +8,15 @@ import {
     faEyeSlash
 } from '@fortawesome/free-solid-svg-icons';
 import { useState, useRef, useEffect } from 'react';
-import { apiGet } from '../utils/api_utils';
-import { getCurrentUser } from '../utils/auth_utils';
-
+import { apiGet, apiPost } from '../utils/api_utils';
+import { adminHelper, getCurrentUser } from '../utils/auth_utils';
+import toast from 'react-hot-toast'
 
 
 
 const Profile = () => {
-
+//admin
+const isAdmin = adminHelper()
 const fileInputRef = useRef(null) //Upload photo reference
 
 //Auto-resizing textarea in the Experience div
@@ -86,7 +87,7 @@ useEffect(() => {
                     contactNum: data.contactNumb,
                     department: data.programName || 'Not Assigned',
                     area: data.areaNum && data.areaName ? `${data.areaNum}: ${data.areaName}` : 'Not Assigned',
-                    experience: " - Ph.D. in Educational Management, Universidad de Manila. \n - Associate Professor with over 10 years of teaching experience in higher education. \n - Master's Degree in Information Technology \n - Currently teaching at the College of Education.",
+                    experience: data.experience ? data.experience : 'No current experience.',
                 })
             } else {
                 console.error('Error loading profile:', response.error)
@@ -142,12 +143,28 @@ const [form, setForm] = useState({
         setForm({...form, [e.target.name] : e.target.value})
     }
     
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        setUser({
-            ...user,
-            ...form
+        try {
+            const resp = await apiPost('/api/profile', {
+                suffix: form.suffix,
+                email: form.email,
+                experience: form.experience,
+                contactNum: form.contactNum,
+                password: form.password
             })
+            if (resp.success && resp.message) {
+                setUser({
+                    ...user,
+                    ...resp.updated_user_data
+                })
+                toast.success('Profile update successfully!')
+            } else {
+                toast.error(resp.message || 'Failed to update profile. Try again.')
+            }
+        } catch (error) {
+            toast.error('An error occured while updating the profile.')
+        }
 
     }
 
@@ -303,8 +320,9 @@ const [form, setForm] = useState({
                         name='firstName'
                         placeholder={user.firstName}
                         onChange={handleChange}
-                        required
-                        className="p-2 py-3 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border border-neutral-400 rounded-xl inset-shadow-sm inset-shadow-gray-400 focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-900 dark:shadow-zuccini-900 dark:shadow-md"
+                        disabled={isAdmin ? false : true}
+                        className="p-2 py-3 font-semibold transition-all duration-500 cursor-not-allowed bg-neutral-300 border border-neutral-400 rounded-xl inset-shadow-sm inset-shadow-gray-400 focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-900 dark:shadow-zuccini-900 dark:shadow-md"
+                        
                     />
                 </div>
                 <div className="flex flex-col mr-5">
@@ -313,8 +331,8 @@ const [form, setForm] = useState({
                         name='lastName'
                         placeholder={user.lastName}
                         onChange={handleChange}
-                        required
-                         className="p-2 py-3 font-semibold transition-all duration-500 cursor-pointer bg-neutral-300 border border-neutral-400 rounded-xl inset-shadow-sm inset-shadow-gray-400 focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-900 dark:shadow-zuccini-900 dark:shadow-md"
+                        disabled={isAdmin ? false : true}
+                         className="p-2 py-3 font-semibold transition-all duration-500 cursor-not-allowed bg-neutral-300 border border-neutral-400 rounded-xl inset-shadow-sm inset-shadow-gray-400 focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-900 dark:shadow-zuccini-900 dark:shadow-md"
                     />
                 </div>
                 <div className="flex flex-col">
