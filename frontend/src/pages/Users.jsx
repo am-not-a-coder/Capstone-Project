@@ -664,6 +664,19 @@ const Users = () => {
                                             onClick={() => setRemoveConfirmation(true)} 
                                         />
                                     </button>
+                        {showDetails && selectedUser && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                                
+                                <div className={`relative flex w-full max-w-3xl gap-2 p-8 bg-gray-200 border border-gray-200 shadow-xl dark:bg-gray-800 dark:border-gray-700 rounded-2xl ${showDetails ? "fade-in" : "fade-out"}`}>
+                                    <div className='absolute flex gap-5 px-5 py-4 top-4 right-4'>
+                                    
+                                    <button className='text-lg' onClick={() => setRemoveConfirmation(true)}>
+                                        <FontAwesomeIcon 
+                                            icon={faTrash} 
+                                            className='text-gray-500 transition-colors duration-300 cursor-pointer hover:text-red-700 dark:text-gray-400 dark:hover:text-red-500' 
+                                            onClick={() => setRemoveConfirmation(true)} 
+                                        />
+                                    </button>
 
                                     <button className='text-lg' onClick={exitShowDetails}>
                                         <FontAwesomeIcon 
