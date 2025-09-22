@@ -663,7 +663,6 @@ def register_routes(app):
                 'detail': response.text
             }), response.status_code
 
-<<<<<<< HEAD
     @app.route('/api/profile', methods=['POST'])
     @jwt_required()
     def change_profile():
@@ -718,8 +717,6 @@ def register_routes(app):
 
 
                                                             
-=======
->>>>>>> 77bea5c8b6c0290c01762caf97e8ff8deab7d89f
     #Get the users 
     @app.route('/api/users', methods=["GET"])
     @jwt_required()
@@ -1924,15 +1921,6 @@ def register_routes(app):
         socketio.emit('conversation_deleted', {'conversationID': conversation_id}, room=f'conversation:{conversation_id}')
         return jsonify({'success': True}), 200
            
-<<<<<<< HEAD
-=======
-
-
-
-        
-                    
-        
->>>>>>> 77bea5c8b6c0290c01762caf97e8ff8deab7d89f
 
 
 
