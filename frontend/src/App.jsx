@@ -100,7 +100,11 @@ const loadUser = async () => {
       console.log('Found session_id, validating with backend...')
 
       try {
-        await fetchCurrentUser() // This will call /api/me and validate the session
+        await fetchCurrentUser() 
+        sessionStorage.removeItem('welcomeShown')
+        for (const k of Object.keys(sessionStorage)) {
+          if (k.startsWith('welcomeShown:')) sessionStorage.removeItem(k)
+        }
         console.log('Session valid, initializing WebSocket...')
         initPresenceListeners()
         const socket = getSocket()
@@ -222,6 +226,11 @@ useEffect(() => {
     const { type } = e.data || {};
     if (type === 'login') {
       console.log('login')
+      // Clear any stale welcome flags before showing dashboard
+      sessionStorage.removeItem('welcomeShown')
+      for (const k of Object.keys(sessionStorage)) {
+        if (k.startsWith('welcomeShown:')) sessionStorage.removeItem(k)
+      }
       initPresenceListeners()
       await fetchCurrentUser()
       setAuthTick(t => t + 1)

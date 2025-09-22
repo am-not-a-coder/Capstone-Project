@@ -35,37 +35,31 @@ export const MakeApiCalls = async (endpoint, options = {}) => {
     try {
         const response = await fetch(fullUrl, finalOptions)
         
-        // Handle 401 Unauthorized - try to refresh token
+        // Handle 401 Unauthorized - try to refresh token once
         if (response.status === 401 && !endpoint.includes('/login') && !endpoint.includes('/refresh-token')) {
             try {
                 const refreshResponse = await fetch(`${API_URL}/api/refresh-token`, {
                     method: 'POST',
                     credentials: 'include'
                 })
-                
                 if (refreshResponse.ok) {
-                    // Token refreshed, retry original request
                     return await fetch(fullUrl, finalOptions)
-                } else {
-                    // Refresh failed, redirect to login
-                    window.location.href = '/login'
-                    return { success: false, status: 401, data: { message: 'Session expired' } }
                 }
             } catch (refreshError) {
                 console.error('Token refresh failed:', refreshError)
-                window.location.href = '/login'
-                return { success: false, status: 401, data: { message: 'Session expired' } }
             }
+            window.dispatchEvent(new CustomEvent('app:toast', { detail: { type: 'error', msg: 'Session expired. Please login again.' } }))
+            window.location.href = '/login'
+            return { success: false, status: 401, data: { message: 'Session expired' } }
         }
+
+        // Handle 403 Forbidden - do not redirect; show clear toast
         if (response.status === 403) {
             let data = null
             try { data = await response.json() } catch {}
-            const msg = (data && (data.message || data.error)) || 'Admins only'
-            window.dispatchEvent(new CustomEvent('app:toast', { detail: { type: 'error', msg: 'Session expired' } }))
-            window.location.href = '/login'
+            const msg = (data && (data.message || data.error)) || 'You do not have permission to perform this action.'
             window.dispatchEvent(new CustomEvent('app:toast', { detail: { type: 'error', msg } }))
             return { success: false, status: 403, error: msg, data }
-            
         }
 
 // Handle blob responses (for file downloads)

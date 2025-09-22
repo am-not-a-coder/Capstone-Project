@@ -283,6 +283,11 @@ def register_routes(app):
     @app.route('/api/user', methods=["POST"])
     @jwt_required()
     def create_user():
+        # admin-only
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
         # get the user input 
         data = request.form
         profilePic = request.files.get("profilePic")
@@ -398,6 +403,11 @@ def register_routes(app):
     @app.route('/api/user/<string:employeeID>/reset-password', methods=["POST"])
     @jwt_required()
     def reset_user_password(employeeID):
+        # admin-only
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
         try:
             data = request.get_json()
             new_password = data.get("newPassword")
@@ -421,7 +431,13 @@ def register_routes(app):
 
     #Delete the user 
     @app.route('/api/user/<string:employeeID>', methods=["DELETE"])
+    @jwt_required()
     def delete_user(employeeID):
+        # admin-only
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
         user = Employee.query.filter_by(employeeID=employeeID).first()
 
         if not user:
@@ -747,8 +763,13 @@ def register_routes(app):
 
     #edit program base on program id
     @app.route('/api/program/<int:programID>', methods=['PUT'])
+    @jwt_required()
     def edit_program(programID):
         try:
+            current_user_id = get_jwt_identity()
+            admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+            if not admin_user or not admin_user.isAdmin:
+                return jsonify({'success': False, 'message': 'Admins only'}), 403
             data = request.get_json()  # Get JSON data from frontend
             programs = Program.query.filter_by(programID=programID).first()  # Find program by ID
             
@@ -791,8 +812,13 @@ def register_routes(app):
 
     #Create new program
     @app.route('/api/program', methods=['POST'])
+    @jwt_required()
     def create_program():
         try:
+            current_user_id = get_jwt_identity()
+            admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+            if not admin_user or not admin_user.isAdmin:
+                return jsonify({'success': False, 'message': 'Admins only'}), 403
             data = request.get_json()  # Get JSON data from frontend
             
             # Handle employeeID - accept string format like "23-45-678"
@@ -835,8 +861,13 @@ def register_routes(app):
 
     #Delete program by ID
     @app.route('/api/program/<int:programID>', methods=['DELETE'])
+    @jwt_required()
     def delete_program(programID):
         try:
+            current_user_id = get_jwt_identity()
+            admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+            if not admin_user or not admin_user.isAdmin:
+                return jsonify({'success': False, 'message': 'Admins only'}), 403
             programs = Program.query.filter_by(programID=programID).first()
             
             if not programs:
@@ -1148,7 +1179,12 @@ def register_routes(app):
         return jsonify(list(result.values())) 
     
     @app.route('/api/accreditation/create_area', methods=["POST"])
+    @jwt_required()
     def create_area():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
         data = request.form
         programID = data.get("programID")
         areaNum = data.get("areaNum")
@@ -1169,7 +1205,12 @@ def register_routes(app):
 
 
     @app.route('/api/accreditation/create_subarea', methods=["POST"])
+    @jwt_required()
     def create_sub_area():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
         data = request.form
         areaID = data.get("selectedAreaID")
         subareaName = data.get("subAreaName")
@@ -1190,7 +1231,12 @@ def register_routes(app):
 
         
     @app.route('/api/accreditation/create_criteria', methods=["POST"])
+    @jwt_required()
     def create_criteria():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
         data = request.form
         subareaID = data.get("selectedSubAreaID")
         criteriaContent = data.get("criteria")
@@ -1218,6 +1264,10 @@ def register_routes(app):
     @app.route('/api/accreditation/upload', methods=["POST"])
     @jwt_required()
     def upload_file():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
        # ==== Get and Validate Form Data ====
         # Get form data
         data = request.form
@@ -1382,6 +1432,10 @@ def register_routes(app):
     @app.route('/api/accreditation/delete_file/<int:criteriaID>', methods=["DELETE"])
     @jwt_required()
     def delete_file(criteriaID):
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
         try:
             criteria = Criteria.query.get(criteriaID)
             if not criteria or not criteria.docID:
@@ -1416,7 +1470,12 @@ def register_routes(app):
 
     # Rate criteria
     @app.route('/api/accreditation/rate/criteria', methods=["POST"])
+    @jwt_required()
     def save_rating():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
         data = request.get_json()    
         ratings = data.get("ratings", {})        
 
@@ -1482,7 +1541,12 @@ def register_routes(app):
     # Save subarea rating
     
     @app.route('/api/accreditation/rate/subarea', methods=["POST"])
+    @jwt_required()
     def save_subarea_rate():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
         data = request.get_json()        
         subareaID = data.get("subareaID")
         rating = float(data.get("rating"))
@@ -1526,7 +1590,12 @@ def register_routes(app):
 
     
     @app.route('/api/accreditation/rate/area', methods=["POST"])
+    @jwt_required()
     def save_area_rate():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
         data = request.get_json()        
         areaID = data.get("areaID")
         rating = float(data.get("rating"))
