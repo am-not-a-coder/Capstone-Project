@@ -114,8 +114,9 @@ class AuditLog(db.Model):
 class Announcement(db.Model):
     __tablename__ = 'announcement'
 
-    announceID = db.Column(db.Integer, primary_key=True, nullable=False)
-    employeeID = db.Column(db.Integer, nullable=False)
+    announceID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    employeeID = db.Column(db.Integer)
+    announceTitle = db.Column(db.String(255))
     announceText = db.Column(db.Text)
     duration = db.Column(db.Date)
 

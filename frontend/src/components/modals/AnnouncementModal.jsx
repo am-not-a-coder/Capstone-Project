@@ -1,20 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark, faBullhorn } from "@fortawesome/free-solid-svg-icons";
+import { apiPost } from "../../utils/api_utils";
 
 const AnnouncementModal = ({ setShowModal, onCreate }) => {
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
+  const [duration, setDuration] = useState("");
+
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!title || !message) return;
-    onCreate({ title, message, date: new Date() });
+    onCreate({ title, message, duration});
     setTitle("");
     setMessage("");
+    setDuration("")
     setShowModal(false);
   };
-
 
   return (
     <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -47,6 +50,12 @@ const AnnouncementModal = ({ setShowModal, onCreate }) => {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
+          </div>
+
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Duration</label>
+            <input type="date" value={duration} onChange={(e) => setDuration(e.target.value)}
+              className="w-full placeholder:opacity-50 px-4 py-2 text-gray-800 transition border rounded-xl border-neutral-400 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-green-600 focus:outline-none"/>
           </div>
 
           <div>

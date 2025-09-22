@@ -504,6 +504,26 @@ def register_routes(app):
 
 
                                         #DATA FETCHING ROUTES
+    @app.route('/api/postAnnounce', methods=["POST"])
+    def post_announce():
+        try:
+            data = request.get_json()
+            title = data.get('title') 
+            message = data.get('message')
+            duration = data.get('duration')
+            userID = data.get('userID')
+
+            new_announcement = Announcement(
+                employeeID = userID,
+                announceTitle = title, 
+                announceText = message, 
+                duration = duration
+                )
+            db.session.add(new_announcement)
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Announcement created successfully'}), 200 
+        except Exception as e:
+            return jsonify({'success': False, 'message': f'Failed to create announcement, {e}'}), 500
 
     # Gets the data count for user, programs, and institutes                                        
     @app.route('/api/count', methods=["GET"])

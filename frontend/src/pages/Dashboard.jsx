@@ -11,7 +11,7 @@ import{
 import {useNavigate} from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useState } from 'react';
-import { apiGet } from '../utils/api_utils';
+import { apiGet, apiPost } from '../utils/api_utils';
 import toast, { Toaster } from 'react-hot-toast'
 import { getCurrentUser } from '../utils/auth_utils';
 import AnnouncementModal from '../components/modals/AnnouncementModal';
@@ -52,13 +52,22 @@ const Dashboard = () => {
         }
     }, [])
 
-    const handleCreateAnnouncement = (announcement) => {
-        console.log("New announcement:", announcement);
-        // Here you can push it to state, API call, etc.
-        };
+   const handleCreateAnnouncement = async (announcement) => {
+      console.log("New announcement:", announcement);
+      // Here you can push it to state, API call, etc.
+        const currentUser = getCurrentUser()
+        try {
+        const response = await apiPost('/api/postAnnounce', {
+            title: announcement.title, 
+            message: announcement.message, 
+            duration: announcement.duration,
+            userID: currentUser.userID
+        })
+        } catch(err){ console.error('Posting announcement to server failed, ', err)}
+	};
 
     
-    return (
+   return (
         <>
         <Toaster />
             {/* Dashboard links */}
