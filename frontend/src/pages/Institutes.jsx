@@ -3,6 +3,7 @@ import { useState } from "react";
 import ProgramCard from "../components/ProgramCard";
 import CreateCard from "../components/CreateCard";
 import CreateForm from "../components/CreateForm";
+import { adminHelper } from '../utils/auth_utils';
 
 const Institutes = () => {
 
@@ -32,6 +33,7 @@ const Institutes = () => {
         const [showForm, setShowForm] = useState(false);
         const [activeModify, setActiveModify] = useState(null);
         const [editIndex, setEditIndex] = useState(null);
+        const isAdmin = adminHelper()
 
         function handleModify(mode) {
           setActiveModify((prev) => (prev === mode ? null : mode));
@@ -102,7 +104,7 @@ const Institutes = () => {
         <>
              <div className="min-h-screen p-3 border rounded-[20px] border-neutral-300 dark:bg-gray-900 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-800">
                 <div className="flex flex-wrap gap-5 mt-20 mb-8 lg:mt-8" >
-                  <CreateCard setShowForm={setShowForm}/>
+                    { isAdmin && (<CreateCard setShowForm={setShowForm}/>)}
                 {institutes.map(institute => (
                     <ProgramCard program={institute} key={institute.code}/>
                 ))}

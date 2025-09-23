@@ -19,14 +19,16 @@ import{
     faIdCardClip,
     faArrowRightFromBracket
 } from '@fortawesome/free-solid-svg-icons';
-import { getCurrentUser } from './utils/auth_utils';
+import { getCurrentUser, adminHelper } from './utils/auth_utils';
 import { apiPost } from './utils/api_utils';
 import { getSocket, resetPresenceListeners } from './utils/websocket_utils';
+
 
 const MainLayout = () => {
   //sets the active pages' path in the link
   const location = useLocation();
   const activePage = location.pathname.replace('/','') || 'Dashboard';
+  const isAdmin = adminHelper()
 
   //toggles Dark Mode
   const [darkMode, setDarkMode] = useState(() =>{
@@ -58,43 +60,43 @@ const MainLayout = () => {
                   icon={faLayerGroup}
                   text="Dashboard"
                   active={activePage === 'Dashboard'}
-                  onClick={() => (window.location.hash = '#/Dashboard')}
+                  onClick={() => navigate('/Dashboard')}
                 />
                 <SidebarLinks
                   icon={faSchool}
                   text="Institutes"
                   active={activePage === 'Institutes'}
-                  onClick={() => (window.location.hash = '#/Institutes')}
+                  onClick={() => navigate('/Institutes')}
                 />
                 <SidebarLinks
                   icon={faGraduationCap}
                   text="Programs"
                   active={activePage === 'Programs'}
-                  onClick={() => (window.location.hash = '#/Programs')}
+                  onClick={() => navigate('/Programs')}
                 />
-                <SidebarLinks
+                { isAdmin && (<SidebarLinks
                   icon={faIdCardClip}
                   text="Accreditation"
                   active={activePage === 'Accreditation'}
-                  onClick={() => (window.location.hash = '#/Accreditation')}
-                />
-                <SidebarLinks
+                  onClick={() => navigate('/Accreditation')}
+                />)}
+                { isAdmin && (<SidebarLinks
                   icon={faUsers}
                   text="Users"
                   active={activePage === 'Users'}
-                  onClick={() => (window.location.hash = '#/Users')}
-                />
+                  onClick={() => navigate('/Users')}
+                />)}
                 <SidebarLinks
                   icon={faCircleCheck}
                   text="Tasks"
                   active={activePage === 'Tasks'}
-                  onClick={() => (window.location.hash = '#/Tasks')}
+                  onClick={() => navigate('/Tasks')}
                 />
                 <SidebarLinks
                   icon={faFileAlt}
                   text="Documents"
                   active={activePage === 'Documents'}
-                  onClick={() => (window.location.hash = '#/Documents')}
+                  onClick={() => navigate('/Documents')}
                 />
 
               <hr className="w-full my-3 border-x border-neutral-400 dark:border-neutral-800" />
@@ -144,6 +146,10 @@ const MainLayout = () => {
                  localStorage.removeItem('session_id')
                  sessionStorage.removeItem('user')
                  sessionStorage.removeItem('LoggedIn')
+                 sessionStorage.removeItem('welcomeShown')
+                 for (const k of Object.keys(sessionStorage)) {
+                  if (k.startsWith('welcomeShown:')) sessionStorage.removeItem(k)
+                }
 
                  //disconnect to websocket
                  const socket = getSocket()

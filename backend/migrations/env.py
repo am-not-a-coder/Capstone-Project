@@ -23,7 +23,11 @@ def get_engine():
         # this works with Flask-SQLAlchemy>=3
         return current_app.extensions['migrate'].db.engine
 
-
+def include_object(object, name, type_, reflected, compare_to):
+    if name and name.startswith('oc_'):
+        return False
+    return True
+    
 def get_engine_url():
     try:
         return get_engine().url.render_as_string(hide_password=False).replace(
@@ -50,6 +54,13 @@ def get_metadata():
         return target_db.metadatas[None]
     return target_db.metadata
 
+def include_object(object, name, type_, reflected, compare_to):
+    """
+    Filter out Nextcloud tables (those starting with 'oc_')
+    """
+    if type_ == "table" and name.startswith("oc_"):
+        return False
+    return True
 
 def run_migrations_offline():
     """Run migrations in 'offline' mode.
@@ -65,7 +76,10 @@ def run_migrations_offline():
     """
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=url, target_metadata=get_metadata(), literal_binds=True
+        url=url, 
+        target_metadata=get_metadata(), 
+        include_object=include_object,
+        literal_binds=True
     )
 
     with context.begin_transaction():
@@ -100,6 +114,7 @@ def run_migrations_online():
         context.configure(
             connection=connection,
             target_metadata=get_metadata(),
+            include_object=include_object,
             **conf_args
         )
 

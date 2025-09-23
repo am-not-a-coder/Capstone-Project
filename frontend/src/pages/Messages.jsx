@@ -42,6 +42,11 @@ const Messages = () => {
   const isSelectedOnline = selectedConversation ? onlineIds.has(String(selectedConversation.id)) : false;
   const [userStatus, setUserStatus] = useState(() => new Map())
 
+  // New Message modal state
+  const [showNewMsgModal, setShowNewMsgModal] = useState(false)
+  const [allUsers, setAllUsers] = useState([])
+  const [userSearch, setUserSearch] = useState('')
+
   const selectedStatus = selectedConversation
     ? (userStatus.get(String(selectedConversation.id)) || 'active')
     : 'active'
@@ -130,6 +135,28 @@ const Messages = () => {
     fetchConversations()
     return () => { mounted = false }
   }, [])
+
+  // Load users when opening the New Message modal
+  useEffect(() => {
+    let mounted = true
+    const loadUsers = async () => {
+      if (!showNewMsgModal) return
+      try {
+        const res = await apiGet('/api/users')
+        if (!mounted || !res?.success) return
+        const list = (res.data?.users || []).map(u => ({
+          id: String(u.employeeID),
+          name: u.name || `${u.fName || ''} ${u.lName || ''}`.trim(),
+          profilePic: u.profilePic || avatar1,
+          isOnline: !!u.isOnline,
+          status: u.status || 'active'
+        }))
+        setAllUsers(list)
+      } catch {}
+    }
+    loadUsers()
+    return () => { mounted = false }
+  }, [showNewMsgModal])
 
   useEffect(() => {
     let mounted = true
@@ -279,7 +306,9 @@ const Messages = () => {
   //handle opening a conversation
   const handleOpenConversation = (data) => {
   const conv = conversation.find(c => String(c.otherParticipant.employeeID) === String(data.id))
-  const conversationId = String(conv?.conversationID)
+  const conversationId = data.conversationId
+    ? String(data.conversationId)
+    : (conv ? String(conv.conversationID) : undefined)
 
   // Leave previous room if any
   const socket = getSocket()
@@ -416,34 +445,48 @@ const Messages = () => {
       {/* Messages List */}
       <div className='grid gap-1 pt-3'>
         {view === 'all' ? (
-          filteredMessages.length > 0 ? (
-            filteredMessages.map((item, index) => {
-              //if in 'see all', item is a messg obj, if in 'active users', item is a user obj
-              const messageObj = view === 'all'
-              ? item
-              : messages.find(msg => msg.id === item.id);
+          <>
+            {/* Pinned New Message item */}
+            <div
+              key={'new_message_button'}
+              className='flex items-center gap-3 p-2 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer'
+              onClick={() => setShowNewMsgModal(true)}
+            >
+              <div className='flex flex-col'>
+                <div className='font-medium text-neutral-900 dark:text-white'>New Message</div>
+                <div className='text-sm text-neutral-500'>Start a new conversation</div>
+              </div>
+            </div>
 
-              return (
-                <MessagesItem
-                  key={item.id}
-                  picture={item.profilePic}
-                  userName={item.user}
-                  message={messageObj ? messageObj.message : ""}
-                  time={messageObj ? messageObj.time : ""}
-                  alert={messageObj ? messageObj.alert : false}
-                  isOnline={onlineIds.has(String(item.id))}
-                  status={userStatus.get(String(item.id)) || 'active'}
-                  
-                  onDelete={view === 'all' ? () => handleDeleteConversation() : undefined}
-                  onOpenConversation={() => handleOpenConversation(item)}
-                  isSelected={selectedConversation ?.id === item.id} //check if this messg is selelcted
-                  showMessagePreview={view === 'all'}
-                />
-              )
-            })
-        ) : (
-          <p className='text-lg italic text-gray-500 text-center'>No new messages</p>
-        )
+            {filteredMessages.length > 0 ? (
+              filteredMessages.map((item, index) => {
+                //if in 'see all', item is a messg obj, if in 'active users', item is a user obj
+                const messageObj = view === 'all'
+                ? item
+                : messages.find(msg => msg.id === item.id);
+
+                return (
+                  <MessagesItem
+                    key={item.id}
+                    picture={item.profilePic}
+                    userName={item.user}
+                    message={messageObj ? messageObj.message : ""}
+                    time={messageObj ? messageObj.time : ""}
+                    alert={messageObj ? messageObj.alert : false}
+                    isOnline={onlineIds.has(String(item.id))}
+                    status={userStatus.get(String(item.id)) || 'active'}
+                    
+                    onDelete={view === 'all' ? () => handleDeleteConversation() : undefined}
+                    onOpenConversation={() => handleOpenConversation(item)}
+                    isSelected={selectedConversation ?.id === item.id} //check if this messg is selelcted
+                    showMessagePreview={view === 'all'}
+                  />
+                )
+              })
+            ) : (
+              <p className='text-lg italic text-gray-500 text-center'>No new messages</p>
+            )}
+          </>
         ) : (
           filteredMessages.length > 0 ? (
             filteredMessages.map((item, index) => {
@@ -517,8 +560,35 @@ const Messages = () => {
                   //Sent messages (right side)
                   <div className='flex justify-end mb-4'>
                     <div className='flex flex-col items-end'>
-                      <div className='text-white px-4 py-3 bg-blue-500 max-w-xs shadow-sm rounded-2xl'>
-                        <p className='text-sm'>{msg.message}</p>
+                      <div className='flex items-start gap-2'>
+                        <div className='text-white px-4 py-3 bg-blue-500 max-w-xs shadow-sm rounded-2xl'>
+                          <p className='text-sm'>{msg.message}</p>
+                        </div>
+                        <button
+                          title='Delete for me'
+                          className='text-xs px-2 py-1 rounded bg-neutral-300 hover:bg-neutral-400 text-neutral-800 dark:bg-neutral-700 dark:text-white'
+                          onClick={async () => {
+                            if (!window.confirm('Delete this message for you only?')) return
+                            try {
+                              const res = await apiDelete(`/api/messages/${msg.id}`)
+                              if (res && res.success) {
+                                const convId = selectedConversation?.conversationId
+                                if (!convId) return
+                                setConversationThreads(prev => ({
+                                  ...prev,
+                                  [convId]: (prev[convId] || []).filter(m => m.id !== msg.id)
+                                }))
+                                window.dispatchEvent(new CustomEvent('app:toast', { detail: { type: 'success', msg: 'Message deleted for you' } }))
+                              } else {
+                                window.dispatchEvent(new CustomEvent('app:toast', { detail: { type: 'error', msg: (res && res.error) || 'Failed to delete message' } }))
+                              }
+                            } catch (e) {
+                              window.dispatchEvent(new CustomEvent('app:toast', { detail: { type: 'error', msg: 'Failed to delete message' } }))
+                            }
+                          }}
+                        >
+                          Delete
+                        </button>
                       </div>
                       <p className='mt-1 text-xs text-neutral-500'>You • {msg.time}</p>
                     </div>
@@ -569,6 +639,101 @@ const Messages = () => {
           </div>
 
         </div>  
+      )}
+
+      {/* New Message Modal */}
+      {showNewMsgModal && (
+        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/40'>
+          <div className='w-[560px] max-h-[70vh] bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-neutral-300 dark:border-neutral-700 p-4 flex flex-col'>
+            <div className='flex items-center justify-between mb-3'>
+              <h3 className='text-lg font-semibold text-neutral-900 dark:text-white'>Start a new message</h3>
+              <button className='px-2 py-1 rounded bg-neutral-200 dark:bg-neutral-700' onClick={() => setShowNewMsgModal(false)}>Close</button>
+            </div>
+            <input
+              type='text'
+              placeholder='Search user by name...'
+              className='mb-3 px-3 py-2 rounded border border-neutral-300 dark:border-neutral-600 dark:bg-neutral-900'
+              value={userSearch}
+              onChange={e => setUserSearch(e.target.value)}
+            />
+            <div className='overflow-y-auto flex-1 pr-1'>
+              {allUsers
+                .filter(u => u.name.toLowerCase().includes(userSearch.toLowerCase()))
+                .map(u => (
+                  <div
+                    key={u.id}
+                    className='flex items-center gap-3 p-2 rounded hover:bg-neutral-100 dark:hover:bg-neutral-700 cursor-pointer'
+                    onClick={async () => {
+                      const conv = conversation.find(c => String(c.otherParticipant.employeeID) === String(u.id))
+                      if (conv) {
+                        const item = {
+                          id: String(u.id),
+                          conversationId: String(conv.conversationID),
+                          profilePic: u.profilePic || avatar1,
+                          user: u.name,
+                          message: '',
+                          time: '',
+                          alert: false
+                        }
+                        setMessages(prev => {
+                          if (prev.find(m => m.id === item.id)) return prev
+                          return [item, ...prev]
+                        })
+                        setShowNewMsgModal(false)
+                        handleOpenConversation(item)
+                        return
+                      }
+                      try {
+                        const res = await apiPost('/api/conversations/start', { participantID: u.id })
+                        if (res && res.success && res.data && res.data.conversationID) {
+                          const newConvId = String(res.data.conversationID)
+                          const item = {
+                            id: String(u.id),
+                            conversationId: newConvId,
+                            profilePic: u.profilePic || avatar1,
+                            user: u.name,
+                            message: '',
+                            time: '',
+                            alert: false
+                          }
+                          setMessages(prev => {
+                            if (prev.find(m => m.id === item.id)) return prev
+                            return [item, ...prev]
+                          })
+                          setConversation(prev => ([
+                            ...prev,
+                            {
+                              conversationID: Number(newConvId),
+                              otherParticipant: {
+                                employeeID: Number(u.id),
+                                name: u.name,
+                                profilePic: u.profilePic || avatar1
+                              },
+                              conversationType: 'direct',
+                              createdAt: res.data.createdAt || null
+                            }
+                          ]))
+                          setShowNewMsgModal(false)
+                          handleOpenConversation(item)
+                        }
+                      } catch (e) {
+                        // no-op; API utils already handle toasts
+                      }
+                    }}
+                  >
+                    <img src={u.profilePic} className='w-8 h-8 rounded-full' />
+                    <div className='flex-1'>
+                      <div className='font-medium text-neutral-900 dark:text-white'>{u.name}</div>
+                      <div className='text-xs text-neutral-500'>{u.isOnline ? 'Online' : 'Offline'}</div>
+                    </div>
+                  </div>
+                ))}
+              {allUsers.filter(u => u.name.toLowerCase().includes(userSearch.toLowerCase())).length === 0 && (
+                <div className='text-sm text-neutral-500'>No users found</div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

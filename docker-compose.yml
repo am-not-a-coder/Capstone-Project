@@ -3,6 +3,7 @@ services:
     build: ./frontend
     ports:
       - "5173:5173"
+      - "0.0.0.0:5174:5173" #can remove later
     environment:
       - REACT_APP_API_URL=http://localhost:5000/api
     depends_on:
@@ -19,7 +20,9 @@ services:
     build: ./backend
     ports:
       - "5000:5000"
-    env_file:
+      - "0.0.0.0:5001:5000" #can remove later
+
+    env_file: 
       - ./backend/.env
     develop:
       watch:
@@ -29,30 +32,7 @@ services:
     volumes:
       - ./uploads:/app/uploads        
 
-  # Comment this out or you're going to build your own nextcloud
-  nextcloud_app:
-    image: nextcloud:29-apache
-    container_name: nextcloud_app
-    restart: always
-    ports:
-      - 8080:80
-    environment:
-      - POSTGRES_HOST=47.84.86.131
-      - POSTGRES_DB=capstone_db
-      - POSTGRES_USER=udm1
-      - POSTGRES_PASSWORD=udmcapstone1!
-      - NEXTCLOUD_ADMIN_USER=admin
-      - NEXTCLOUD_ADMIN_PASSWORD=admin123
-      - NEXTCLOUD_TRUSTED_DOMAINS=localhost
-      - PGID=33
-      - PUID=33
-
-    volumes:
-      - nextcloud_data:/var/www/html  # Named volume instead of bind mount
-
-          
-
-  redis:    
+  redis:
     image: redis:alpine
     ports:
       - '6379:6379'

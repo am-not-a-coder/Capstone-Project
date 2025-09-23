@@ -24,7 +24,7 @@ class Employee(db.Model):
     __tablename__ = 'employee'
 
     employeeID = db.Column(db.String(10), primary_key=True, nullable=False)
-    programID = db.Column(db.Integer, nullable=False)
+    programID = db.Column(db.Integer, db.ForeignKey('program.programID'), nullable=False)
     areaID = db.Column(db.Integer, nullable=False)
     fName = db.Column(db.String(50), nullable=False)
     lName = db.Column(db.String(50))
@@ -35,6 +35,14 @@ class Employee(db.Model):
     profilePic = db.Column(db.Text)
     isAdmin = db.Column(db.Boolean, default=False)
     isOnline = db.Column(db.Boolean, default=False)
+    experiences = db.Column(db.Text)
+    
+    # MFA/OTP fields
+    otpcode = db.Column(db.String(6))
+    otpexpiry = db.Column(db.DateTime(timezone=True))
+    otpverified = db.Column(db.Boolean, default=False)
+    # Relationships
+    program = db.relationship("Program", foreign_keys=[programID], backref="employees")
 
 class Area(db.Model):
     __tablename__ = 'area'
@@ -59,7 +67,7 @@ class Program(db.Model):
     programName = db.Column(db.String(100))
     programColor = db.Column(db.String(30))
 
-    dean = db.relationship("Employee", backref="programs")
+    dean = db.relationship("Employee", foreign_keys=[employeeID], backref="programs")
     areas = db.relationship("Area", back_populates="program", cascade="all, delete-orphan")
 
 class Subarea(db.Model):
@@ -189,3 +197,12 @@ class Message(db.Model):
     # Relationships
     conversation = db.relationship("Conversation", back_populates="messages")
     sender = db.relationship("Employee", backref="sent_messages")
+
+
+class MessageDeletion(db.Model):
+    __tablename__ = 'message_deletion'
+
+    id = db.Column(db.Integer, primary_key=True, nullable=False)
+    messageID = db.Column(db.Integer, db.ForeignKey('message.messageID'), nullable=False)
+    employeeID = db.Column(db.String(50), db.ForeignKey('employee.employeeID'), nullable=False)
+    deletedAt = db.Column(db.DateTime, default=datetime.utcnow)

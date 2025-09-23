@@ -1,15 +1,14 @@
 import json
-from flask import jsonify, request, current_app, Response
+from tkinter import FALSE
+from flask import jsonify, request, session, send_from_directory, current_app, Response, render_template
 from app.models import Employee
-from app import db, redis_client, socketio
-from sqlalchemy import text, func, desc
-from werkzeug.security import check_password_hash, generate_password_hash, _hash_internal    
-from urllib.parse import unquote                    
+from app import db, redis_client, socketio, mail
+from werkzeug.security import check_password_hash, generate_password_hash, _hash_internal
 from werkzeug.utils import secure_filename
 from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, decode_token, exceptions, verify_jwt_in_request                                
 from flask_jwt_extended import set_access_cookies, set_refresh_cookies, unset_jwt_cookies
 from flask_jwt_extended.exceptions import JWTExtendedException
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 from app.utils.normalize_path import normalize_path
 from app.utils.file_extractor import extract_pdf, extract_docs, extract_excel, extract_image
 from app.utils.tagging_utils import rule_based_tag, extract_global_tfid_tags
@@ -20,7 +19,11 @@ import os
 import re
 import time
 import redis
-from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message
+from app.otp_utils import generate_random
+from flask_mail import Message as MailMessage
+from app.login_handlers import complete_user_login
+from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message, MessageDeletion
+from sqlalchemy import cast, String, func
 
 
 def register_routes(app):
@@ -58,70 +61,78 @@ def register_routes(app):
                 return jsonify({'success': False, 'message': 'User account has invalid password format. Contact administrator.'}), 400
                 
             if is_valid_password: 
-                
-                #remove this 
-                user.isOnline = True
-                db.session.commit()
+                bypass = redis_client.get(f'otp_bypass:{empID}')
+                if bypass:
+                    return complete_user_login(user, empID)
+                else:
+                    otp_code = generate_random()
+                    otp_expiry = datetime.now(timezone.utc) + timedelta(minutes=2)
+                    user.otpcode = otp_code
+                    user.otpexpiry = otp_expiry
+                    db.session.commit()
 
-                session_id = f'{empID}:{int(time.time())}'
-                
-                # Store in Redis
-                redis_client.setex(f'session:{session_id}', 3600, 'active')
-                redis_client.sadd('online_users', empID)
-                redis_client.hset('user_status', empID, 'active')
-                print(f"Session created: session:{session_id}")  # Debug log
-                try:
-                    # Create both access token (15 minutes) and refresh token (7 days)
-
-
-                    access_token = create_access_token(
-                        identity=empID,
-                        expires_delta=timedelta(minutes=15),  # Short-lived for security
-                        additional_claims={
-                            'role': 'admin' if user.isAdmin else 'user',
-                            'firstName': user.fName,
-                            'lastName': user.lName
-                        }
+                    html_body = render_template(
+                        'email/otp.html',
+                        otp=str(otp_code),
+                        user_name=user.fName,
+                        app_name='UDMS',
+                        recipients=user.email,
+                        logo_url='https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fudmwebsite.udm.edu.ph%2Fwp-content%2Fuploads%2F2023%2F11%2Fudm-logo-1.png&f=1&nofb=1&ipt=a0799b507adde1d83ee8939c52524c6fb2053df034c369f55787f6b1d5db7574'
                     )
-                    
-                    refresh_token = create_refresh_token(
-                        identity=empID,
-                        expires_delta=timedelta(days=7)
-                    )
-                    
-                    
-                    user_data = {
-                        'employeeID': user.employeeID,
-                        'name': f"{user.fName} {user.lName}{user.suffix or ''}",
-                        'firstName': user.fName,
-                        'lastName': user.lName,
-                        'suffix': user.suffix,
-                        'email': user.email,
-                        'contactNum': user.contactNum,
-                        'profilePic': user.profilePic,
-                        'isAdmin': user.isAdmin,
-                        'role': 'admin' if user.isAdmin else 'user',
-                        'sessionID': session_id
-                    }
-                    
-                    resp = jsonify({
-                        'success': True,
-                        'message': f"Welcome!, {user_data['lastName']}",
-                        'user': user_data
-                    })
-                    set_access_cookies(resp, access_token)
-                    set_refresh_cookies(resp, refresh_token)
-                    return resp
-                
-                except Exception as jwt_error:
-                    current_app.logger.error(f"JWT Error: {jwt_error}")
-                    return jsonify({'success': False, 'message': 'Token generation failed'}), 500
+                    msg = MailMessage('Your UDMS Login OTP Code', recipients=[user.email])
+                    msg.html = html_body
 
+                    redis_client.hset('pending_otps', empID, 'waiting')
+                    mail.send(msg)
+
+                    return jsonify({'success': True, 'message': 'OTP email sent succesfully'})
             else:
-                return jsonify({'success': False,'message': "Invalid password"})
+                return jsonify({'success': False, 'message': 'Invalid password'}), 401
         except Exception as e:
             current_app.logger.error(f"Login error: {e}")
             return jsonify({'success': False, 'message': 'Internal server error'}), 500
+    
+    @app.route('/api/verify-otp', methods=['POST'])
+    def verify_otp():
+        data = request.get_json()
+        otp = data.get('otp')
+        employeeID = data.get('employeeID')
+
+        if not employeeID:
+            return jsonify({'success': False, 'message': 'Employee ID are required.'}), 400
+        if not otp:
+            return jsonify({'success': False, 'message': 'OTP are required'}), 400
+        if not otp.isdigit() or not len(otp) == 6:
+            return jsonify({'success': False, 'message': 'OTP "ONLY" contains number and MUST be 6 digits.'}), 400
+        pending_status = redis_client.hget('pending_otps', employeeID)
+        if not pending_status:
+            return jsonify({'success': False, 'message': 'No pending OTP request for this user.'}), 400
+        #why this?
+        user = Employee.query.filter_by(employeeID=employeeID).first()
+        if not user:
+            return jsonify({'success': False, 'message': 'User not found in database.'}), 400
+        current_time = datetime.now(timezone.utc)
+        otp_expiry = user.otpexpiry
+        if otp_expiry is None:
+            return jsonify({'success': False, 'message': 'No OTP expiry set. Please request a new OTP.'}), 400
+        if otp_expiry.tzinfo is None:
+            otp_expiry = otp_expiry.replace(tzinfo=timezone.utc)
+        if current_time > otp_expiry:
+            return jsonify({'success': False, 'message': 'OTP has expired'}), 400
+            #main check
+        if not str(otp) == str(user.otpcode):
+            return jsonify({'success': False, 'message': "OTP Doesn't match!"}), 400
+        else:
+            #clean up redis otp:
+            redis_client.hdel('pending_otps', employeeID)
+            #set otp_bypass for 24hrs
+            redis_client.setex(f'otp_bypass:{employeeID}', 24*60*60, '1')
+            #clean otp storage
+            user.otpcode = None
+            user.otpexpiry = None
+            db.session.commit()
+            return complete_user_login(user, employeeID)
+
         
     @app.route('/api/me', methods=['GET'])
     @jwt_required()
@@ -130,12 +141,15 @@ def register_routes(app):
         user = Employee.query.filter_by(employeeID=emp_id).first()
         if not user:
             return jsonify({'success': False, 'message': 'User not found'})
+        program_name = user.program.programCode if user.program else None
         return jsonify({
             'success': True,
             'user': {
                 'employeeID': user.employeeID,
                 'firstName': user.fName,
                 'lastName': user.lName,
+                'programID': user.programID,
+                'programCode': program_name,
                 'suffix' : user.suffix,
                 'email': user.email,
                 'contactNum': user.contactNum,
@@ -335,6 +349,11 @@ def register_routes(app):
     @app.route('/api/user', methods=["POST"])
     @jwt_required()
     def create_user():
+        # admin-only
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
         # get the user input 
         data = request.form
         profilePic = request.files.get("profilePic")
@@ -450,6 +469,11 @@ def register_routes(app):
     @app.route('/api/user/<string:employeeID>/reset-password', methods=["POST"])
     @jwt_required()
     def reset_user_password(employeeID):
+        # admin-only
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
         try:
             data = request.get_json()
             new_password = data.get("newPassword")
@@ -473,7 +497,13 @@ def register_routes(app):
 
     #Delete the user 
     @app.route('/api/user/<string:employeeID>', methods=["DELETE"])
+    @jwt_required()
     def delete_user(employeeID):
+        # admin-only
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
         user = Employee.query.filter_by(employeeID=employeeID).first()
 
         if not user:
@@ -699,6 +729,60 @@ def register_routes(app):
                 'detail': response.text
             }), response.status_code
 
+    @app.route('/api/profile', methods=['POST'])
+    @jwt_required()
+    def change_profile():
+        current_user = get_jwt_identity()
+        user = Employee.query.filter_by(employeeID=current_user).first()
+
+        if not user:
+            return jsonify({'success': False, 'message': 'you cannot edit this user.'}), 404
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({'success': False, 'message': 'no data passed.'}), 400
+
+            suffix = data.get('suffix')
+            email = data.get('email')
+            contactNum = data.get('contactNum')
+            experience = data.get('experience')
+            password = data.get('password')
+
+            if email and not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+                return jsonify({'success': False, 'message': 'Invalid email format'}), 400
+        
+            if password and len(password) < 6:
+                return jsonify({'success': False, 'message': 'Password must be at least 6 characters'}), 400
+            if suffix is not None:
+                user.suffix = suffix
+            if email is not None:
+                user.email = email
+            if contactNum is not None:
+                user.contactNum = contactNum
+            if experience is not None:
+                user.experiences = experience
+            if password is not None:
+                user.password = generate_password_hash(password, method="pbkdf2:sha256")
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': 'Profile updated successfully',
+                'updated_user_data': {
+                    'firstName': user.fName,
+                    'lastName': user.lName,
+                    'suffix': user.suffix,
+                    'email': user.email,
+                    'experience': user.experiences,
+                    'contactNum': user.contactNum,
+                }
+            }), 200
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': 'Failed to update profile.'})
+
+
+                                                            
     #Get the users 
     @app.route('/api/users', methods=["GET"])
     @jwt_required()
@@ -917,9 +1001,14 @@ def register_routes(app):
                                         #PROGRAM PAGE ROUTES
     
     #edit program base on program id
-    @app.route('/api/program/<int:programID>', methods=['PUT'])    
+    @app.route('/api/program/<int:programID>', methods=['PUT'])
+    @jwt_required()
     def edit_program(programID):
         try:
+            current_user_id = get_jwt_identity()
+            admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+            if not admin_user or not admin_user.isAdmin:
+                return jsonify({'success': False, 'message': 'Admins only'}), 403
             data = request.get_json()  # Get JSON data from frontend
             programs = Program.query.filter_by(programID=programID).first()  # Find program by ID
             
@@ -962,8 +1051,13 @@ def register_routes(app):
 
     #Create new program
     @app.route('/api/program', methods=['POST'])
+    @jwt_required()
     def create_program():
         try:
+            current_user_id = get_jwt_identity()
+            admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+            if not admin_user or not admin_user.isAdmin:
+                return jsonify({'success': False, 'message': 'Admins only'}), 403
             data = request.get_json()  # Get JSON data from frontend
             
             # Handle employeeID - accept string format like "23-45-678"
@@ -1006,8 +1100,13 @@ def register_routes(app):
 
     #Delete program by ID
     @app.route('/api/program/<int:programID>', methods=['DELETE'])
+    @jwt_required()
     def delete_program(programID):
         try:
+            current_user_id = get_jwt_identity()
+            admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+            if not admin_user or not admin_user.isAdmin:
+                return jsonify({'success': False, 'message': 'Admins only'}), 403
             programs = Program.query.filter_by(programID=programID).first()
             
             if not programs:
@@ -1062,30 +1161,47 @@ def register_routes(app):
             current_app.logger.error(f"Delete program error: {str(e)}")
             return jsonify({'error': 'Database error occurred'}), 500
         
-
-    #Get the program
-    @app.route('/api/program', methods=["GET"])
-    def get_program():
-        programs = Program.query.all()
+    @app.route('/api/program', methods=['GET'])
+    @jwt_required()
+    def get_user_program():
+        try:
+            current_user_id = get_jwt_identity()
+            current_user = Employee.query.filter_by(employeeID=current_user_id).first()
+            
+            if not current_user:
+                return jsonify({'success': False, 'message': 'User not found'}), 404
+            
+            # If user is admin, return all programs
+            if current_user.isAdmin:
+                programs = Program.query.all()
+            else:
+                # If regular user, return only their assigned program
+                programs = Program.query.filter_by(programID=current_user.programID).all()
                     
-        program_list = []
+            program_list = []
+            for program in programs:
+                dean = program.dean
+                program_data = {
+                    'programID': program.programID,
+                    'programDean': f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A",
+                    'programCode': program.programCode,
+                    'programName': program.programName,
+                    'programColor': program.programColor,
+                    'employeeID': program.employeeID
+                }
+                program_list.append(program_data)
 
-        for program in programs:
+            return jsonify({
+                'success': True,
+                'programs': program_list,
+                'isAdmin': current_user.isAdmin
+            }), 200
+            
+        except Exception as e:
+            current_app.logger.error(f"Get user program error: {e}")
+            return jsonify({'success': False, 'message': 'Failed to fetch programs'}), 500
 
-            dean = program.dean
 
-            program_data = {
-                'programID': program.programID,
-
-                'programDean': f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A",
-
-                'programCode': program.programCode,
-                'programName': program.programName,
-                'programColor': program.programColor,
-                'employeeID': program.employeeID  # Include the foreign key ID
-            } 
-            program_list.append(program_data)
-        return jsonify({"programs": program_list}), 200
 
     #Get the area for displaying in tasks
     @app.route('/api/area', methods=["GET"])
@@ -1302,7 +1418,12 @@ def register_routes(app):
         return jsonify(list(result.values())) 
     
     @app.route('/api/accreditation/create_area', methods=["POST"])
+    @jwt_required()
     def create_area():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
         data = request.form
         programID = data.get("programID")
         areaNum = data.get("areaNum")
@@ -1323,7 +1444,12 @@ def register_routes(app):
 
 
     @app.route('/api/accreditation/create_subarea', methods=["POST"])
+    @jwt_required()
     def create_sub_area():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
         data = request.form
         areaID = data.get("selectedAreaID")
         subareaName = data.get("subAreaName")
@@ -1344,7 +1470,12 @@ def register_routes(app):
 
         
     @app.route('/api/accreditation/create_criteria', methods=["POST"])
+    @jwt_required()
     def create_criteria():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
         data = request.form
         subareaID = data.get("selectedSubAreaID")
         criteriaContent = data.get("criteria")
@@ -1374,6 +1505,10 @@ def register_routes(app):
     @app.route('/api/accreditation/upload', methods=["POST"])
     @jwt_required()        
     def upload_file():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
        # ==== Get and Validate Form Data ====
         # Get form data
         data = request.form
@@ -1592,6 +1727,10 @@ def register_routes(app):
     @app.route('/api/documents/delete_file/<int:docID>', methods=["DELETE"])
     @jwt_required()
     def delete_file(docID):
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
         try:
             # Check if metadata exists first
             doc = Document.query.get(docID)
@@ -1884,7 +2023,12 @@ def register_routes(app):
 
     # === Rate criteria ===
     @app.route('/api/accreditation/rate/criteria', methods=["POST"])
+    @jwt_required()
     def save_rating():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
         data = request.get_json()    
         ratings = data.get("ratings", {})        
 
@@ -1950,7 +2094,12 @@ def register_routes(app):
     # Save subarea rating
     
     @app.route('/api/accreditation/rate/subarea', methods=["POST"])
+    @jwt_required()
     def save_subarea_rate():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
         data = request.get_json()        
         subareaID = data.get("subareaID")
         rating = float(data.get("rating"))
@@ -1994,7 +2143,12 @@ def register_routes(app):
 
     
     @app.route('/api/accreditation/rate/area', methods=["POST"])
+    @jwt_required()
     def save_area_rate():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
         data = request.get_json()        
         areaID = data.get("areaID")
         rating = float(data.get("rating"))
@@ -2101,7 +2255,15 @@ def register_routes(app):
         if not participants:
             return jsonify({'success': False, 'message': 'Access Denied.'}), 403
 
-        messages = Message.query.filter_by(conversationID=conversation_id).order_by(Message.sentAt.asc()).all()
+        # Exclude messages the current user chose to hide
+        hidden_ids_subq = db.session.query(MessageDeletion.messageID).filter(
+            MessageDeletion.employeeID == str(current_user_id)
+        ).subquery()
+
+        messages = db.session.query(Message).filter(
+            Message.conversationID == conversation_id,
+            ~Message.messageID.in_(hidden_ids_subq)
+        ).order_by(Message.sentAt.asc()).all()
 
         messages_data = []
         for msg in messages:
@@ -2117,6 +2279,151 @@ def register_routes(app):
             'success': True,
             'messages': messages_data
         }), 200
+
+    @app.route('/api/conversations', methods=['GET'])
+    @jwt_required()
+    def get_conversations():
+        current_user_id = get_jwt_identity()
+        
+        # Get conversations where current user participates
+        
+        user_conversation_ids = db.session.query(
+            ConversationParticipant.conversationID
+        ).filter(
+            ConversationParticipant.employeeID == current_user_id
+        ).subquery()
+        
+        # Get other participants in those conversations
+        conversations = db.session.query(
+            Conversation.conversationID,
+            Conversation.conversationType,
+            Conversation.createdAt,
+            ConversationParticipant.employeeID.label('other_participant_id'),
+            Employee.fName,
+            Employee.lName,
+            Employee.profilePic
+        ).join(
+            ConversationParticipant, 
+            Conversation.conversationID == ConversationParticipant.conversationID
+        ).join(
+            Employee, 
+            ConversationParticipant.employeeID == Employee.employeeID
+        ).filter(
+            Conversation.conversationID.in_(user_conversation_ids),
+            ConversationParticipant.employeeID != current_user_id
+        ).all()
+        
+        # Format results (same as before)
+        conversations_data = []
+        for conv in conversations:
+            conversations_data.append({
+                'conversationID': conv.conversationID,
+                'otherParticipant': {
+                    'employeeID': conv.other_participant_id,
+                    'name': f"{conv.fName} {conv.lName}",
+                    'profilePic': conv.profilePic
+                },
+                'conversationType': conv.conversationType,
+                'createdAt': conv.createdAt.isoformat() if conv.createdAt else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'conversations': conversations_data
+        }), 200
+
+    @app.route('/api/conversations/start', methods=['POST'])
+    @jwt_required()
+    def conversations_start():
+        try:
+            current_user_id = get_jwt_identity()
+            data = request.get_json() or {}
+            participant_id = data.get('participantID')
+
+            if not participant_id:
+                return jsonify({'success': False, 'message': 'participantID is required'}), 400
+            # Accept IDs that may contain non-digits (e.g., formatted IDs like 22-16-075)
+            raw_pid = str(participant_id).strip()
+            normalized_pid = re.sub(r'\D', '', raw_pid)
+            if not raw_pid:
+                return jsonify({'success': False, 'message': 'participantID is required'}), 400
+            # Prevent self-conversation (compare after stripping non-digits)
+            if re.sub(r'\D', '', str(current_user_id).strip()) == normalized_pid:
+                return jsonify({'success': False, 'message': 'Cannot start a conversation with yourself'}), 400
+
+            # Validate participant exists
+            # Try exact string match, or match on digits-only using regexp_replace
+            target_user = db.session.query(Employee).filter(
+                (cast(Employee.employeeID, String) == raw_pid) |
+                (func.regexp_replace(cast(Employee.employeeID, String), '[^0-9]', '', 'g') == normalized_pid)
+            ).first()
+            if not target_user:
+                return jsonify({'success': False, 'message': 'Participant not found'}), 404
+            
+            # Find existing direct conversation between both users
+            current_user_id_str = str(current_user_id).strip()
+            participant_id_str = raw_pid
+
+            user_conv_ids = db.session.query(
+                ConversationParticipant.conversationID
+            ).filter(
+                ConversationParticipant.employeeID == current_user_id_str
+            ).subquery()
+
+            other_conv_ids = db.session.query(
+                ConversationParticipant.conversationID
+            ).filter(
+                ConversationParticipant.employeeID == participant_id_str
+            ).subquery()
+
+            existing_conv = db.session.query(Conversation).filter(
+                Conversation.conversationType == 'direct',
+                Conversation.conversationID.in_(user_conv_ids),
+                Conversation.conversationID.in_(other_conv_ids)
+            ).first()
+
+            if existing_conv:
+                return jsonify({
+                    'success': True,
+                    'conversationID': existing_conv.conversationID,
+                    'conversationType': existing_conv.conversationType,
+                    'createdAt': existing_conv.createdAt.isoformat() if existing_conv.createdAt else None,
+                    'otherParticipant': {
+                        'employeeID': str(target_user.employeeID),
+                        'name': f"{target_user.fName} {target_user.lName}",
+                        'profilePic': target_user.profilePic
+                    }
+                }), 200
+
+            # Create new direct conversation
+            new_conv = Conversation(
+                conversationType='direct',
+                createdBy=current_user_id_str
+            )
+            db.session.add(new_conv)
+            db.session.flush()
+
+            # Add both participants
+            db.session.add_all([
+                ConversationParticipant(conversationID=new_conv.conversationID, employeeID=current_user_id_str),
+                ConversationParticipant(conversationID=new_conv.conversationID, employeeID=participant_id_str)
+            ])
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'conversationID': new_conv.conversationID,
+                'conversationType': new_conv.conversationType,
+                'createdAt': new_conv.createdAt.isoformat() if new_conv.createdAt else None,
+                'otherParticipant': {
+                    'employeeID': str(target_user.employeeID),
+                    'name': f"{target_user.fName} {target_user.lName}",
+                    'profilePic': target_user.profilePic
+                }
+            }), 201
+        except Exception as e:
+            current_app.logger.error(f"Start conversation error: {e}")
+            return jsonify({'success': False, 'message': 'Internal server error'}), 500
 
     @app.route('/api/conversations/<int:conversation_id>/message', methods=['POST'])
     @jwt_required()
@@ -2160,6 +2467,43 @@ def register_routes(app):
             'success': True,
             'message': 'Message sent successfully'
         }), 201
+
+    @app.route('/api/messages/<int:message_id>', methods=['DELETE'])
+    @jwt_required()
+    def hide_message_for_user(message_id):
+        try:
+            current_user_id = get_jwt_identity()
+            # Ensure the message exists and user is a participant of the conversation
+            msg = Message.query.filter_by(messageID=message_id).first()
+            if not msg:
+                return jsonify({'success': False, 'message': 'Message not found'}), 404
+
+            is_participant = ConversationParticipant.query.filter_by(
+                conversationID=msg.conversationID,
+                employeeID=str(current_user_id)
+            ).first() is not None
+            if not is_participant:
+                return jsonify({'success': False, 'message': 'Forbidden'}), 403
+
+            # Idempotent insert: if already hidden, return success
+            already = MessageDeletion.query.filter_by(
+                messageID=message_id,
+                employeeID=str(current_user_id)
+            ).first()
+            if already:
+                return jsonify({'success': True}), 200
+
+            deletion = MessageDeletion(
+                messageID=message_id,
+                employeeID=str(current_user_id)
+            )
+            db.session.add(deletion)
+            db.session.commit()
+            return jsonify({'success': True}), 200
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Hide message error: {e}")
+            return jsonify({'success': False, 'message': 'Internal server error'}), 500
                     
     @app.route('/api/conversations/<int:conversation_id>', methods=['DELETE'])
     @jwt_required()
@@ -2188,5 +2532,4 @@ def register_routes(app):
         
                     
         
-
     
