@@ -5,8 +5,10 @@ from requests.auth import HTTPBasicAuth
 from io import BytesIO
 from werkzeug.utils import secure_filename
 from flask import Response, stream_with_context, send_file, jsonify
+from app.models import Document
 
-NEXTCLOUD_URL = os.getenv('HOME_NEXTCLOUD_URL') or os.getenv('NEXTCLOUD_URL')
+
+NEXTCLOUD_URL = os.getenv('HOME_NEXTCLOUD_URL') or os.getenv('NEXTCLOUD_URL') or os.getenv('LIBRARY_NEXTCLOUD_URL')
 NEXTCLOUD_USER = os.getenv('NEXTCLOUD_USER')
 NEXTCLOUD_PASSWORD = os.getenv('NEXTCLOUD_PASSWORD')
 
@@ -120,8 +122,9 @@ def preview_from_nextcloud(doc_path):
 def rename_file_nextcloud(old_path, new_path):
     UDMS_URL = f"{NEXTCLOUD_URL.rstrip('/')}/UDMS_Repository/"
    
-    old_url = UDMS_URL + quote(old_path)
-    new_url = UDMS_URL + quote(new_path)
+    old_url = UDMS_URL + '/'.join(quote(part) for part in old_path.split('/'))
+    new_url = UDMS_URL + '/'.join(quote(part) for part in new_path.split('/'))
+
     print(f"Renaming in Nextcloud: {old_url} -> {new_url}")
 
     try:
@@ -206,7 +209,9 @@ def list_files_from_nextcloud():
     root = {"files": [], "folders": {}}
     file_ext = {"pdf", "docx", "xlsx", "txt", "pptx", "jpg", "png", "jpeg", "xls", "ppt", "csv"}
 
-    # Convert flat paths into directory tree
+    # Preload all docs from DB into a dict {path: Document}
+    db_docs = {doc.docPath: doc for doc in Document.query.all()}
+
     for path, resp in responses:
         parts = path.split("/")
         current = root
@@ -221,31 +226,36 @@ def list_files_from_nextcloud():
             if is_last:
                 ext = os.path.splitext(part)[1].lower().lstrip(".")
                 if ext in file_ext:
-                    # File metadata
+                    # Add UDMS_Repository to match DB docPath
+                    db_doc = db_docs.get(f"UDMS_Repository/{path}")
+
                     file_obj = {
-                        "name": part,
+                        "name": unquote(part),
                         "type": "file",
                         "size": int(size.text) if size is not None and size.text else None,
                         "mime": mime.text if mime is not None else None,
-                        "modified": modified.text if modified is not None else None
+                        "modified": modified.text if modified is not None else None,
+                        "docID": db_doc.docID if db_doc else None,
+                        "docName": db_doc.docName if db_doc else None,
+                        "docTag": db_doc.tags if db_doc else None,
                     }
                     current["files"].append(file_obj)
                 else:
-                    # Folder metadata
                     if part not in current["folders"]:
-                        current["folders"][part] = {
+                        current["folders"][unquote(part)] = {
                             "files": [],
                             "folders": {},
                             "type": "folder",
                             "meta": {
-                                "name": part,                            
+                                "name": unquote(part),
                                 "modified": modified.text if modified is not None else None
                             }
                         }
-            else:
-                if part not in current["folders"]:
-                    current["folders"][part] = {"files": [], "folders": {}, "meta": {"name": part}}
-                current = current["folders"][part]
+            else:                
+                decoded_part = unquote(part)
+                if decoded_part not in current["folders"]:
+                    current["folders"][decoded_part] = {"files": [], "folders": {}, "meta": {"name": decoded_part}}
+                current = current["folders"][decoded_part]
 
     return root
 

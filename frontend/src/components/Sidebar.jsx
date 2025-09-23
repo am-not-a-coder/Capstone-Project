@@ -3,16 +3,23 @@ import {
     faAngleRight,
     faAngleLeft,
     faSearch,
+    faCircleNotch
     } 
 from '@fortawesome/free-solid-svg-icons';
 import udmsLogo from '../assets/udms-logo.png';
 import { createContext, useState, useContext } from 'react';
-import { Link } from 'react-router-dom';
-import { useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useEffect} from 'react';
+import { apiGet } from '../utils/api_utils';
 
 export const SidebarContext = createContext();
     const Sidebar = ({children}) => {
 	const [expanded, setExpanded] = useState(false);
+    const [query, setQuery] = useState("");
+    const [results, setResults] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [directory, setDirectory] = useState(null);
+    const navigate = useNavigate();
 
     // Detect screen size if viewport is large enough for sidebar to expand at start
     const isLargeScreen = window.matchMedia('(min-width: 1024px)').matches; // Check if the screen is large enough for sidebar expansion
@@ -21,6 +28,106 @@ export const SidebarContext = createContext();
     useEffect(() => {
         setExpanded(isLargeScreen);
     }, [isLargeScreen]);
+
+    
+    // Fetch directory structure for navigation
+    useEffect(() => {
+        const fetchDirectory = async () => {
+            try {
+                const res = await apiGet('/api/documents');
+                setDirectory(res.data);
+            } catch (err) {
+                console.error("Failed to fetch directory:", err);
+            }
+        };
+        fetchDirectory();
+    }, []);
+
+    
+    useEffect(() => {
+      // Don't call API if query is empty
+      if (!query.trim()) {
+        setResults([]);
+        return;
+      }
+      setLoading(true)
+      const delayDebounce = setTimeout(async () => {
+        try {
+          const res = await apiGet(`/api/search?q=${encodeURIComponent(query)}`);
+    
+          Array.isArray(res.data) ? setResults(res.data) : setResults([]);
+          console.log(res.data); // should log Array(2)
+        } catch (err) {
+          console.error("Search failed:", err);
+        } finally{
+          setLoading(false)
+        }
+      }, 300); // 300ms debounce
+    
+      return () => clearTimeout(delayDebounce);
+    }, [query]);
+    
+    
+      const handleSearch = async (e) => {
+        e.preventDefault();
+        if(!query.trim()) return;
+        try{
+            const res = await apiGet(`/api/search?q=${encodeURIComponent(query)}`);      
+    
+            Array.isArray(res.data) ? setResults(res.data) : setResults([]);
+            console.log(res.data); 
+          } catch(err){
+            console.error("Search failed: ", err)
+          }
+      }
+
+      
+  const handleResultClick = (doc) => {
+     if (!directory) {
+            console.warn("Directory not loaded yet");
+            return;
+        }
+
+        let pathArray = doc.docPath.split('/').filter(Boolean);
+        
+        if(pathArray.length > 0 && pathArray[0] === "UDMS_Repository"){
+            pathArray = pathArray.slice(1);
+        }
+
+
+    pathArray = pathArray.map(decodeURIComponent);
+
+    let folderPath = directory;
+    let filePath = []
+
+    for (const pathPart of pathArray){
+      if(folderPath?.folders?.[pathPart]){
+        folderPath = folderPath.folders[pathPart]
+        filePath.push(pathPart)
+      } else{
+         console.warn(`Path part '${pathPart}' not found. Using valid portion: [${filePath.join(', ')}]`);
+      break;
+      }
+    }
+
+    const folderPaths = filePath.map((_, i) => filePath.slice(0, i + 1).join('/')); 
+
+
+
+    navigate('/Documents', {
+        state: {
+            navigateToFile: {
+                currentPath: filePath,
+                expandedFolders: folderPaths,
+                highlightedFile: doc.docID
+            }
+        }
+    });
+
+    setQuery("");
+    
+  }
+
 
     // Sidebar component with state for expanded/collapsed
    return(
@@ -40,14 +147,54 @@ export const SidebarContext = createContext();
                 
 
                 {/* Search bar*/}
-                <div className="relative px-1 py-2 ml-1 overflow-hidden">
-                    <FontAwesomeIcon icon={faSearch} className={`absolute text-zuccini-800 ml-3.5 mt-3.5 ${expanded ? '' : 'cursor-pointer'}`} />
-                    <input
-                        type="text" 
-                        placeholder="Search..." 
-                        className={`min-w-65 p-2 pl-10 text-black placeholder-neutral-400 rounded-xl bg-gray-300 border dark:bg-gray-950 dark:border-gray-800 border-gray-900 transition-colors duration-500 focus:outline-none focus:ring-2 focus:ring-zuccini-900 ${expanded ? '' : 'cursor-pointer'} dark:border-neutral-800 dark:bg-[#242424]`}
-                    />
+                <div className='relative'>
+                    <div className="relative px-1 py-2 ml-1 overflow-hidden">
+                        <FontAwesomeIcon icon={faSearch} className={`absolute text-zuccini-800 ml-3.5 mt-3.5 ${expanded ? '' : 'cursor-pointer'}`} />
+                        <input
+                            type="text" 
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                             onKeyDown={(e) => {
+                                if (e.key === "Enter") handleSearch(); // trigger search on Enter key
+                            }}
+                            placeholder="Search..." 
+                            className={`min-w-65 p-2 pl-10 text-gray-800 dark:text-gray-200 placeholder-neutral-400 rounded-xl bg-gray-300 border dark:bg-gray-950 dark:border-gray-800 border-gray-900 transition-colors duration-500 focus:outline-none focus:ring-2 focus:ring-zuccini-900 ${expanded ? '' : 'cursor-pointer'} dark:border-neutral-800 dark:bg-[#242424]`}
+                        />
+                    </div>
+                 
+        
+                        {/* Search results */}
+                    {query.trim() !== "" && (
+                        <ul className="absolute z-10 w-full max-w-[300px] p-2 pt-3 overflow-y-scroll border border-gray-300 right-0 top-full bg-gray-100/50 backdrop-blur-sm rounded-b-xl text-neutral-800 dark:text-white dark:border-gray-900 dark:bg-gray-800/20 max-h-72 ">
+                        {loading ? (
+                            <li className="flex justify-center p-3">
+                            <FontAwesomeIcon icon={faCircleNotch} className="animate-spin text-zuccini-700" />
+                            </li>
+                        ) : results.length > 0 ? (
+                            results.map((doc) => (
+                            <li
+                                onClick={() => handleResultClick(doc)}
+                                key={doc.docID}
+                                className="p-2 mb-1 cursor-pointer rounded-xl hover:bg-gray-400/20 dark:hover:bg-gray-700/20"
+                            >
+                                <div className="flex flex-col">
+                                <h1 className="text-lg font-medium">{doc.docName}</h1>
+                                <span
+                                    className="text-sm italic text-gray-500 truncate"
+                                    dangerouslySetInnerHTML={{ __html: doc.file_snippet }}
+                                />
+                                </div>
+                            </li>
+                            ))
+                        ) : (
+                            <li className="p-2 mb-1 cursor-pointer rounded-xl hover:bg-gray-400/20 dark:hover:bg-gray-700/20">
+                            No results found
+                            </li>
+                        )}
+                        </ul>
+                    )}
                 </div>
+
 
                 {/* Nav Links */}
                 <SidebarContext.Provider value={{expanded}}>

@@ -1,11 +1,29 @@
 from app import db
 from datetime import datetime
-from sqlalchemy.dialects.postgresql import TSVECTOR
+from sqlalchemy.dialects.postgresql import TSVECTOR, ARRAY
+from sqlalchemy.types import UserDefinedType
+class Vector(UserDefinedType):
+    def __init__(self, dimensions):
+        self.dimensions = dimensions
+
+    def get_col_spec(self, **kw):
+        return f"vector({self.dimensions})"
+
+    def bind_processor(self, dialect):
+        def process(value):
+            return value
+        return process
+
+    def result_processor(self, dialect, coltype):
+        def process(value):
+            return value
+        return process
+
 
 class Employee(db.Model):
     __tablename__ = 'employee'
 
-    employeeID = db.Column(db.Integer, primary_key=True, nullable=False)
+    employeeID = db.Column(db.String(10), primary_key=True, nullable=False)
     programID = db.Column(db.Integer, nullable=False)
     areaID = db.Column(db.Integer, nullable=False)
     fName = db.Column(db.String(50), nullable=False)
@@ -36,7 +54,7 @@ class Program(db.Model):
     __tablename__ = 'program'
 
     programID = db.Column(db.Integer, primary_key=True, nullable=False)
-    employeeID = db.Column(db.Integer, db.ForeignKey('employee.employeeID'))
+    employeeID = db.Column(db.String(10), db.ForeignKey('employee.employeeID'))
     programCode = db.Column(db.String(20))
     programName = db.Column(db.String(100))
     programColor = db.Column(db.String(30))
@@ -75,14 +93,15 @@ class Document(db.Model):
     __tablename__ = 'document'
 
     docID = db.Column(db.Integer, primary_key=True, nullable=False)
-    employeeID = db.Column(db.Integer, nullable=False)
+    employeeID = db.Column(db.String(10), nullable=False)
     docName = db.Column(db.String(150), nullable=False)
-    docType = db.Column(db.String(50), nullable=False)
-    docTag = db.Column(db.String(50))
+    docType = db.Column(db.String(50), nullable=False)    
     docPath = db.Column(db.Text)
     isApproved = db.Column(db.Boolean, default=False)
     content = db.Column(db.Text)
     search_vector = db.Column(TSVECTOR)
+    tags = db.Column(ARRAY(db.String))
+    embedding = db.Column(Vector(384)) 
 
     criteria = db.relationship("Criteria", back_populates="document")
 
@@ -90,11 +109,13 @@ class Institute(db.Model):
     __tablename__ = 'institute'
 
     instID = db.Column(db.Integer, primary_key=True, nullable=False)
+    employeeID = db.Column(db.String(10), db.ForeignKey('employee.employeeID'))
     programID = db.Column(db.Integer, nullable=False)
-    employeeID = db.Column(db.Integer, nullable=False)
     instCode = db.Column(db.String(50), nullable=False)
     instName = db.Column(db.String(100), nullable=False)
     instPic = db.Column(db.Text)
+
+    dean = db.relationship("Employee", backref="institutes")
 
 
 class Deadline(db.Model):
@@ -110,15 +131,16 @@ class AuditLog(db.Model):
     __tablename__ = 'audit_log'
 
     logID = db.Column(db.Integer, primary_key=True, nullable=False)
-    employeeID = db.Column(db.Integer, nullable=False)
+    employeeID = db.Column(db.String(10), nullable=False)
     action = db.Column(db.String(255))
     timestamp = db.Column(db.DateTime)
 
 class Announcement(db.Model):
     __tablename__ = 'announcement'
 
-    announceID = db.Column(db.Integer, primary_key=True, nullable=False)
-    employeeID = db.Column(db.Integer, nullable=False)
+    announceID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    employeeID = db.Column(db.String(10), db.ForeignKey('employee.employeeID'), nullable=False)
+    announceTitle = db.Column(db.String(255))
     announceText = db.Column(db.Text)
     duration = db.Column(db.Date)
 

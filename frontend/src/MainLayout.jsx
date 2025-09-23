@@ -110,7 +110,7 @@ const MainLayout = () => {
           
           {/* Main Content */}
 
-          <main id="main-scroll" className="flex-1 h-full col-span-4 col-start-2 row-span-5 row-start-1 p-4 overflow-y-auto">
+          <main id="main-scroll" className="relative flex-1 h-full col-span-4 col-start-2 row-span-5 row-start-1 p-4 overflow-y-auto">
             <Header title={activePage} />
             <Outlet />
           </main>

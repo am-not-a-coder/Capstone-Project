@@ -11,12 +11,17 @@ import{
 import {useNavigate} from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useState } from 'react';
-import { apiGet } from '../utils/api_utils';
+import { apiGet, apiPost } from '../utils/api_utils';
 import toast, { Toaster } from 'react-hot-toast'
 import { getCurrentUser } from '../utils/auth_utils';
 import AnnouncementModal from '../components/modals/AnnouncementModal';
+import StatusModal from '../components/modals/StatusModal';
 
 const Dashboard = () => {
+    
+    const [showStatusModal, setShowStatusModal] = useState(false);
+    const [statusMessage, setStatusMessage] = useState("");
+    const [statusType, setStatusType] = useState("success");
 
     const [showAnnounceModal, setShowAnnounceModal] = useState(false);
     
@@ -52,21 +57,44 @@ const Dashboard = () => {
         }
     }, [])
 
-    const handleCreateAnnouncement = (announcement) => {
-        console.log("New announcement:", announcement);
-        // Here you can push it to state, API call, etc.
-        };
+      const handleCreateAnnouncement = async (announcement) => {
+      console.log("New announcement:", announcement);
+      // Here you can push it to state, API call, etc.
+        
+        try {
+        const response = await apiPost('/api/announcement/post', {
+            title: announcement.title, 
+            message: announcement.message, 
+            duration: announcement.duration,            
+        })
+
+        setShowStatusModal(true)
+        setStatusMessage(response.data.message)
+        setStatusType("success")
+
+        } catch(err){ 
+            console.error('Posting announcement to server failed, ', err)
+            setShowStatusModal(true)
+            setStatusMessage("Failed to post announcement.")
+            setStatusType("error")
+        }
+	};
 
     
     return (
         <>
         <Toaster />
+
+            {showStatusModal && (
+                <StatusModal message={statusMessage} type={statusType} showModal={showStatusModal} onClick={()=>setShowStatusModal(false)} />
+            )} 
+
             {/* Dashboard links */}
             <section className='grid grid-rows-4 gap-1 mt-20 mb-5 lg:mt-8 lg:grid-cols-4 lg:grid-rows-1'>   
-                <DashboardLinks icon={faUsers} text="Users" count={count.employees}/>            
-                <DashboardLinks icon={faGraduationCap} text="Programs" count={count.programs}/>            
-                <DashboardLinks icon={faSchool} text="Institutes" count={count.institutes}/>               
-                <DashboardLinks icon={faCalendarDays} text="Deadlines" count={count.deadlines} />            
+                <DashboardLinks icon={faUsers} text="Users" page="Users" count={count.employees}/>            
+                <DashboardLinks icon={faGraduationCap} text="Programs" page="Programs" count={count.programs}/>            
+                <DashboardLinks icon={faSchool} text="Institutes" page="Institutes" count={count.institutes}/>               
+                <DashboardLinks icon={faCalendarDays} text="Deadlines" page="Tasks" count={count.deadlines} />            
             </section>
 
             {/* Announcements */}
@@ -124,13 +152,13 @@ const Dashboard = () => {
     );
 }
 
-export const DashboardLinks = ({icon, text, count}) =>{
+export const DashboardLinks = ({icon, text, page, count}) =>{
     const navigate = useNavigate();
 
     return (
     
         <div 
-        onClick={() => navigate(`/${text}`)}
+        onClick={() => navigate(`/${page}`)}
         className='relative flex flex-row items-center h-20 p-4 m-1 transition-all duration-500 shadow-xl cursor-pointer text-neutral-800 border-1 border-neutral-300 inset-shadow-sm inset-shadow-gray-400 dark:border-gray-800 rounded-3xl dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-900'>
             <div className='flex items-center justify-center p-2 w-12 h-12 bg-[#5ADF9C] rounded-full mr-3'>
                 <FontAwesomeIcon icon={icon}  className="text-2xl text-center text-neutral-800" />

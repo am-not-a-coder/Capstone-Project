@@ -16,25 +16,32 @@ import {
   faTriangleExclamation,
   faSpinner,
   faXmark,
-  faPenToSquare
+  faPenToSquare,
+  faPlus,
+  faCircleNotch
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useRef, useEffect } from "react";
+import { useLocation } from 'react-router-dom';
 import { apiDelete, apiGet, apiPut } from '../utils/api_utils';
 import { DocumentSkeleton } from '../components/Skeletons';
 import  StatusModal  from '../components/modals/StatusModal';
+import  DocUpload  from '../components/modals/DocUpload';
 
 
 const Documents = () => {
 
+  const location = useLocation()
+
   const docRef = useRef(null);
-  const collapsedMenuRef = useRef(null);
-  
-  const [openIndex, setOpenIndex] = useState(null);  
-  const [input, setInput] = useState(""); // State for live input from the search bar
-  const [searchTerm, setSearchTerm] = useState(""); // State that triggers actual filtering (when user press Enter or clicks Search)
-  const filterTags = ["BSIT", "Compliance", "BSED"];
-  const [tags, setTags] = useState(filterTags); // State to hold tags
+  const collapsedMenuRef = useRef(null);    
+
+  const [openIndex, setOpenIndex] = useState(null);    
+  const [tags, setTags] = useState([]); // State to hold tags
+  const [activeTags, setActiveTags] = useState([]) 
+  const [viewMode, setViewMode] = useState("directory") // "directory" or "tag" 
+  const [filteredDocs, setFilteredDocs] = useState([]);
+
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   
@@ -57,20 +64,36 @@ const Documents = () => {
   const [renameValue, setRenameValue] = useState("");
   const [isRenaming, setIsRenaming] = useState(false);
 
-  // Filters the files based on searchTerm (case-insensitive)
-  // const filteredFiles = uploadedFiles.filter((file) =>
-  //   file.toLowerCase().includes(searchTerm.toLowerCase())
-  // );
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [expandedFolders, setExpandedFolders] = useState([]);
+  const [highlightedFile, setHighlightedFile] = useState(null);
 
-  // Updates the actual searchTerm when search button is clicked or Enter is pressed
-  const handleSearch = () => {
-    setSearchTerm(input.trim()); // remove extra spaces
-  };
+  const [fileToDelete, setFileToDelete] = useState(null);
 
-  // Function to clear all tags when ✕ button is clicked
-  const handleClearTags = () => {
-  setTags([]); // Removes all tags
-  };
+  const [showUploadModal, setShowUploadModal] = useState(false);
+
+  const [loading, setLoading] = useState(false);
+
+  // Handle navigation from search bar
+  useEffect(() => { 
+    if (location.state?.navigateToFile){
+      const { currentPath: navPath, expandedFolders: navExpanded, highlightedFile: navHighlighted} = location.state.navigateToFile;
+
+      setCurrentPath(navPath);
+      setExpandedFolders (prev => Array.from(new Set([...prev, ...navExpanded])))
+      setHighlightedFile(navHighlighted)
+
+      window.history.replaceState({}, document.title);
+
+      setQuery("");
+
+      setTimeout(() => {
+        setHighlightedFile(null)
+      }, 3000);
+    }
+  }, [location.state])
+
 
   useEffect( () => {
           const handleOutsideClick = (e) => {
@@ -100,6 +123,21 @@ const Documents = () => {
   }, [showCollapsedMenu])
 
   useEffect(() => {
+    
+  const fetchTags = async () => {
+      try{
+        const res = await apiGet('/api/documents/tags')
+
+        setTags(res.data)        
+      } catch (err) {
+        console.error("Failed to fetch tags", err)
+      }
+    } 
+    fetchTags();
+  }, [])
+
+
+  useEffect(() => {
     const fetchDirectory = async () => {
       try{
         const res = await apiGet('/api/documents');
@@ -111,20 +149,87 @@ const Documents = () => {
  
     }
     fetchDirectory();
-  }, [])
+  }, []);
+
 
   const getCurrentFolder = () => {
-    if (!directory) return null;
+    if (!directory ) return null;
     let folder = directory
+    let validPath = []
+
     for (const part of currentPath){
+      // Check if current folder has a folders property and the specific folder exists
+    if (!folder.folders || !folder.folders[part]) {     
+
+        setCurrentPath(validPath);
+        return folder;
+      }
+
       folder = folder.folders[part];
+      validPath.push(part);
     }
     return folder;
   }
-
+ 
   const currentFolder = getCurrentFolder();
 
+  // Utility for cleaning the paths
+  const buildPath = (currentPath, fileName = "") => {
+    // Join currentPath array and optional fileName into one clean string
+    const path = [...currentPath, fileName].filter(Boolean).join("/");
+    return encodeURIComponent(path); // Always encoded before sending to backend
+  };
+  
+  const handleResultClick = (doc) => {
+    let pathArray = doc.docPath.split('/').filter(Boolean);
+    
 
+    if(pathArray.length > 0 && pathArray[0] === "UDMS_Repository"){
+      pathArray = pathArray.slice(1);
+      console.log("Path removed udms: ", pathArray)
+    }
+
+    pathArray = pathArray.map(decodeURIComponent);
+
+    let folderPath = directory;
+    let filePath = []
+
+    for (const pathPart of pathArray){
+      if(folderPath?.folders?.[pathPart]){
+        folderPath = folderPath.folders[pathPart]
+        filePath.push(pathPart)
+      } else{
+         console.warn(`Path part '${pathPart}' not found. Using valid portion: [${filePath.join(', ')}]`);
+      break;
+      }
+    }
+
+    const folderPaths = filePath.map((_, i) => filePath.slice(0, i + 1).join('/')); 
+
+    // Expand all folders
+    setExpandedFolders (prev => Array.from(new Set([...prev, ...folderPaths])))
+    
+    // Navigate to result directory
+    setCurrentPath(filePath);
+
+    // Highligh search file
+    setHighlightedFile(doc.docID);
+
+    setQuery("")
+
+    // clear highlighted file after 3s
+    setTimeout(() => {
+      setHighlightedFile(null)
+    }, 3000);
+  }
+
+  const refreshDirectory = async () => {
+    // Refresh directory
+    const updatedRes = await apiGet('/api/documents');
+    setDirectory(updatedRes.data);
+  }  
+
+  
   const goBack = () => {
     setCurrentPath((prev) => prev.slice(0, -1));
   }
@@ -139,33 +244,28 @@ const Documents = () => {
       setCurrentPath((prev) => prev.slice(0, index));
     }
   };
-  
 
-  const handlePreview = (filePath) => {
-    const path = encodeURIComponent(filePath)
+
+  const handlePreview = (file) => {
+    const path = buildPath(currentPath, file.name);    
     window.open(`http://localhost:5000/api/documents/preview/${path}`, "_blank");
   }
 
-  const handleDownload = (filePath) => {
-    const path = encodeURIComponent(filePath)
+  const handleDownload = (file) => {
+    const path = buildPath(currentPath, file.name);
     window.location.href = `http://localhost:5000/api/documents/download/${path}`;
   }
 
-  const handleDelete = async (filePath) => {
-
-  setIsLoading(true);
-
-  const cleanPath = filePath.replace(/^\/+/, "");  
-  const path = encodeURIComponent(cleanPath);
-
-
+  const handleDelete = async (docID) => {
+  setIsLoading(true);  
   try {
-    const res = await apiDelete(`/api/documents/delete_file/${path}`);
+    const res = await apiDelete(`/api/documents/delete_file/${docID}`);
+    console.log("Deleted: ", res.data)
     setShowStatusModal(true);
     setStatusMessage(res.data.message);
     setStatusType("success");
     setShowDeleteModal(false);
-
+    
     setIsLoading(false);
     
 
@@ -262,22 +362,20 @@ const handleRename = async (target) => {
 
   setIsRenaming(true); // Start loading
 
-  const oldPath = `${currentPath.join('/')}/${target.name}`;
-  const newPath = `${currentPath.join('/')}/${renameValue.trim()}`;
+  const oldPath = buildPath(currentPath, target.name)
+  const newPath = buildPath(currentPath, renameValue.trim());
 
   try {
     await apiPut('/api/documents/rename', { oldPath, newPath });
 
-    // Refresh directory
-    const updatedRes = await apiGet('/api/documents');
-    setDirectory(updatedRes.data);
+    await refreshDirectory()
     
     // Clear rename states after successful rename
     setRenameTarget(null);
     setRenameValue("");
     setIsRenaming(false);
   } catch (err) {
-    console.error("Rename failed:", err.response?.data || err.message);
+    console.error("Rename failed:", err.response?.data || err.message);    
     
     // Clear rename states even on error
     setRenameTarget(null);
@@ -286,50 +384,220 @@ const handleRename = async (target) => {
   }
 };
 
+useEffect(() => {
+  // Don't call API if query is empty
+  if (!query.trim()) {
+    setResults([]);
+    return;
+  }
+  setLoading(true)
+  const delayDebounce = setTimeout(async () => {
+    try {
+      const res = await apiGet(`/api/search?q=${encodeURIComponent(query)}`);
+
+      Array.isArray(res.data) ? setResults(res.data) : setResults([]);
+      console.log(res.data); // should log Array(2)
+    } catch (err) {
+      console.error("Search failed:", err);
+    } finally{
+      setLoading(false)
+    }
+  }, 300); // 300ms debounce
+
+  return () => clearTimeout(delayDebounce);
+}, [query]);
+
+
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    if(!query.trim()) return;
+    try{
+        const res = await apiGet(`/api/search?q=${encodeURIComponent(query)}`);      
+
+        Array.isArray(res.data) ? setResults(res.data) : setResults([]);
+        console.log(res.data); 
+      } catch(err){
+        console.error("Search failed: ", err)
+      }
+  }
+
+  const handleRemoveTag = (tag) => {
+    setActiveTags((prev) => {
+      if (prev.includes(tag)){
+        return prev.filter((t) => t !== tag);
+      } else {
+        return [...prev, tag];
+      }
+    })
+    setViewMode("directory")
+  }
+
+
+  
+  
+  const filterDocByTag = async (tag) => {
+    try{
+      const res = await apiGet(`/api/documents/filter?tag=${encodeURIComponent(tag)}`)
+      console.log("Filtered docs structure:", res.data);
+      setFilteredDocs(res.data);
+      setActiveTags([tag]);
+      setViewMode("tag");
+    } catch (err) {
+      console.error("Error filtering documents", err)
+    }
+
+  }
+  
+  // Function to clear all tags when ✕ button is clicked
+  const handleClearTags = () => {
+    setActiveTags([]); // Removes all active tags
+    setViewMode("directory");
+  };
 
 
   return (
     <>
         {showStatusModal && (
-                <StatusModal message={statusMessage} type={statusType} showModal={showStatusModal} onClick={()=>setShowStatusModal(false)} />
-            )}
-        {/* Search Bar Section */}
-        <div className="flex max-w-[500px] place-self-end items-center mb-4">
-          <label className="mr-2 text-lg font-semibold text-neutral-800 dark:text-white">Search</label>
-          
+          <StatusModal message={statusMessage} type={statusType} showModal={showStatusModal} onClick={()=>setShowStatusModal(false)} />
+        )}
+        {showUploadModal && (
+           <DocUpload
+              showModal={showUploadModal}
+              onClose={() => setShowUploadModal(false)}
+              currentPath={currentPath}               
+              uploadSuccess={refreshDirectory}
+      />
+        )} 
+      
+     
+
+      {/* Outer container for the document panel */}
+      <div className="relative flex flex-col justify-center border border-neutral-300 rounded-[20px] min-w-[950px] min-h-[90%] shadow-md inset-shadow-sm inset-shadow-gray-400 p-3 bg-neutral-200 dark:bg-gray-900 dark:inset-shadow-zuccini-800">     
+
+           {/* Upload button */}
+          <button
+            onClick={() => setShowUploadModal(true)}
+            className='fixed p-4 text-gray-700 transition-all duration-300 border shadow-xl cursor-pointer right-10 bottom-8 px-7 rounded-xl dark:bg-gray-950/50 hover:shadow-sm hover:shadow-zuccini-700'>
+            <FontAwesomeIcon icon={faPlus} className="text-xl dark:text-gray-200" />
+          </button>   
+        
+         {/* Search Bar Section */}        
+        <div className="relative flex items-center w-full max-w-2xl my-4 place-self-center">
+          <label className="mr-2 text-lg font-semibold text-shadow-2xs text-neutral-800 dark:text-white">Search</label>
           {/* Input field for typing search query */}
           <input
             type="text"
-            placeholder="Search Document"
-            className="flex-grow px-3 py-2 text-base transition duration-300 bg-gray-200 border border-r-0 text-neutral-800 rounded-l-md focus:outline-none focus:ring focus:ring-zuccini-600 placeholder-neutral-500 dark:text-white dark:border-none dark:inset-shadow-sm dark:inset-shadow-gray-800 dark:bg-gray-950/50"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
+            placeholder="Type to search document..."
+            className={`flex-grow px-3 py-2 text-base transition duration-300 bg-neutral-300/90 rounded-l-xl border-neutral-300 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 outline-none dark:border-gray-900 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50`}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") handleSearch(); // trigger search on Enter key
             }}
           />
 
           {/* Button to trigger search when clicked */}
-          <button
-            className="px-6 w-[45px] h-[42px] flex items-center justify-center border rounded-r-md cursor-pointer bg-zuccini-600 hover:bg-zuccini-500 transition-all duration-500"
+          <button 
+            className={`px-6 w-[45px] h-[42px] flex items-center justify-center border rounded-r-xl cursor-pointer border-neutral-300 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:border-gray-900 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50 bg-zuccini-600 hover:bg-zuccini-500 transition-all duration-500`}
             onClick={handleSearch}
           >
             <FontAwesomeIcon icon={faMagnifyingGlass} className="text-lg text-white" />
           </button>
-        </div>
-      
 
-      {/* Outer container for the document panel */}
-      <div className={`flex border border-neutral-800 rounded-[20px] p-3 min-w-[950px] min-h-screen shadow-md bg-neutral-200 inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-900 dark:shadow-md dark:shadow-zuccini-800 gap-4`}>
+              {/* Search results */}
+            {query.trim() !== "" && (
+              <ul className="absolute z-10 w-full max-w-[565px] p-2 pt-3 overflow-y-auto border border-gray-300 right-12 top-full bg-gray-200/10 backdrop-blur-sm rounded-b-xl text-neutral-800 dark:text-white dark:border-gray-900 dark:bg-gray-800/20 max-h-72 ">
+                {loading ? (
+                  <li className="flex justify-center p-3">
+                    <FontAwesomeIcon icon={faCircleNotch} className="animate-spin text-zuccini-700" />
+                  </li>
+                ) : results.length > 0 ? (
+                  results.map((doc) => (
+                    <li
+                      onClick={() => handleResultClick(doc)}
+                      key={doc.docID}
+                      className="p-2 mb-1 cursor-pointer rounded-xl hover:bg-gray-400/20 dark:hover:bg-gray-700/20"
+                    >
+                      <div className="flex flex-col">
+                        <h1 className="text-lg font-medium">{doc.docName}</h1>
+                        <span
+                          className="text-sm italic text-gray-500 truncate"
+                          dangerouslySetInnerHTML={{ __html: doc.file_snippet }}
+                        />
+                      </div>
+                    </li>
+                  ))
+                ) : (
+                  <li className="p-2 mb-1 cursor-pointer rounded-xl hover:bg-gray-400/20 dark:hover:bg-gray-700/20">
+                    No results found
+                  </li>
+                )}
+              </ul>
+            )}
+        </div>
+ 
         
+
+        <div className='flex flex-row justify-around'>
         {/* Main content area */}
-        <div className={`flex flex-col flex-1 transition-all duration-300 ${showDetails ? 'mr-2' : ''}`}>
+        <div className={`flex flex-col flex-1 transition-all duration-300 ${showDetails ? 'mr-2' : ''}`}>      
+          
+          {/* Filter Tags Section */}
+          <div className="border border-neutral-300 dark:border-neutral-600 rounded-[20px] px-5 py-4 dark:bg-gray-950/50 inset-shadow-sm inset-shadow-gray-400 mb-2">
+            
+            {/* Header + removable tag chip (inline using flex) */}
+            <div className="flex flex-wrap items-center gap-3 mb-3">
+              <p className="text-sm font-medium text-neutral-800 dark:text-white">Filter by:</p>
+
+              {activeTags.length > 0 && activeTags.map((tag, index) => (
+                <div
+                  key={index}
+                  className="inline-flex items-center px-4 py-1 text-sm text-gray-700 capitalize border rounded-full border-neutral-400 dark:text-white"
+                >
+                  {tag}
+                  <button
+                    className="ml-3 text-sm text-gray-500 cursor-pointer hover:text-red-600"
+                    onClick={() => handleRemoveTag(tag)} // removes that tag only
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              {activeTags.length > 0 && (
+                <button
+                  className="px-3 py-1 ml-3 text-xs text-gray-600 border border-gray-400 rounded-full hover:text-red-600"
+                  onClick={handleClearTags}
+                >
+                  Clear All
+                </button>
+              )}
+             
+            </div>
+
+            {/* Filter tags buttons */}
+            <div className="flex flex-wrap items-center gap-2">
+              {tags.map((tag) => (
+                <div
+                  key={tag}
+                  onClick={() => filterDocByTag(tag)}
+                  className={`px-4 py-1 text-sm capitalize border rounded-full cursor-pointer 
+                    ${activeTags.includes(tag) ? "inset-shadow-sm inset-shadow-gray-400 bg-gray-300 text-zuccini-700 dark:bg-emerald-800 dark:text-gray-300" : "shadow-md dark:shadow-sm dark:shadow-zuccini-900 text-neutral-800"} 
+                    border-neutral-300 dark:border-gray-700  hover:bg-neutral-300 dark:hover:bg-emerald-800 dark:text-white transition-all duration-200`}>
+                  {tag}
+                  </div>
+              ))}
+            </div>
+          </div>
+
           {/* BreadCrumbs */}
-          <div className='flex flex-row gap-2 mb-2'>
+          <div className='flex flex-row gap-2'>
             <FontAwesomeIcon icon={faArrowLeft} 
               onClick={goBack}
               disabled={currentPath.length === 0}
-              className={`${currentPath.length === 0 ? 'cursor-not-allowed text-gray-500' : ' cursor-pointer text-gray-500 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 '} p-4 text-xl transition-all duration-200 rounded-xl bg-gray-300/90 inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-950/50`}/>
+             className={`${currentPath.length === 0 
+                ? 'text-gray-500 inset-shadow-sm inset-shadow-gray-400 bg-gray-300 dark:inset-shadow-gray-800 dark:bg-gray-800/50 dark:text-gray-400' 
+                : 'cursor-pointer text-gray-500 bg-gray-200 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 shadow-md dark:inset-shadow-sm dark:inset-shadow-gray-400 dark:bg-gray-950/50'
+            } p-4 text-xl transition-all duration-200 border border-neutral-300 rounded-xl dark:border-neutral-500`} />
              
             <div className='w-full p-3 font-semibold bg-neutral-300/90 rounded-xl border-neutral-300 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:border-gray-900 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50'>          
               <nav className="flex items-center font-semibold text-gray-700 gap-x-2 text-md lg:text-lg dark:text-white">
@@ -410,7 +678,7 @@ const handleRename = async (target) => {
                     ) : (
                       /* Show full breadcrumb for shorter paths */
                       currentPath.map((pathPart, index) => (
-                        <span key={index} className="flex items-center min-w-0 gap-x-2">
+                        <span key={index} className="flex items-center min-w-0 gap-x-2"> 
                           <span className="flex-shrink-0 text-gray-500">/</span>
                           <span 
                             className="flex items-center transition-all cursor-pointer duration-250 hover:text-zuccini-500"
@@ -427,163 +695,141 @@ const handleRename = async (target) => {
               </nav>
             </div>
           </div>
-          
-          {/* Filter Tags Section */}
-          <div className="border border-neutral-800 rounded-[20px] px-5 py-4 dark:bg-gray-950/50 dark:inset-shadow-sm dark:inset-shadow-gray-800">
-            
-            {/* Header + removable tag chip (inline using flex) */}
-            <div className="flex flex-wrap items-center gap-3 mb-3">
-              <p className="text-sm font-medium text-neutral-800 dark:text-white">Filter by:</p>
 
-              {/* Example selected filter with remove "✕" */}
-              <div className="inline-block px-4 py-1 text-sm text-gray-700 border rounded-full cursor-pointer border-neutral-400 dark:text-white">
-                Tags
-                <button className="ml-3 text-sm text-gray-500 cursor-pointer hover:text-red-600"
-                onClick={handleClearTags}
-                >✕</button>
-              </div>
-            </div>
+          {/* Grid for displaying file directory */}
+          {viewMode === "directory" && (
+            <div className="grid w-full gap-4 mt-6 md:grid-cols-2 sm:grid-cols-1 lg:grid-cols-3 ">                      
+              {/* Folder Components */}          
+              {currentFolder?.folders ? Object.keys(currentFolder.folders).map((folder) => {                
+                return(
+                  <div
+                    key={folder}
+                    onClick={() => {
+                      setShowDetails(false);
+                      setCurrentPath([...currentPath, folder])
+                    }}
+                    className="relative border text-neutral-800 border-neutral-300 dark:border-neutral-700 shadow-md rounded-[20px] px-4 py-5 flex justify-between items-center cursor-pointer hover:shadow-lg dark:hover:shadow-md dark:hover:shadow-zuccini-800 transition dark:bg-gray-950/50 dark:inset-shadow-sm dark:inset-shadow-gray-400">
+                    
+                    <div className="flex items-center space-x-3">
+                      {/* Icon for Folder */}
+                      <FontAwesomeIcon icon={displayFileIcon(folder)} className="text-3xl text-blue-400 cursor-pointer dark:text-blue-500" />
 
-            {/* Filter tags buttons */}
-            <div className="flex flex-wrap items-center gap-2">
-              {tags.map((tag) => (
-                <div
-                  key={tag}
-                  className="px-4 py-1 text-sm border rounded-full cursor-pointer text-neutral-800 border-neutral-400 hover:bg-neutral-300 dark:hover:bg-neutral-600 dark:text-white" 
-                >
-                  {tag}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Grid for displaying filtered documents */}
-          <div className="grid w-full gap-4 mt-6 md:grid-cols-2 sm:grid-cols-1 lg:grid-cols-3 ">
-              
-            {/* Folder Components */}
-            {currentFolder?.folders ? Object.keys(currentFolder.folders).map((folder) => (          
-                <div
-                  key={folder}
-                  onClick={() => {
-                    setShowDetails(false);
-                    setCurrentPath([...currentPath, folder])
-                  }}
-                  className="relative border text-neutral-800 border-neutral-800 shadow-md rounded-[20px] px-4 py-5 flex justify-between items-center cursor-pointer hover:shadow-lg dark:hover:shadow-md dark:hover:shadow-zuccini-800 transition dark:bg-gray-950/50 dark:inset-shadow-sm dark:inset-shadow-gray-800"
-                >
-                  <div className="flex items-center space-x-3">
-                    {/* Icon for Folder */}
-                    <FontAwesomeIcon icon={displayFileIcon(folder)} className="text-3xl text-blue-400 cursor-pointer dark:text-blue-500" />
-
-                    {/* Filename */}
-                    {renameTarget === folder ? (
-                        isRenaming ? (
-                          // Show loading state
-                          <div className="flex items-center">
-                            <span className="font-medium text-gray-400 text-md dark:text-gray-400">
-                              {renameValue}
-                            </span>
-                            <FontAwesomeIcon icon={faSpinner} className="ml-2 text-lg text-gray-400 animate-spin"/>
-                          </div>
-                        ) : (
-                          // Show input when not loading
-                          <input 
-                            type='text'
-                            value={renameValue}
-                            onChange={(e) => setRenameValue(e.target.value)}
-                            onClick={(e) => e.stopPropagation()}
-                            onBlur={() => !isRenaming && handleRename({ name: folder, type: "folder" })}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && !isRenaming) {
-                                e.preventDefault();
-                                handleRename({ name: folder, type: "folder" });
-                              }
-                              if (e.key === "Escape") {
-                                setRenameTarget(null);
-                                setRenameValue("");
-                              }
-                            }}
-                            className='px-2 py-1 bg-white border rounded outline-none'
-                            autoFocus
-                            disabled={isRenaming}
-                          />
-                        )
-                      ) : (
-                        // Show normal folder name when not renaming
-                        <span className="font-medium cursor-pointer text-md text-neutral-800 dark:text-white">
-                          {folder}
-                        </span>
-                      )}
-                  </div>
-
-                  {/* Menu icon (⋮) */}
-                  <button                
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOpenIndex(openIndex === folder ? null : folder)
-                  }}
-                  className='p-2 transition-all duration-300 rounded-full'>
-                  <FontAwesomeIcon icon={faEllipsisVertical}               
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOpenIndex(openIndex === folder ? null : folder)
-                  }}
-                  className="text-xl text-gray-500 cursor-pointer hover:text-black" />
-                  </button>
-                  {openIndex === folder && (
-                    <div 
-                    ref={docRef}
-                    onClick={(e) => e.stopPropagation()}
-                    className='absolute z-10 p-3 border shadow-xl bg-gray-200/10 backdrop-blur-sm rounded-xl w-35 -top-23 right-3 dark:bg-gray-900 '>
-                      <button 
-                      onClick={(e) => {
-                        e.stopPropagation(); 
-                        setRenameTarget(folder);
-                        setRenameValue(folder);
-                        setOpenIndex(null);
-                      }}
-                      className='relative block w-full px-2 py-1 text-gray-600 transition-all duration-300 rounded-md hover:text-gray-100 hover:bg-zuccini-500/80 dark:text-gray-200'>
-                        Rename
-                        <FontAwesomeIcon icon={faPenToSquare}  className="ml-5"/>
-                      </button>
-                      <div className="w-full my-2 border-b border-gray-600"/>
-                      <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedFile(currentFolder.folders[folder]);
-                        setShowDetails(true);
-                        setOpenIndex(null);
-                      }}
-                      className='relative block w-full px-2 py-1 text-gray-600 transition-all duration-300 rounded-md hover:text-gray-100 hover:bg-gray-400/80 dark:text-gray-200'>
-                        Details
-                        <FontAwesomeIcon icon={faCircleInfo} className="ml-5"/>
-                      </button>
-                      <div className="w-full my-2 border-b border-gray-600"/>
-                      <button className='relative block w-full px-2 py-1 text-gray-600 transition-all duration-300 rounded-md hover:text-gray-100 hover:bg-red-500/80 dark:text-gray-200'>
-                        Delete
-                        <FontAwesomeIcon icon={faTrash} className="ml-5"/>
-                      </button>
+                      {/* Filename */}
+                      {renameTarget === folder ? (
+                          isRenaming ? (
+                            // Show loading state
+                            <div className="flex items-center">
+                              <span className="font-medium text-gray-400 text-md dark:text-gray-400">
+                                {renameValue}
+                              </span>
+                              <FontAwesomeIcon icon={faCircleNotch} className="ml-2 text-lg text-gray-400 animate-spin"/>
+                            </div>
+                          ) : (
+                            // Rename mode
+                            <input 
+                              type='text'
+                              value={renameValue}
+                              onChange={(e) => setRenameValue(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              onBlur={() => !isRenaming && handleRename({ name: folder, type: "folder" })}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && !isRenaming) {
+                                  e.preventDefault();
+                                  handleRename({ name: folder, type: "folder" });
+                                }
+                                if (e.key === "Escape") {
+                                  setRenameTarget(null);
+                                  setRenameValue("");
+                                }
+                              }}
+                              className='px-2 py-1 bg-white border rounded outline-none'
+                              autoFocus
+                              disabled={isRenaming}
+                            />
+                          )
+                        ) : (                        
+                          <span className="font-medium whitespace-normal cursor-pointer text-md text-neutral-800 dark:text-white">
+                            {folder.split(/(_|-)/g).map((part, i) => (
+                              (part === '_' || part === '-') 
+                                ? <span key={i}>{part}<wbr/></span>
+                                : <span key={i}>{part}</span>
+                            ))}
+                          </span>
+                        )}
+                      
                     </div>
-                  )}
-                </div>                                
+                    
 
-              )) : (            
+                    {/* Menu icon (⋮) */}
+                    <button                
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenIndex(openIndex === folder ? null : folder)
+                    }}
+                    className='p-2 transition-all duration-300 rounded-full'>
+                    <FontAwesomeIcon icon={faEllipsisVertical}               
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenIndex(openIndex === folder ? null : folder)
+                    }}
+                    className="text-xl text-gray-500 cursor-pointer hover:text-black" />
+                    </button>
+                    {openIndex === folder && (
+                      <div 
+                      ref={docRef}
+                      onClick={(e) => e.stopPropagation()}
+                      className='absolute z-10 p-3 border shadow-xl bg-gray-200/10 backdrop-blur-sm rounded-xl w-35 -top-23 right-3 dark:bg-gray-900 '>
+                        <button 
+                        onClick={(e) => {
+                          e.stopPropagation(); 
+                          setRenameTarget(folder);
+                          setRenameValue(folder);
+                          setOpenIndex(null);
+                        }}
+                        className='relative block w-full px-2 py-1 text-gray-600 transition-all duration-300 rounded-md hover:text-gray-100 hover:bg-zuccini-500/80 dark:text-gray-200'>
+                          Rename
+                          <FontAwesomeIcon icon={faPenToSquare}  className="ml-5"/>
+                        </button>
+                        <div className="w-full my-2 border-b border-gray-600"/>
+                        <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedFile(currentFolder.folders[folder]);
+                          console.log(selectedFile)
+                          setShowDetails(true);
+                          setOpenIndex(null);
+                        }}
+                        className='relative block w-full px-2 py-1 text-gray-600 transition-all duration-300 rounded-md hover:text-gray-100 hover:bg-gray-400/80 dark:text-gray-200'>
+                          Details
+                          <FontAwesomeIcon icon={faCircleInfo} className="ml-5"/>
+                        </button>
+                        <div className="w-full my-2 border-b border-gray-600"/>
+                        <button className='relative block w-full px-2 py-1 text-gray-600 transition-all duration-300 rounded-md hover:text-gray-100 hover:bg-red-500/80 dark:text-gray-200'>
+                          Delete
+                          <FontAwesomeIcon icon={faTrash} className="ml-5"/>
+                        </button>
+                      </div>
+                    )}
+                  </div>                                                
+              ) }) : (            
                 <>
                   <DocumentSkeleton />
                   <DocumentSkeleton />
                   <DocumentSkeleton />
                 </>
               )} 
-
+          
 
 
               {/* File Components */}
-
-
               {currentFolder?.files?.map((file, index) => (
                 <div
-                  key={index}                
-                  onClick={() => handlePreview(`${currentPath.join('/')}/${file.name}`)}
-                  className={`relative border text-neutral-800  border-neutral-800 shadow-md rounded-[20px] px-4 py-5 flex justify-between items-center cursor-pointer hover:shadow-lg dark:hover:shadow-md dark:hover:shadow-zuccini-800 transition dark:bg-gray-950/50 dark:inset-shadow-sm dark:inset-shadow-gray-800`}
+                  key={index}                                
+                  onClick={() => {
+                    handlePreview(file);
+                    setHighlightedFile(null);
+                  }}
+                  className={`${highlightedFile === file.docID ? 'scale-101 ring-2 ring-zuccini-400/50' : 'ring-0'} relative border text-neutral-800 border-neutral-800 shadow-md rounded-[20px] px-4 py-5 flex justify-between items-center cursor-pointer hover:shadow-lg dark:hover:shadow-md dark:hover:shadow-zuccini-800 transition dark:bg-gray-950/50 dark:inset-shadow-sm dark:inset-shadow-gray-800`}
                 >
                   <div className="flex items-center space-x-3">
                     {/* Icon for File */}
@@ -592,7 +838,7 @@ const handleRename = async (target) => {
                      className="text-3xl text-red-500 cursor-pointer dark:text-red-500" />
 
                     {/* Filename */}
-                    <div className='flex flex-col'>
+                    <div className='flex flex-col flex-1 min-w-0'>
                       
                         {renameTarget === file ? (
                           // Show input when renaming is active
@@ -629,12 +875,14 @@ const handleRename = async (target) => {
                           )
                         ) : (
                           // Show normal filename when not renaming
-                          <span className="font-medium cursor-pointer text-md text-neutral-800 hover:underline dark:text-white">
-                            {file.name}
+                          <span className="font-medium whitespace-normal cursor-pointer text-md text-neutral-800 hover:underline dark:text-white">
+                            {file.name.split(/(_|-)/g).map((part, i) => (
+                              (part === '_' || part === '-') 
+                                ? <span key={i}>{part}<wbr/></span>
+                                : <span key={i}>{part}</span>
+                            ))}
                           </span>
-                        )}
-
-                      
+                        )}                      
                       <span className="text-sm font-medium cursor-pointer text-neutral-600 dark:text-gray-400">
                         {formatSize(file.size)}
                       </span>
@@ -666,7 +914,7 @@ const handleRename = async (target) => {
                       <button 
                         onClick={(e) => {                       
                           e.stopPropagation();
-                          handleDownload(`${currentPath.join('/')}/${file.name}`);
+                          handleDownload(file);
                           console.log(`Downloading file: ${currentPath.join('/')}/${file.name}`);
                           }
                         }
@@ -706,7 +954,13 @@ const handleRename = async (target) => {
                       <div className="w-full my-2 border-b border-gray-600"/> {/* Line */}
 
                       <button 
-                      onClick={() => setShowDeleteModal(true)}                                     
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFileToDelete(file);
+                        setShowDeleteModal(true);
+                        console.log(fileToDelete);
+                        setOpenIndex(null);
+                      }}                                     
                       className='relative block w-full px-2 py-1 text-gray-600 transition-all duration-300 rounded-md hover:text-gray-100 hover:bg-red-500/80 dark:text-gray-200'>
                         Delete
                         <FontAwesomeIcon icon={faTrash} className="ml-5"/>
@@ -717,7 +971,9 @@ const handleRename = async (target) => {
                     {/* Delete Modal */}
                   {showDeleteModal && (
                     <div
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();                                            
+                    }}
                     className="fixed inset-0 z-50 flex items-center justify-center transition-all duration-300 transform scale-100 bg-black/60 backdrop-blur-xs">
                       <div className={`flex flex-col justify-center items-center p-5 py-10 border border-gray-800 bg-gray-200 dark:bg-gray-900 rounded-xl shadow-xl max-w-xl w-full max-h-[90vh] overflow-y-auto inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-800 ${showDeleteModal ? 'fade-in' : 'fade-out'}`}>
                         <h1 className='mb-4 text-4xl font-bold text-red-500 text-shadow-md'>Delete File</h1>
@@ -730,10 +986,10 @@ const handleRename = async (target) => {
                         </div>
                         <div className='flex flex-row justify-around w-full'>
                           <button
-                          onClick={() => setShowDeleteModal(false)}
+                          onClick={() =>  setShowDeleteModal(false)}
                           className={`px-10 py-3 font-medium transition-colors rounded-full bg-gray-300 dark:bg-gray-700 text-neutral-500 dark:text-gray-300 hover:text-gray-900 hover:bg-gray-400/50 dark:hover:bg-gray-600 dark:hover:text-gray-200 cursor-pointer`}>Cancel</button>
                           <button 
-                          onClick={() => handleDelete(`${currentPath.join('/')}/${file.name}`)}
+                          onClick={() => handleDelete(file.docID)}
                           className={`${isLoading ? 'cursor-not-allowed bg-gray-700' : 'bg-red-600/70 hover:bg-red-600/90 cursor-pointer'} px-8 py-3 rounded-full font-medium transition-colors flex items-center  text-white `}>
                             {isLoading && (
                               <FontAwesomeIcon icon={faSpinner} className="mr-2 text-gray-400 animate-spin"/>
@@ -744,80 +1000,331 @@ const handleRename = async (target) => {
                     </div>
                   )}
                 </div>          
-              ))}                        
+              ))}  
+              
           </div>
+          )}  
+
+
+          {viewMode === "tag" && (
+            <div className="grid w-full gap-4 mt-6 md:grid-cols-2 sm:grid-cols-1 lg:grid-cols-3 ">
+              {filteredDocs.length === 0 ? (
+                <p>No Documents Found</p>
+              ) : (
+                <>
+                {filteredDocs.map((file, index) => (
+                  <div
+                  key={index}                                
+                  onClick={() => {
+                    handlePreview(file);
+                    setHighlightedFile(null);
+                  }}
+                  className={`${highlightedFile === file.docID ? 'scale-101 ring-2 ring-zuccini-400/50' : 'ring-0'} relative border text-neutral-800 border-neutral-800 shadow-md rounded-[20px] px-4 py-5 flex justify-between items-center cursor-pointer hover:shadow-lg dark:hover:shadow-md dark:hover:shadow-zuccini-800 transition dark:bg-gray-950/50 dark:inset-shadow-sm dark:inset-shadow-gray-800`}
+                >
+                  <div className="flex items-center space-x-3">
+                    {/* Icon for File */}
+                    <FontAwesomeIcon
+                    icon={displayFileIcon(file.docName)}
+                     className="text-3xl text-red-500 cursor-pointer dark:text-red-500" />
+
+                    {/* Filename */}
+                    <div className='flex flex-col flex-1 min-w-0'>
+                      
+                        {renameTarget === file ? (
+                          // Show input when renaming is active
+                          isRenaming ? (
+                            // Show loading state instead of input when API call is in progress
+                            <div className="flex items-center">
+                              <span className="font-medium text-gray-400 text-md dark:text-gray-400">
+                                {renameValue}
+                              </span>
+                              <FontAwesomeIcon icon={faSpinner} className="ml-2 text-lg text-gray-400 animate-spin"/>
+                            </div>
+                          ) : (
+                            // Show input when not loading
+                            <input 
+                              type='text'
+                              value={renameValue}
+                              onChange={(e) => setRenameValue(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              onBlur={() => !isRenaming && handleRename(file)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && !isRenaming) {
+                                  e.preventDefault();
+                                  handleRename(file);
+                                }
+                                if (e.key === "Escape") {
+                                  setRenameTarget(null);
+                                  setRenameValue("");
+                                }
+                              }}
+                              className='px-2 py-1 bg-white border rounded outline-none'
+                              autoFocus
+                              disabled={isRenaming}
+                            />
+                          )
+                        ) : (
+                          // Show normal filename when not renaming
+                          <span className="font-medium whitespace-normal cursor-pointer text-md text-neutral-800 hover:underline dark:text-white">
+                            {file?.docName?.split(/(_|-)/g).map((part, i) => (
+                              (part === '_' || part === '-') 
+                                ? <span key={i}>{part}<wbr/></span>
+                                : <span key={i}>{part}</span>
+                            ))}
+                          </span>
+                        )}                                            
+                    </div>
+                  </div>
+
+                  {/* Menu icon (⋮) */}
+
+                  <button                
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenIndex(openIndex === file ? null : file)
+                  }}
+                  className='p-2 transition-all duration-300 rounded-full'>
+                  <FontAwesomeIcon icon={faEllipsisVertical}               
+                    onClick={(e) => {
+                      e.stopPropagation();                    
+                      setOpenIndex(openIndex === file ? null : file)
+                    }}
+                  className="text-xl text-gray-500 cursor-pointer hover:text-black" />
+                  </button>
+                  {openIndex === file && (
+
+                    <div 
+                      ref={docRef}
+                      onClick={(e) => e.stopPropagation()}
+                    className='absolute z-10 p-3 border shadow-xl bg-gray-200/10 backdrop-blur-sm rounded-xl min-w-35 -top-[170%] right-3 dark:bg-gray-900 '>
+
+                      <button 
+                        onClick={(e) => {                       
+                          e.stopPropagation();
+                          handleDownload(file);
+                          console.log(`Downloading file: ${currentPath.join('/')}/${file.docName}`);
+                          }
+                        }
+                      className='relative block w-full px-2 py-1 text-gray-600 transition-all duration-300 rounded-md hover:text-gray-100 hover:bg-zuccini-500/80 dark:text-gray-200'>
+                        Download
+                        <FontAwesomeIcon icon={faDownload} className="ml-5"/>
+                      </button>
+
+                       <div className="w-full my-2 border-b border-gray-600"/> {/* Line */}
+
+                      <button                       
+                      onClick={(e) => {
+                        e.stopPropagation(); 
+                        setRenameTarget(file);
+                        setOpenIndex(null);
+                        setRenameValue(file.name);
+                      }}
+                      className='relative block w-full px-2 py-1 text-gray-600 transition-all duration-300 rounded-md hover:text-gray-100 hover:bg-gray-400/80 dark:text-gray-200'>
+                        Rename
+                        <FontAwesomeIcon icon={faPenToSquare} className="ml-5"/>
+                      </button>
+
+                      <div className="w-full my-2 border-b border-gray-600"/> {/* Line */}
+                      
+                      <button 
+                      onClick={(e) => {
+                        e.stopPropagation(); 
+                        setShowDetails(true);
+                        setOpenIndex(null);
+                        setSelectedFile(file);
+                      }}
+                      className='relative block w-full px-2 py-1 text-gray-600 transition-all duration-300 rounded-md hover:text-gray-100 hover:bg-gray-400/80 dark:text-gray-200'>
+                        Details
+                        <FontAwesomeIcon icon={faCircleInfo} className="ml-5"/>
+                      </button>
+                     
+                      <div className="w-full my-2 border-b border-gray-600"/> {/* Line */}
+
+                      <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFileToDelete(file);
+                        setShowDeleteModal(true);
+                        console.log(fileToDelete);
+                        setOpenIndex(null);
+                      }}                                     
+                      className='relative block w-full px-2 py-1 text-gray-600 transition-all duration-300 rounded-md hover:text-gray-100 hover:bg-red-500/80 dark:text-gray-200'>
+                        Delete
+                        <FontAwesomeIcon icon={faTrash} className="ml-5"/>
+                      </button>
+                    </div>                                  
+                  )}
+                
+                </div> 
+                ))}
+              </>
+              )}    
+           {/* Delete Modal */}
+                  {showDeleteModal && (
+                    <div
+                    onClick={(e) => {
+                      e.stopPropagation();                                            
+                    }}
+                    className="fixed inset-0 z-50 flex items-center justify-center transition-all duration-300 transform scale-100 bg-black/60 backdrop-blur-xs">
+                      <div className={`flex flex-col justify-center items-center p-5 py-10 border border-gray-800 bg-gray-200 dark:bg-gray-900 rounded-xl shadow-xl max-w-xl w-full max-h-[90vh] overflow-y-auto inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-800 ${showDeleteModal ? 'fade-in' : 'fade-out'}`}>
+                        <h1 className='mb-4 text-4xl font-bold text-red-500 text-shadow-md'>Delete File</h1>
+                        <div className="flex items-center justify-center w-20 h-20 mx-auto mb-3 bg-red-100 rounded-full inset-shadow-sm inset-shadow-red-500 dark:bg-red-900/30">
+                          <FontAwesomeIcon icon={faTriangleExclamation} className="text-3xl text-red-500 dark:text-red-400"/>
+                        </div>
+                        <div className='flex flex-col justify-center items-center w-[90%]'>
+                          <h1 className='mb-1 text-2xl font-semibold text-gray-800 dark:text-gray-200'>Are you sure you want to delete this file?</h1>
+                          <p className='mb-5 text-lg text-center text-gray-600 dark:text-gray-400'>This file could be involved in the accreditation process. Please proceed with caution</p>
+                        </div>
+                        <div className='flex flex-row justify-around w-full'>
+                          <button
+                          onClick={() =>  setShowDeleteModal(false)}
+                          className={`px-10 py-3 font-medium transition-colors rounded-full bg-gray-300 dark:bg-gray-700 text-neutral-500 dark:text-gray-300 hover:text-gray-900 hover:bg-gray-400/50 dark:hover:bg-gray-600 dark:hover:text-gray-200 cursor-pointer`}>Cancel</button>
+                          <button 
+                          onClick={() => handleDelete(file.docID)}
+                          className={`${isLoading ? 'cursor-not-allowed bg-gray-700' : 'bg-red-600/70 hover:bg-red-600/90 cursor-pointer'} px-8 py-3 rounded-full font-medium transition-colors flex items-center  text-white `}>
+                            {isLoading && (
+                              <FontAwesomeIcon icon={faSpinner} className="mr-2 text-gray-400 animate-spin"/>
+                            )}
+                            Delete File</button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+            </div>
+          )}
+
         </div>
 
+         
+        
         {/* Details Panel */}          
-          <div className={`flex flex-col h-fit min-h-[500px] z-0 shadow-xl bg-gradient-to-br from-gray-300 via-transparent to-gray-300 backdrop-blur-sm border border-gray-600 rounded-2xl p-3 dark:bg-gray-800 transition-all duration-300 ${showDetails ? 'opacity-100 w-80 fade-in-right' : 'opacity-0 w-0 fade-out-right'}`}>
-            <div className="flex items-center justify-between mb-3">
-              <h1 className='text-2xl font-semibold text-gray-800'>Details</h1>  
-              <FontAwesomeIcon 
-                onClick={() => setShowDetails(false)}
-                icon={faXmark}
-                className="text-xl text-gray-800 transition-colors duration-200 cursor-pointer hover:text-red-500"
-              />
-            </div>
-            
-            {showDetails && selectedFile && (
-              <div>
-            {/* File Name */}
-            <div className='flex flex-row items-center gap-3 my-5'>
-              <FontAwesomeIcon 
-              icon={displayFileIcon(selectedFile.name)} 
-              className={`p-3 text-3xl border border-gray-500 shadow-md rounded-xl ${selectedFile.type === "file" ? 'text-red-500' : 'text-blue-500'}`}/>
-              {/* Display File Name */}
-             {selectedFile.type === "file" && (
-               <div className="text-gray-800 dark:text-gray-200">              
-                <h2 className="text-xl font-medium ">{selectedFile.name}</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{selectedFile.mime}</p>
-              </div>  
-             )}
-             {/* Display folder name */}
-             {selectedFile.type === "folder" && (
-               <div className="text-gray-800 dark:text-gray-200">              
-                <h2 className="text-xl font-medium ">{selectedFile.meta.name}</h2>
+        <div className={`flex flex-col h-fit min-h-[500px] z-0 shadow-xl bg-gradient-to-br from-gray-300 via-transparent to-gray-300 dark:from-gray-900  dark:to-gray-900 backdrop-blur-sm border border-gray-600 rounded-2xl p-3 dark:bg-gray-800 transition-all duration-300 ${showDetails ? 'opacity-100 w-80 fade-in-right' : 'opacity-0 w-0 fade-out-right'}`}>
+          <div className="flex items-center justify-between mb-3">
+            <h1 className='text-2xl font-semibold text-gray-800 dark:text-gray-200'>Details</h1>  
+            <FontAwesomeIcon 
+              onClick={() => setShowDetails(false)}
+              icon={faXmark}
+              className="text-xl text-gray-800 transition-colors duration-200 cursor-pointer hover:text-red-500 dark:text-gray-200"
+            />
+          </div>
+          
+          {showDetails && selectedFile && (
+            <div>
+              {/* File Name */}
+              <div className='flex flex-row items-center gap-3 my-5'>
+                <FontAwesomeIcon 
+                  icon={displayFileIcon(selectedFile.name || selectedFile.docName)} 
+                  className={`p-3 text-3xl border border-gray-500 shadow-md rounded-xl ${
+                    selectedFile.type === "file" || selectedFile.docName ? 'text-red-500' : 'text-blue-500'
+                  }`}
+                />
                 
-              </div>  
-             )}
-            </div>
-            
-            {/* File Details */}            
-             <div className="px-2 pt-5 text-gray-800 border-t border-gray-700 dark:text-gray-200">
-              {/* Display file details */}
+                {/* Display File Name */}
+                <div className="text-gray-800 dark:text-gray-200">              
+                  <h2 className="text-xl font-medium ">
+                    {(selectedFile.name || selectedFile.docName || selectedFile.meta?.name)?.split(/(_|-)/g).map((part, i) => (
+                      (part === '_' || part === '-') 
+                        ? <span key={i}>{part}<wbr/></span>
+                        : <span key={i}>{part}</span>
+                    ))}
+                  </h2>
+                  
+                   {/* Show doc ID for filtered docs */}
+                  {selectedFile.docID && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Document ID: {selectedFile.docID}</p>
+                  )}
+
+                  {/* Show mime type for directory files */}
+                  {selectedFile.mime && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{selectedFile.mime.split('/')[1].toUpperCase()} File</p>
+                  )}                
+                 
+                </div>
+              </div>
+              
+              {/* File Details */}            
+              <div className="px-2 pt-5 text-gray-800 border-t border-gray-700 dark:text-gray-200">
+                
+                {/* Directory file details */}
                 {selectedFile.size !== undefined && selectedFile.type !== "folder" && (
                   <>
                     <h2 className="mb-2 text-lg font-medium">File Size:</h2>
-                      <p className="mb-5 ml-3 text-gray-600 text-md dark:text-gray-400">
-                        {formatSize(selectedFile.size)}
-                      </p>
+                    <p className="mb-5 ml-3 text-gray-600 text-md dark:text-gray-400">
+                      {formatSize(selectedFile.size)}
+                    </p>
                     <h2 className="text-lg font-medium">Modified:</h2>
-                      <p className="ml-3 text-gray-600 text-md dark:text-gray-400">
-                        {selectedFile.modified}
-                      </p>
+                    <p className="ml-3 mb-5 text-gray-600 text-md dark:text-gray-400">
+                      {selectedFile.modified}
+                    </p>
+
+                    {/* Show tags for directory files */}
+                
+                  
+                    <h2 className="mb-2 text-lg font-medium">Tags:</h2>
+                    <div className="flex flex-wrap gap-2 mb-5 ml-3">
+                      {selectedFile.docTag.map((tag, index) => (
+                        <span
+                          key={index}
+                          className="px-2 py-1 text-xs text-gray-700 capitalize border rounded-full border-neutral-400 dark:text-white dark:border-gray-500"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
                   </>
                 )}
-                  {/* Display folder details */}
+
+                  
+                
+                
+                {/* Folder details */}
                 {selectedFile.type === "folder" && (
                   <>
                     <h2 className="mb-2 text-lg font-medium">Folder Size:</h2>
                     <p className="mb-5 ml-3 text-gray-600 text-md dark:text-gray-400">
                       {formatSize(getFolderSize(selectedFile))}
                     </p>
-
                     <h2 className="text-lg font-medium">Modified:</h2>
-                    <p className="ml-3 text-gray-600 text-md dark:text-gray-400">
+                    <p className="ml-3 mb-5 text-gray-600 text-md dark:text-gray-400">
                       {selectedFile.meta.modified}
-                  </p>  
+                    </p>  
                   </>
                 )}
-
                 
+                {/* Filtered document details */}
+                {selectedFile.docPath && (
+                  <>
+                    <h2 className="mb-2 text-lg font-medium">Document Path:</h2>
+                    <p className="mb-5 ml-3 text-sm text-gray-600 break-all dark:text-gray-400">
+                      {selectedFile.docPath.replace('UDMS_Repository/', '')}
+                    </p>
+                  </>
+                )}
+                
+                {/* Show tags for filtered documents */}
+                {selectedFile.docTags && selectedFile.docTags.length > 0 && (
+                  <>
+                    <h2 className="mb-2 text-lg font-medium">Tags:</h2>
+                    <div className="flex flex-wrap gap-2 mb-5 ml-3">
+                      {selectedFile.docTags.map((tag, index) => (
+                        <span
+                          key={index}
+                          className="px-2 py-1 text-xs text-gray-700 capitalize border rounded-full border-neutral-400 dark:text-white dark:border-gray-500"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
+                
+              </div>
             </div>
-          </div>
           )}
-          </div>
-        </div>   
+        </div>
+      </div>
+        
+    </div>   
              
     </>
   );

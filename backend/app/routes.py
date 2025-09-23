@@ -2,15 +2,20 @@ import json
 from flask import jsonify, request, current_app, Response
 from app.models import Employee
 from app import db, redis_client, socketio
-from sqlalchemy import text
-from werkzeug.security import check_password_hash, generate_password_hash, _hash_internal                        
+from sqlalchemy import text, func, desc
+from werkzeug.security import check_password_hash, generate_password_hash, _hash_internal    
+from urllib.parse import unquote                    
 from werkzeug.utils import secure_filename
 from flask_jwt_extended import create_access_token, create_refresh_token, get_jwt_identity, jwt_required, decode_token, exceptions, verify_jwt_in_request                                
 from flask_jwt_extended import set_access_cookies, set_refresh_cookies, unset_jwt_cookies
 from flask_jwt_extended.exceptions import JWTExtendedException
-from datetime import timedelta
-from app.utils.file_extractor import extract_pdf, extract_docs, extract_excel
+from datetime import timedelta, datetime
+from app.utils.normalize_path import normalize_path
+from app.utils.file_extractor import extract_pdf, extract_docs, extract_excel, extract_image
+from app.utils.tagging_utils import rule_based_tag, extract_global_tfid_tags
 from app.nextcloud_service import upload_to_nextcloud, preview_from_nextcloud, delete_from_nextcloud, ensure_directories, safe_path, list_files_from_nextcloud, preview_file_nextcloud, download_file_nextcloud, rename_file_nextcloud
+from sentence_transformers import SentenceTransformer
+import numpy as np
 import os
 import re
 import time
@@ -261,6 +266,68 @@ def register_routes(app):
         except Exception as e:
             print(f"Logout error: {e}")
             return jsonify({'success': False, 'error': str(e)}), 500
+
+
+                # DASHBOARD ROUTES
+
+    @app.route('/api/announcement/post', methods=["POST"])
+    @jwt_required()
+    def post_announce():
+        try:
+            data = request.get_json()
+            title = data.get("title") 
+            message = data.get("message")
+            duration = data.get("duration")
+            userID = get_jwt_identity()
+
+            duration = datetime.strptime(duration, "%Y-%m-%d").date()
+
+
+            new_announcement = Announcement(
+                employeeID = userID,
+                announceTitle = title, 
+                announceText = message, 
+                duration = duration
+                )
+            db.session.add(new_announcement)
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Announcement created successfully'}), 200 
+        except Exception as e:
+            return jsonify({'success': False, 'message': f'Failed to create announcement, {e}'}), 500
+
+    @app.route('/api/announcements', methods=["GET"])
+    def get_announcements():
+        try:            
+            announcement = (Announcement.query
+                            .join(Employee, Employee.employeeID == Announcement.employeeID)
+                            .add_columns(
+                                Announcement.announceID,
+                                Announcement.announceTitle,
+                                Announcement.announceText,
+                                Announcement.duration,
+                                Employee.fName,
+                                Employee.lName,
+                                Employee.suffix                                
+                            )).all()
+
+            result = []
+
+            for ann in announcement:
+                announce_data = {
+                    'announceID': ann.announceID,
+                    'announceTitle': ann.announceTitle,
+                    'announceText': ann.announceText,
+                    'duration': ann.duration,
+                    'author': f"{ann.fName} {ann.lName} {ann.suffix or ''}".strip()
+                }
+                
+                result.append(announce_data)
+                
+            return jsonify(result), 200
+        
+        except Exception as e:
+            return jsonify({'success': False, 'message': f'Failed to fetch announcements, {e}'}), 500
+    
 
                  #USER PAGE ROUTES
 
@@ -672,12 +739,185 @@ def register_routes(app):
         
             user_list.append(user_data)
         return jsonify({"users" : user_list}), 200
+
+                    #INSTITUTES PAGE ROUTES 
+    
+    #edit institute base on institute id
+    @app.route('/api/institute/<int:instID>', methods=['PUT'])    
+    def edit_institute(instID):
+        try:
+            data = request.get_json()  # Get JSON data from frontend
+            institutes = Institute.query.filter_by(instID=instID).first()  # Find institute by ID
+            
+            if institutes:
+                # Update the database fields with new values
+                institutes.instID = data.get('instID')      # Update institute code (e.g., "BSIT")
+                institutes.instCode = data.get('instCode')      # Update institute code (e.g., "BSIT")
+                institutes.instName = data.get('instName')      # Update institute name  
+                institutes.instPic = data.get('instPic')    # Update institute color
+                # Handle employeeID - accept string format like "23-45-678"
+                employee_id = data.get('employeeID')
+                if employee_id and employee_id.strip():  # Check if not empty
+                    institutes.employeeID = employee_id  # Store as string (matches your DB format)
+                else:
+                    institutes.employeeID = None  # Set to null for empty values
+                
+                db.session.commit()  # Save changes to database
+                
+                # After saving, get the updated dean info via the foreign key relationship
+                dean = institutes.dean  # This uses the relationship defined in your models.py
+                dean_name = f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A"
+                
+                return jsonify({
+                    'success': True,
+                    'message': 'Program Updated Successfully',
+                    'updated_program': {
+                        'instID': institutes.instID,
+                        'instCode': institutes.instCode,
+                        'instName': institutes.instName,
+                        'instPic': institutes.instPic,
+                        'instDean': dean_name,  # Send back the dean's full name for display
+                        'employeeID': institutes.employeeID  # Include the ID for future edits
+                    }
+                })
+            else:
+                return jsonify({'error': 'Program not found'}), 404
+                
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': 'Database error occurred'}), 500
+
+    #Create new program
+    @app.route('/api/institutes', methods=['POST'])
+    def create_institute():
+        try:
+            data = request.get_json()  # Get JSON data from frontend
+            
+            # Handle employeeID - accept string format like "23-45-678"
+            employee_id = data.get('employeeID')
+            if employee_id and employee_id.strip():  # Check if not empty
+                final_employee_id = employee_id  # Store as string
+            else:
+                final_employee_id = None  # Set to null for empty values
+            
+            # Create new program object
+            new_institute = Institute(
+                instID=data.get('instID'),
+                instCode=data.get('instCode'),
+                instName=data.get('instName'),
+                instPic=data.get('instPic'),
+                employeeID=final_employee_id
+            )
+            
+            db.session.add(new_institute)  # Add to database
+            db.session.commit()  # Save changes
+            
+            # Get the dean info for response (same as edit route)
+            dean = new_institute.dean
+            dean_name = f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A"
+            
+            return jsonify({
+                'success': True,
+                'message': 'Institutes Created Successfully',
+                'programID': new_institute.programID,
+                'programCode': new_institute.programCode,
+                'programName': new_institute.programName,
+                'programColor': new_institute.programColor,
+                'programDean': dean_name,
+                'employeeID': new_institute.employeeID
+            })
+            
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Create Institute error: {str(e)}")
+            return jsonify({'error': 'Failed to create institute'}), 500
+
+    #Delete institute by ID
+    @app.route('/api/institute/<int:instID>', methods=['DELETE'])
+    def delete_institute(instID):
+        try:
+            institutes = Institute.query.filter_by(instID=instID).first()
+            
+            if not institutes:
+                return jsonify({'error': 'Program not found'}), 404
+            
+            # Check dependencies before deletion
+            dependencies = []
+            
+            # Check employees
+            employees = Employee.query.filter_by(instID=instID).count()
+            if employees > 0:
+                dependencies.append(f"{employees} employee(s)")
+            
+            # Check areas
+            areas = Area.query.filter_by(instID=instID).count()
+            if areas > 0:
+                dependencies.append(f"{areas} area(s)")
+            
+            # Check institutes  
+            institutes = Institute.query.filter_by(instID=instID).count()
+            if institutes > 0:
+                dependencies.append(f"{institutes} institute(s)")
+                
+            # Check deadlines
+            deadlines = Deadline.query.filter_by(instID=instID).count()  
+            if deadlines > 0:
+                dependencies.append(f"{deadlines} deadline(s)")
+            
+            # If dependencies exist, prevent deletion
+            if dependencies:
+                dependency_text = ", ".join(dependencies)
+                return jsonify({
+                    'error': 'Cannot delete institute',
+                    'reason': f'This institute is referenced by: {dependency_text}',
+                    'suggestion': 'Please reassign or remove dependent records first',
+                    'canDelete': False,
+                    'dependencies': dependencies
+                }), 400
+            
+            # Safe to delete - no dependencies found
+            db.session.delete(institutes)
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Institute deleted successfully',
+                'deletedID': instID
+            })
+                
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Delete institute error: {str(e)}")
+            return jsonify({'error': 'Database error occurred'}), 500
+
+    #Get the institute
+    @app.route('/api/institute', methods=["GET"])
+    def get_institute():
+        institutes = Program.query.all()
+                    
+        institute_list = []
+
+        for institute in institutes:
+
+            dean = institute.dean
+
+            institute_data = {
+                'instID': institute.instID,
+
+                'instDean': f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A",
+
+                'instCode': institute.instCode,
+                'instName': institute.instName,
+                'instPic': institute.instPic,
+                'employeeID': institute.employeeID  # Include the foreign key ID
+            } 
+            institute_list.append(institute_data)
+        return jsonify({"programs": institute_list}), 200
     
                                         #PROGRAM PAGE ROUTES
     
-
     #edit program base on program id
-    @app.route('/api/program/<int:programID>', methods=['PUT'])
+    @app.route('/api/program/<int:programID>', methods=['PUT'])    
     def edit_program(programID):
         try:
             data = request.get_json()  # Get JSON data from frontend
@@ -734,29 +974,29 @@ def register_routes(app):
                 final_employee_id = None  # Set to null for empty values
             
             # Create new program object
-            new_program = Program(
+            new_institute = Program(
                 programCode=data.get('programCode'),
                 programName=data.get('programName'),
                 programColor=data.get('programColor'),
                 employeeID=final_employee_id
             )
             
-            db.session.add(new_program)  # Add to database
+            db.session.add(new_institute)  # Add to database
             db.session.commit()  # Save changes
             
             # Get the dean info for response (same as edit route)
-            dean = new_program.dean
+            dean = new_institute.dean
             dean_name = f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A"
             
             return jsonify({
                 'success': True,
                 'message': 'Program Created Successfully',
-                'programID': new_program.programID,
-                'programCode': new_program.programCode,
-                'programName': new_program.programName,
-                'programColor': new_program.programColor,
+                'programID': new_institute.programID,
+                'programCode': new_institute.programCode,
+                'programName': new_institute.programName,
+                'programColor': new_institute.programColor,
                 'programDean': dean_name,
-                'employeeID': new_program.employeeID
+                'employeeID': new_institute.employeeID
             })
             
         except Exception as e:
@@ -1127,10 +1367,12 @@ def register_routes(app):
         db.session.commit()
 
         return jsonify({'message': 'Criteria created successfully!'}), 200
-
+    
+    # Load the embedding model for semantic searching
+    embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
     @app.route('/api/accreditation/upload', methods=["POST"])
-    @jwt_required()
+    @jwt_required()        
     def upload_file():
        # ==== Get and Validate Form Data ====
         # Get form data
@@ -1175,8 +1417,7 @@ def register_routes(app):
 
         # Gets the file url
         path = f"UDMS_Repository/Accreditation/Programs/{program_code}/{area_name}/{subarea_name}/{criteria_type}/{criteria_id}"
-        path = path.strip('/')
-
+        normalized_path = normalize_path(path)    
 
         # Generates a secure filename
         filename = secure_filename(file.filename)
@@ -1213,6 +1454,27 @@ def register_routes(app):
             finally:
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
+
+            # === Generate Tags === 
+            tags = set(rule_based_tag(extracted_text))
+            
+            # Fetch all documents in the DB
+            all_docs = [d.content for d in Document.query.with_entities(Document.content).all()]
+            all_docs.append(extracted_text)
+
+            tfidf_tags = extract_global_tfid_tags(all_docs, len(all_docs) - 1)
+            if tfidf_tags:
+                # Flatten tfidf_tags if it's a list of lists
+                from itertools import chain
+                if any(isinstance(tag, list) for tag in tfidf_tags):
+                    flat_tags = list(chain.from_iterable(tfidf_tags))
+                    tags.update(flat_tags)
+                else:
+                    tags.update(tfidf_tags)
+
+           # === Generate Embedding ===
+            embedding = embedding_model.encode(extracted_text, normalize_embeddings=True)
+            embedding = np.array(embedding, dtype=np.float32).tolist()
             
                                    
            # ==== Create or update document record ====
@@ -1220,9 +1482,11 @@ def register_routes(app):
 
             if doc:
                 # Update existing doc
-                doc.docPath = f"{path}/{filename}"
+                doc.docPath = f"{normalized_path}/{filename}"
                 doc.docName = file_name
                 doc.content = extracted_text
+                doc.tags = list(tags)
+                doc.embedding = embedding
             else:
                 # Create new doc
                 doc = Document(
@@ -1230,7 +1494,9 @@ def register_routes(app):
                     docType=file_type,
                     docPath=f"{path}/{filename}",
                     content=extracted_text,
-                    employeeID=uploader.employeeID
+                    employeeID=uploader.employeeID,
+                    tags=list(tags),
+                    embedding=embedding
                 )
                 db.session.add(doc)
                 db.session.flush()  # Assign docID before linking
@@ -1260,7 +1526,7 @@ def register_routes(app):
             return jsonify({
                 'success': True, 
                 'message': 'File uploaded successfully!', 
-                'filePath': f"{path}/{filename}",
+                'filePath': f"{normalized_path}/{filename}",
                 'status': response.status_code, 
             }), 200
             
@@ -1322,26 +1588,52 @@ def register_routes(app):
     def download_file_documents(file_path):
         return download_file_nextcloud(file_path)
     
-    @app.route('/api/documents/delete_file/<path:file_path>', methods=["DELETE"])
+    
+    @app.route('/api/documents/delete_file/<int:docID>', methods=["DELETE"])
     @jwt_required()
-    def delete_file(file_path):
+    def delete_file(docID):
         try:
-            print(f"Deleting request for: {file_path}")
-
-            response = delete_from_nextcloud(file_path)
-            if response.status_code in (200, 204):
-                Document.query.filter_by(docPath=file_path).delete()
-                db.session.commit()
-                return jsonify({'success': True, 'message': 'File deleted successfully.'}), 200
-            else:
+            # Check if metadata exists first
+            doc = Document.query.get(docID)
+            if not doc:
                 return jsonify({
                     'success': False,
-                    'message': 'Nextcloud deletion failed. Please try again.',
+                    'message': 'Document not found.'
+                }), 404
+
+            file_path = doc.docPath
+            print(f"Deleting docID = {docID}, path = {file_path}")
+            if file_path.startswith('UDMS_Repository/'):
+                file_path = file_path.replace("UDMS_Repository/", "", 1)
+
+            # Delete from Nextcloud
+            response = delete_from_nextcloud(file_path)
+
+            if response.status_code not in (200, 204):
+                return jsonify({
+                    'success': False,
+                    'message': 'Nextcloud deletion failed.',
                     'status': response.status_code,
                     'details': response.text
                 }), 400
+
+            # Delete metadata from DB only if Nextcloud deletion succeeded
+            db.session.delete(doc)
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': 'File deleted successfully.'
+            }), 200
+
         except Exception as e:
-            return jsonify({'success': False, 'message': f'Failed to delete document {str(e)}'}), 500
+            db.session.rollback()
+            return jsonify({
+                'success': False,
+                'message': f'Failed to delete document: {str(e)}'
+            }), 500
+
+
 
     @app.route('/api/documents/rename', methods=["PUT"])
     def rename_file():        
@@ -1359,18 +1651,16 @@ def register_routes(app):
                         'success': True,
                         'message': 'Folder renamed in Nextcloud but not tracked in DB.'
                     }), 200
-
+                
+                display_name = unquote(new_path)
                 # Update DB only if it's a file
                 doc = Document.query.filter_by(docPath=old_path).first()
                 if doc:
-                    doc.docPath = new_path
+                    doc.docPath = display_name
                     db.session.commit()
-                else:
-                    new_doc = Document(docPath=new_path, fileName=os.path.basename(new_path))
-                    db.session.add(new_doc)
-                    db.session.commit()
-
-                return jsonify({'success': True, 'message': 'File renamed successfully.'}), 200
+                else:                 
+                    return jsonify({'success': True, 'message': 'File renamed successfully.'}), 200
+                
             else:
                 return jsonify({
                     'success': False,
@@ -1381,6 +1671,215 @@ def register_routes(app):
         except Exception as e:
             return jsonify({'success': False, 'message': f'Failed to rename document {str(e)}'}), 500
 
+    @app.route('/api/documents/upload', methods=["POST"])
+    @jwt_required()
+    def upload_documents():
+        file = request.files.get('uploadedFile')
+        data = request.form
+        file_type = data.get("fileType")
+        file_name = data.get("fileName")
+        directory = data.get("directory", "").strip('/')
+
+        base_path = "UDMS_Repository"
+
+        if not directory:
+            directory = base_path
+        else:
+            directory = f"{base_path}/{directory}"
+
+        if not file:
+            return jsonify({'success': False, 'message': 'No file provided'}), 400        
+
+        if not file.filename or '.' not in file.filename:
+            return jsonify({'success': False, 'message': 'Invalid file name'}), 400
+
+        # Get uploader info
+        uploader = Employee.query.filter_by(employeeID=get_jwt_identity()).first()
+        if not uploader:
+            return jsonify({'success': False, 'message': 'User not found'}), 400
+        
+        filename = secure_filename(file.filename)
+
+        # Upload to Nextcloud
+        response = upload_to_nextcloud(file, directory)
+        if response.status_code not in (200, 201, 204):
+            return jsonify({
+                "success": False,
+                "message": f"Upload failed: {response.status_code} {response.text}"
+            }), 500
+
+        # === Extract text ===
+        extracted_text = ""
+        temp_path = f"/tmp/{filename}"
+        try:
+            file.save(temp_path) 
+
+            file_extension = filename.rsplit('.', 1)[-1].lower()
+            if file_extension == 'pdf':
+                extracted_text = extract_pdf(temp_path)
+            elif file_extension in ('docx', 'doc'):
+                extracted_text = extract_docs(temp_path)
+            elif file_extension in ('xls', 'xlsx'):
+                extracted_text = extract_excel(temp_path)
+            elif file_extension in ('jpg', 'png', 'jpeg'):
+                extracted_text = extract_image(temp_path) 
+            else:
+                extracted_text = "" # could be extended for txt, etc.            
+
+        except Exception as e:
+            return jsonify({'success': False, 'message': f'Text extraction failed: {str(e)}'}), 500
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        
+       # === Generate Tags === 
+        tags = set(rule_based_tag(extracted_text))
+        
+        # Fetch all documents in the DB
+        all_docs = [d.content for d in Document.query.with_entities(Document.content).all()]
+        all_docs.append(extracted_text)
+
+        tfidf_tags = extract_global_tfid_tags(all_docs, len(all_docs) - 1)
+        if tfidf_tags:
+            # Flatten tfidf_tags if it's a list of lists
+            from itertools import chain
+            if any(isinstance(tag, list) for tag in tfidf_tags):
+                flat_tags = list(chain.from_iterable(tfidf_tags))
+                tags.update(flat_tags)
+            else:
+                tags.update(tfidf_tags)
+
+        # === Generate Embedding ===
+        embedding = embedding_model.encode(extracted_text, normalize_embeddings=True)
+        embedding = np.array(embedding, dtype=np.float32).tolist()
+        
+        
+        # === Save record to DB ===
+        try:
+            doc = Document(
+                docName=file_name,
+                docType=file_type,
+                docPath=f"{directory}/{filename}",
+                content=extracted_text,
+                employeeID=uploader.employeeID,
+                tags=list(tags),
+                embedding=embedding
+            )
+            db.session.add(doc)
+            db.session.flush() # Assign docID before updating search vector
+
+            # ==== Update search vector ====
+            db.session.execute(
+                text("""
+                    UPDATE document
+                    SET search_vector = to_tsvector('english', "docName" || ' ' || content)
+                    WHERE "docID" = :doc_id
+                """), 
+                {"doc_id": doc.docID}
+            )
+
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': 'File uploaded successfully!'
+            }), 200
+
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': f'Database save failed: {str(e)}'}), 500
+
+    @app.route('/api/documents/tags', methods=["GET"])
+    def get_tags():
+
+        tags = Document.query.with_entities(Document.tags).all()
+
+        unique_tags = set()
+
+        for tag_list, in tags:
+            if tag_list:
+                unique_tags.update(tag_list)
+                sorted_tags = sorted(unique_tags)
+        
+        return jsonify(sorted_tags), 200
+
+    @app.route('/api/documents/filter', methods=["GET"])
+    def filter_by_tags():
+        tag = request.args.get('tag', "").strip()
+
+        if not tag:
+            return jsonify({"error": "Tag is required"}), 400
+        
+        search_tag = tag.lower()
+
+        documents = Document.query.filter(Document.tags.any(search_tag)).all()
+
+
+        result = []
+
+        for doc in documents:  
+            doc_data = {
+                    "docID": doc.docID,
+                    "docName": doc.docName,
+                    "docTags": doc.tags,
+                    "docPath": doc.docPath,
+                }
+            
+            result.append(doc_data)
+
+        return jsonify(result), 200
+            
+
+
+        
+    @app.route('/api/search', methods=["GET"])
+    def search_document():
+        query = request.args.get('q', '').strip()
+        if not query:
+            return jsonify([])
+
+        tsquery = ' & '.join([f"{word}:*" for word in query.split()])
+        query_embedding = embedding_model.encode(query).tolist()
+
+        sql = text(""" 
+            SELECT 
+                d."docID", 
+                d."docName", 
+                d."docPath",
+                ts_rank_cd(d.search_vector, to_tsquery('english', :tsquery)) as keyword_rank,
+                1 - (d.embedding <=> CAST(:embedding AS vector)) AS semantic_score,
+                (0.3 * ts_rank_cd(d.search_vector, to_tsquery('english', :tsquery)) +
+                0.7 * (1 - (d.embedding <=> CAST(:embedding AS vector)))) AS hybrid_score,
+                ts_headline('english', d.content, to_tsquery('english', :tsquery)) AS file_snippet
+            FROM document d
+            WHERE d.search_vector @@ to_tsquery('english', :tsquery) 
+                OR d.embedding IS NOT NULL
+            ORDER BY hybrid_score DESC
+            LIMIT 10
+        """)
+
+        results = db.session.execute(
+            sql,             
+            {
+                "tsquery": tsquery,
+                "embedding": query_embedding
+            }
+        ).mappings().all()
+
+        output = []
+        for row in results:
+            output.append({
+                "docID": row.docID,
+                "docName": row.docName,
+                "docPath": row.docPath,
+                "directory": row.docPath,
+                'file_snippet': row.file_snippet,
+                "keyword_rank": float(row.keyword_rank) if row.keyword_rank else 0,
+                "semantic_score": float(row.semantic_score) if row.semantic_score else 0,
+                "hybrid_score": float(row.hybrid_score) if row.hybrid_score else 0
+            })
+
+        return jsonify(output)
 
 
     # === Rate criteria ===

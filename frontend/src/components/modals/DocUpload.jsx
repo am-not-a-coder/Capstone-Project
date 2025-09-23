@@ -8,9 +8,9 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import StatusModal from './StatusModal';
-import { apiPostForm, apiGet } from '../../utils/api_utils';
+import { apiPostForm } from '../../utils/api_utils';
 
-const UploadModal = ({ onClose, showModal, programCode, areaName, subareaName, criteriaType, criteriaID, onUploadSuccess, setAreas}) => {
+const DocUpload = ({ onClose, showModal, currentPath, uploadSuccess}) => {
 
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
@@ -28,9 +28,6 @@ const UploadModal = ({ onClose, showModal, programCode, areaName, subareaName, c
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  useEffect(() => {
-    // Initialization logic here
-  }, []);
 
   const handleDragEnter = (e) => {
     e.preventDefault();
@@ -62,11 +59,7 @@ const UploadModal = ({ onClose, showModal, programCode, areaName, subareaName, c
     }
   };
 
-  const handleFileSelection = (file) => {
-    if (!file || file.type !== 'application/pdf') {
-      errorMessage.current.textContent = 'Please upload a valid PDF file.';
-      return;
-    }
+  const handleFileSelection = (file) => {    
     
     setUploadedFile({
       name: file.name,
@@ -107,8 +100,7 @@ const UploadModal = ({ onClose, showModal, programCode, areaName, subareaName, c
     }
   };
 
-  const closeModal = () => {  
-    refreshAreas(programCode);  
+  const closeModal = () => {      
     resetUpload();
     if (onClose) {
       onClose();
@@ -130,20 +122,19 @@ const UploadModal = ({ onClose, showModal, programCode, areaName, subareaName, c
   }
 
   const handleUpload = async () => {
+    if (!uploadedFile) return;
     setIsUploading(true)
     setUploadProgress(0)    
 
     const progressInterval = startProgress();
+             
     
     const formData = new FormData()
     formData.append('uploadedFile', uploadedFile.file);
     formData.append('fileType', fileType);
     formData.append('fileName', fileName);
-    formData.append('criteriaID', criteriaID);
-    formData.append('programCode', programCode);
-    formData.append('areaName', areaName);
-    formData.append('subareaName', subareaName);
-    formData.append('criteriaType', criteriaType);
+    formData.append('directory', currentPath.join('/'));
+
 
     try{
       const response = await apiPostForm('/api/documents/upload', formData, {withCredentials: true});
@@ -161,10 +152,10 @@ const UploadModal = ({ onClose, showModal, programCode, areaName, subareaName, c
           setShowStatusModal(true);
           resetUpload();
           
-          if(onUploadSuccess){
-            onUploadSuccess();
-          }
         }, 500);       
+      } 
+      if (uploadSuccess) {
+        uploadSuccess();
       }
 
     }catch(err){
@@ -176,15 +167,7 @@ const UploadModal = ({ onClose, showModal, programCode, areaName, subareaName, c
       setShowStatusModal(true);
     }
   }
-
-   const refreshAreas = async (programCode) => {
-        try {
-           const response = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`, {withCredentials: true})
-          Array.isArray(response.data) ? setAreas(response.data) : setAreas([]);
-        } catch(err) {
-          console.error('Error refreshing areas:', err);
-        }
-      }
+   
 
   return (
     <div>
@@ -228,9 +211,6 @@ const UploadModal = ({ onClose, showModal, programCode, areaName, subareaName, c
                   Drag and drop your file here, or click to browse
                 </p>
 
-                 <p className="mb-4 italic text-gray-600/50 dark:text-gray-500">
-                  Supported formats: PDF (max 10MB)
-                </p>
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="px-4 py-2 font-medium text-white transition-colors bg-blue-600 rounded-md hover:bg-blue-700"
@@ -344,4 +324,4 @@ const UploadModal = ({ onClose, showModal, programCode, areaName, subareaName, c
   );
 }
 
-export default UploadModal;
+export default DocUpload;

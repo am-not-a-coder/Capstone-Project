@@ -41,6 +41,7 @@ def create_app():
 
     CORS(app, origins=['http://localhost:5173'], supports_credentials=True)
 
+
     # Initialize SocketIO with CORS settings
     socketio.init_app(app, cors_allowed_origins="http://localhost:5173", 
                       async_mode='threading', logger=True, engineio_logger=True)

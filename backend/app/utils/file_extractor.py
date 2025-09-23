@@ -1,15 +1,29 @@
 import PyPDF2
 import docx
 import openpyxl
+import pytesseract
+from pdf2image import convert_from_path
+from PIL import Image
 
 
 def extract_pdf(file_path):
     text = ""
-    with open(file_path, "rb") as f:
-        reader = PyPDF2.PdfReader(f)
-        for page in reader.pages:
-            text += page.extract_text() + "\n"
+    images = convert_from_path(
+        file_path,
+        dpi=300
+    )
+    # Extract text from image inside the pdf
+    for i, img in enumerate(images):
+        page_text = pytesseract.image_to_string(img, lang="eng")
+        text += page_text
+
     return text
+
+def extract_image(image_path):
+    text = pytesseract.image_to_string(Image.open(image_path))
+    return text
+
+
 
 def extract_docs(file_path):
     doc = docx.Document(file_path)
