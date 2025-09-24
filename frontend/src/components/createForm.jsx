@@ -138,28 +138,28 @@ export default function CreateForm({
   // Memoize the default fields to prevent recreation on every render
   const defaultFields = useMemo(() => [
     {
-      name: "programCode",
+      name: title === "Program" ? "programCode" : "instCode",
       label: `${title} Code`,
       placeholder: `e.g. ${title === "Program" ? "BSIT" : "CCS"}`,
       type: "text",
       required: true
     },
     {
-      name: "programName", 
+      name: title === "Program" ? "programName" : "instName", 
       label: `${title} Name`,
       placeholder: `Full ${title.toLowerCase()} name`,
       type: "text",
       required: true
     },
     {
-      name: title === "Program" ? "employeeID" : "instituteHead",
+      name: title === "Program" ? "employeeID" : "employeeID", // keep consistent
       label: title === "Program" ? "Program Dean" : "Institute Head",
       placeholder: title === "Program" ? "Select Program Dean" : "Institute Head",
-      type: title === "Program" ? "select" : "text",
+      type: "select",
       required: false
     },
     {
-      name: title === "Program" ? "programColor" : "img",
+      name: title === "Program" ? "programColor" : "instPic",
       label: title === "Program" ? `${title} Color` : `${title} Logo`,
       placeholder: title === "Program" ? `${title} Color` : `Select ${title.toLowerCase()} logo`,
       type: title === "Program" ? "color" : "file",
@@ -168,6 +168,7 @@ export default function CreateForm({
     }
   ], [title]);
 
+
   // Memoize formFields to prevent recreation
   const formFields = useMemo(() => {
     return fields.length > 0 ? fields : defaultFields;
@@ -175,24 +176,29 @@ export default function CreateForm({
 
   // Memoize file change handler to prevent recreation
   const handleFileChange = useCallback((e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const allowedTypes = ['.webp', '.png', '.jpeg', '.jpg'];
-      const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-      if (allowedTypes.includes(fileExtension)) {
-        const fileUrl = URL.createObjectURL(file);
-        handleChange({
-          target: {
-            name: 'img',
-            value: fileUrl
-          }
-        });
-      } else {
-        alert('Please select a valid image file (.webp, .png, .jpeg, .jpg)');
-        e.target.value = '';
+  const file = e.target.files[0];
+  if (file) {
+    const allowedTypes = ['.webp', '.png', '.jpeg', '.jpg'];
+    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+    if (allowedTypes.includes(fileExtension)) {
+      // ✅ Save the File object to form state
+      handleChange({
+      target: {
+        name: 'instPic',
+        value: file
       }
+    });
+
+      // (optional) If you want a preview in UI, 
+      // you can also set a separate state for preview URL
+      // setPreview(URL.createObjectURL(file));
+    } else {
+      alert('Please select a valid image file (.webp, .png, .jpeg, .jpg)');
+      e.target.value = '';
     }
-  }, [handleChange]);
+  }
+}, [handleChange]);
+
 
   // Memoize action button handlers to prevent recreation
   const handleAddClick = useCallback(() => handleModify("add"), [handleModify]);

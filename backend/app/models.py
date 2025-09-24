@@ -123,7 +123,6 @@ class Institute(db.Model):
 
     instID = db.Column(db.Integer, primary_key=True, nullable=False)
     employeeID = db.Column(db.String(10), db.ForeignKey('employee.employeeID'))
-    programID = db.Column(db.Integer, nullable=False)
     instCode = db.Column(db.String(50), nullable=False)
     instName = db.Column(db.String(100), nullable=False)
     instPic = db.Column(db.Text)

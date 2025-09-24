@@ -33,10 +33,10 @@ export default function ProgramCard({ program, onClick, className = "" }) {
         {/* Program Code and Name */}
         <div className="space-y-2">
           <h3 className="text-lg font-bold leading-tight text-gray-900 transition-colors duration-200 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
-            {program.programCode}
+            {program.programCode || program.code}
           </h3>
           <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-300 line-clamp-2">
-            {program.programName}
+            {program.programName || program.name}
           </p>
         </div>
 
