@@ -1,5 +1,4 @@
 import json
-from tkinter import FALSE
 from flask import jsonify, request, session, send_from_directory, current_app, Response, render_template
 from app.models import Employee
 from app import db, redis_client, socketio, mail
@@ -23,7 +22,7 @@ from app.otp_utils import generate_random
 from flask_mail import Message as MailMessage
 from app.login_handlers import complete_user_login
 from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message, MessageDeletion
-from sqlalchemy import cast, String, func
+from sqlalchemy import cast, String, func, text
 
 
 def register_routes(app):
@@ -345,7 +344,7 @@ def register_routes(app):
 
                  #USER PAGE ROUTES
 
-    #CREATE USER
+    # CREATE USER
     @app.route('/api/user', methods=["POST"])
     @jwt_required()
     def create_user():
@@ -354,74 +353,65 @@ def register_routes(app):
         admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
         if not admin_user or not admin_user.isAdmin:
             return jsonify({'success': False, 'message': 'Admins only'}), 403
+
         # get the user input 
         data = request.form
-        profilePic = request.files.get("profilePic")
-        empID = data.get("employeeID").strip()
-        password = data.get("password").strip()
-        first_name = data.get("fName").strip()
-        last_name = data.get("lName").strip()
-        suffix = data.get("suffix").strip()
-        email = data.get("email").strip()
-        contactNum = data.get("contactNum").strip()
+        profilePic = request.files.get("profilePic")  # ✅ Do not override this
+        empID = data.get("employeeID", "").strip()
+        password = data.get("password", "").strip()
+        first_name = data.get("fName", "").strip()
+        last_name = data.get("lName", "").strip()
+        suffix = data.get("suffix", "").strip()
+        email = data.get("email", "").strip()
+        contactNum = data.get("contactNum", "").strip()
         programID = data.get("programID")
         areaID = data.get("areaID")
+        isAdmin = str(data.get("isAdmin", "false")).lower() in ["true", "1", "yes", "y"]
+        created_at = datetime.now()
 
-        #email regex for validation
+        # email regex for validation
         validEmail = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         
         # Validate required fields
-        if not password or len(password.strip()) == 0:
+        if not password:
             return jsonify({'success': False, 'message': 'Password cannot be empty'}), 400
         if not empID:
             return jsonify({'success': False, 'message': 'Employee ID is required'}), 400
         if not first_name:
             return jsonify({'success': False, 'message': 'First name is required'}), 400
         if not last_name:
-            return jsonify({'success': False, 'message': 'Last name is required' }), 400
-        # Validate email format
-        if not email or len(email.strip()) == 0:
-            return jsonify({'success': False, 'message': 'Email is required' }), 400
-        elif not re.match(validEmail, email):
+            return jsonify({'success': False, 'message': 'Last name is required'}), 400
+        if not email or not re.match(validEmail, email):
             return jsonify({'success': False, 'message': 'Please enter a valid email'}), 400
-        # Validate contact number format (11 digits)
-        if not contactNum:
-            return jsonify({'success': False, 'message': 'Contact number is required'}), 400
-        elif not re.match(r'^\d{11}$', contactNum):
+        if not contactNum or not re.match(r'^\d{11}$', contactNum):
             return jsonify({'success': False, 'message': 'Contact number must be 11 digits'}), 400
         
-        # === Validate the Profile Picture ===   
-        # Check if file exists
-        if not profilePic:
-            return jsonify({'success': False, 'message': 'No file provided'}), 400
-        
-        # Check if file has a valid name and extension
-        if not profilePic.filename or '.' not in profilePic.filename:        
-            return jsonify({'success': False, 'message': 'Invalid file name'}), 400
-        
-        allowed_extensions = {'jpg', 'png'}
-        file_extension = profilePic.filename.rsplit('.', 1)[1].lower()
-        
-        if file_extension not in allowed_extensions:            
-            return jsonify({'success': False, 'message': 'Invalid file format. Only jpg and png files are allowed.'}), 400
-                
-        # Get the profile picture file
-        path = f"UDMS_Repository/Profile_Pictures"
-        path = path.strip('/')
+        # === Handle the Profile Picture (optional) ===
+        profilePicPath = None
+        if profilePic:  # ✅ Only validate and upload if provided
+            if profilePic.filename == '':
+                return jsonify({'success': False, 'message': 'No selected file'}), 400
+            
+            allowed_extensions = {'jpg', 'png'}
+            if '.' not in profilePic.filename:
+                return jsonify({'success': False, 'message': 'Invalid file format'}), 400
 
-        encoded_path = safe_path(path)
+            file_extension = profilePic.filename.rsplit('.', 1)[1].lower()
+            if file_extension not in allowed_extensions:
+                return jsonify({'success': False, 'message': 'Invalid file format. Only jpg and png allowed.'}), 400
 
-        ensure_directories(encoded_path)
-        
-        filename = f"{empID}.{file_extension}"
-        filename = secure_filename(filename)
+            # Build Nextcloud path
+            path = f"UDMS_Repository/Profile_Pictures"
+            encoded_path = safe_path(path)
+            ensure_directories(encoded_path)
 
-        if not filename:
-            return jsonify({'success': False, 'message': 'Invalid filename'}), 400
-        
-        
-        try:
-            # saves the file into repository (Nextcloud)
+            filename = f"{empID}.{file_extension}"
+            filename = secure_filename(filename)
+
+            if not filename:
+                return jsonify({'success': False, 'message': 'Invalid filename'}), 400
+
+            # Upload to Nextcloud
             response = upload_to_nextcloud(profilePic, encoded_path)
             if response.status_code not in (200, 201, 204):
                 return jsonify({
@@ -431,36 +421,35 @@ def register_routes(app):
                     'details': response.text
                 }), 400
             
-            
-            # Checks if the user already exists
-            user = Employee.query.filter_by(employeeID=empID).first()
-            if user:
-                return jsonify({'success': False, "message": "Employee already exists"}), 400
-            else:
-                new_user = Employee(
-                    employeeID = empID,
-                    password = generate_password_hash(password, method="pbkdf2:sha256"),
-                    fName = first_name,
-                    lName = last_name,
-                    suffix = suffix,
-                    email = email,
-                    contactNum = contactNum,
-                    profilePic = f"{path}/{filename}",
-                    programID = programID,
-                    areaID = areaID
-            )
-                db.session.add(new_user)
-                db.session.commit()
+            profilePicPath = f"{path}/{filename}"  # ✅ Save path if uploaded
 
-            return jsonify({
-                'success': True, 
-                'message': 'Employee created successfully!', 
-                'profilePic': f"{path}/{filename}",
-                'status': response.status_code, 
-            }), 200
-            
-        except Exception as e:    
-            return jsonify({'success': False, 'message': f'Failed to upload file: {str(e)}'}), 400                
+        # Checks if the user already exists
+        if Employee.query.filter_by(employeeID=empID).first():
+            return jsonify({'success': False, "message": "Employee already exists"}), 400
+
+        # Create user
+        new_user = Employee(
+            employeeID=empID,
+            password=generate_password_hash(password, method="pbkdf2:sha256"),
+            fName=first_name,
+            lName=last_name,
+            suffix=suffix,
+            email=email,
+            contactNum=contactNum,
+            profilePic=profilePicPath, 
+            programID=programID,
+            areaID=areaID,
+            isAdmin=isAdmin,
+            created_at=created_at
+        )
+        db.session.add(new_user)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Employee created successfully!',
+            'profilePic': profilePicPath,  # ✅ Return None if no upload
+        }), 200
 
  
         
@@ -711,7 +700,7 @@ def register_routes(app):
         print(f"Profile pic path: {user.profilePic}")
 
         # Fetch from nextcloud
-        response = preview_from_nextcloud(user.profilePic)
+        response = preview_from_nextcloud(user.profilePic)  
         print(f"Nextcloud response status: {response.status_code}")        
            
         if response.status_code == 200:
@@ -1201,6 +1190,56 @@ def register_routes(app):
             current_app.logger.error(f"Get user program error: {e}")
             return jsonify({'success': False, 'message': 'Failed to fetch programs'}), 500
 
+    # Mark criteria as done or not done
+    @app.route('/api/criteria/<int:criteriaID>/done', methods=["PUT"])
+    def mark_criteria_done(criteriaID):
+        data = request.get_json()
+        is_done = data.get('isDone')
+        
+        criteria = Criteria.query.filter_by(criteriaID=criteriaID).first()
+
+        if not criteria:
+            return jsonify({'success': False, 'message': 'Criteria not found'}), 404
+        
+        criteria.isDone = is_done
+
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Criteria marked as done'}), 200
+
+    @app.route('/api/area/progress', methods=["PUT"])
+    def save_area_progress():
+        data = request.get_json()
+        areaID = data.get("areaID")
+        progress = data.get("progress")
+
+        if areaID is None or progress is None:
+            return jsonify({'success': False, 'message': 'areaID and progress are required'}), 400
+        
+        area = Area.query.filter_by(areaID=areaID).first()
+
+        area.progress = progress
+
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Area progress saved!'}), 200
+
+    @app.route('/api/criteria', methods=["GET"])
+    def get_criteria(): 
+
+        criteria = Criteria.query.all()
+
+        results = []
+
+        for c in criteria:
+            criteria_data ={
+                'criteriaID': c.criteriaID,
+                'criteriaContent': c.criteriaContent,
+                'isDone': c.isDone
+            }
+            results.append(criteria_data)
+
+        return jsonify(results)
 
 
     #Get the area for displaying in tasks
@@ -1234,12 +1273,12 @@ def register_routes(app):
                 'areaNum': area.areaNum,
                 'areaName': f"{area.areaNum}: {area.areaName}",
                 'progress': area.progress,
-                'subareaName': area.subareaName            
+                'subareaName': area.subareaName,                
             }
             area_list.append(area_data)
         
 
-        return jsonify({"area": area_list}), 200
+        return jsonify({"area": area_list}), 200    
 
 
     #Create deadline
@@ -2280,57 +2319,7 @@ def register_routes(app):
             'messages': messages_data
         }), 200
 
-    @app.route('/api/conversations', methods=['GET'])
-    @jwt_required()
-    def get_conversations():
-        current_user_id = get_jwt_identity()
-        
-        # Get conversations where current user participates
-        
-        user_conversation_ids = db.session.query(
-            ConversationParticipant.conversationID
-        ).filter(
-            ConversationParticipant.employeeID == current_user_id
-        ).subquery()
-        
-        # Get other participants in those conversations
-        conversations = db.session.query(
-            Conversation.conversationID,
-            Conversation.conversationType,
-            Conversation.createdAt,
-            ConversationParticipant.employeeID.label('other_participant_id'),
-            Employee.fName,
-            Employee.lName,
-            Employee.profilePic
-        ).join(
-            ConversationParticipant, 
-            Conversation.conversationID == ConversationParticipant.conversationID
-        ).join(
-            Employee, 
-            ConversationParticipant.employeeID == Employee.employeeID
-        ).filter(
-            Conversation.conversationID.in_(user_conversation_ids),
-            ConversationParticipant.employeeID != current_user_id
-        ).all()
-        
-        # Format results (same as before)
-        conversations_data = []
-        for conv in conversations:
-            conversations_data.append({
-                'conversationID': conv.conversationID,
-                'otherParticipant': {
-                    'employeeID': conv.other_participant_id,
-                    'name': f"{conv.fName} {conv.lName}",
-                    'profilePic': conv.profilePic
-                },
-                'conversationType': conv.conversationType,
-                'createdAt': conv.createdAt.isoformat() if conv.createdAt else None
-            })
-        
-        return jsonify({
-            'success': True,
-            'conversations': conversations_data
-        }), 200
+    
 
     @app.route('/api/conversations/start', methods=['POST'])
     @jwt_required()

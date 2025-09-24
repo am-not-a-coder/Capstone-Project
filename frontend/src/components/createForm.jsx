@@ -5,7 +5,113 @@ import {
     faPlus,
     faTrash
 } from '@fortawesome/free-solid-svg-icons';
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, memo } from 'react';
+
+// Memoized ActionButton component to prevent unnecessary re-renders
+const ActionButton = memo(({ action, color, icon, isActive, onClick, children }) => {
+  // Define color classes statically to avoid dynamic class generation
+  const actionButtonStyles = {
+    emerald: {
+      active: "bg-emerald-600 text-white shadow-lg scale-105",
+      inactive: "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 hover:scale-105 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-800/40"
+    },
+    amber: {
+      active: "bg-amber-600 text-white shadow-lg scale-105",
+      inactive: "bg-amber-100 text-amber-700 hover:bg-amber-200 hover:scale-105 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-800/40"
+    },
+    red: {
+      active: "bg-red-600 text-white shadow-lg scale-105",
+      inactive: "bg-red-100 text-red-700 hover:bg-red-200 hover:scale-105 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-800/40"
+    }
+  };
+
+  return (
+    <button 
+      onClick={onClick}
+      className={`
+        flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 min-w-[120px] justify-center
+        ${isActive ? actionButtonStyles[color].active : actionButtonStyles[color].inactive}
+      `}
+    >
+      <FontAwesomeIcon icon={icon} className="text-lg"/>
+      {children}
+    </button>
+  );
+});
+
+// Memoized InputField component to prevent unnecessary re-renders
+const InputField = memo(({ field, form, handleChange, handleFileChange, employees }) => {
+  const baseInputClasses = "w-full px-4 py-3 text-black dark:text-white rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 dark:bg-gray-800 dark:border-gray-600 dark:focus:ring-blue-400";
+  
+  return (
+    <div className="space-y-2">
+      <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+        {field.label}
+        {field.required && <span className="ml-1 text-red-500">*</span>}
+      </label>
+      {field.type === "select" ? (
+        <select
+          name={field.name}
+          className={baseInputClasses}
+          value={form[field.name] || ""}
+          onChange={handleChange}
+          required={field.required}
+        >
+          <option value="" className="text-gray-500">{field.placeholder}</option>
+          {employees.map((employee) => (
+            <option key={employee.employeeID} value={employee.employeeID}>
+              {employee.name}
+            </option>
+          ))}
+        </select>
+      ) : field.type === "file" ? (
+        <div className="space-y-2">
+          <input
+            type="file"
+            name={field.name}
+            accept={field.accept}
+            onChange={handleFileChange}
+            className="w-full px-4 py-3 text-black transition-colors duration-200 border-2 border-gray-300 border-dashed dark:text-white rounded-xl bg-gray-50 hover:border-blue-400 focus:outline-none focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600"
+            required={field.required}
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Accepted formats: .webp, .png, .jpeg, .jpg
+          </p>
+        </div>
+      ) : field.type === "color" ? (
+        <div className="flex gap-3">
+          <input
+            type="color"
+            name={field.name}
+            value={form[field.name] || "#3B82F6"}
+            onChange={handleChange}
+            className="w-16 h-12 border border-gray-200 rounded-lg cursor-pointer"
+            required={field.required}
+          />
+          <input
+            type="text"
+            name={field.name}
+            placeholder="#3B82F6"
+            className={`${baseInputClasses} flex-1`}
+            value={form[field.name] || ""}
+            onChange={handleChange}
+            required={field.required}
+          />
+        </div>
+      ) : (
+        <input
+          type={field.type}
+          name={field.name}
+          placeholder={field.placeholder}
+          className={baseInputClasses}
+          value={form[field.name] || ""}
+          onChange={handleChange}
+          required={field.required}
+        />
+      )}
+    </div>
+  );
+});
 
 export default function CreateForm({ 
   // Configuration props
@@ -88,109 +194,15 @@ export default function CreateForm({
     }
   }, [handleChange]);
 
-  // Define color classes statically to avoid dynamic class generation
-  const actionButtonStyles = {
-    emerald: {
-      active: "bg-emerald-600 text-white shadow-lg scale-105",
-      inactive: "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 hover:scale-105 dark:bg-emerald-900/30 dark:text-emerald-300 dark:hover:bg-emerald-800/40"
-    },
-    amber: {
-      active: "bg-amber-600 text-white shadow-lg scale-105",
-      inactive: "bg-amber-100 text-amber-700 hover:bg-amber-200 hover:scale-105 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-800/40"
-    },
-    red: {
-      active: "bg-red-600 text-white shadow-lg scale-105",
-      inactive: "bg-red-100 text-red-700 hover:bg-red-200 hover:scale-105 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-800/40"
-    }
-  };
+  // Memoize action button handlers to prevent recreation
+  const handleAddClick = useCallback(() => handleModify("add"), [handleModify]);
+  const handleEditClick = useCallback(() => handleModify("edit"), [handleModify]);
+  const handleDeleteClick = useCallback(() => handleModify("delete"), [handleModify]);
 
-  // Memoize ActionButton to prevent unnecessary re-renders
-  const ActionButton = useCallback(({ action, color, icon, isActive, onClick, children }) => (
-    <button 
-      onClick={onClick}
-      className={`
-        flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 min-w-[120px] justify-center
-        ${isActive ? actionButtonStyles[color].active : actionButtonStyles[color].inactive}
-      `}
-    >
-      <FontAwesomeIcon icon={icon} className="text-lg"/>
-      {children}
-    </button>
-  ), []);
-
-  // Memoize InputField to prevent unnecessary re-renders
-  const InputField = useCallback(({ field }) => {
-    const baseInputClasses = "w-full px-4 py-3 text-black dark:text-white rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 dark:bg-gray-800 dark:border-gray-600 dark:focus:ring-blue-400";
-    
-    return (
-      <div className="space-y-2">
-        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
-          {field.label}
-          {field.required && <span className="ml-1 text-red-500">*</span>}
-        </label>
-        {field.type === "select" ? (
-          <select
-            name={field.name}
-            className={baseInputClasses}
-            value={form[field.name] || ""}
-            onChange={handleChange}
-            required={field.required}
-          >
-            <option value="" className="text-gray-500">{field.placeholder}</option>
-            {employees.map((employee) => (
-              <option key={employee.employeeID} value={employee.employeeID}>
-                {employee.name}
-              </option>
-            ))}
-          </select>
-        ) : field.type === "file" ? (
-          <div className="space-y-2">
-            <input
-              type="file"
-              name={field.name}
-              accept={field.accept}
-              onChange={handleFileChange}
-              className="w-full px-4 py-3 text-black transition-colors duration-200 border-2 border-gray-300 border-dashed dark:text-white rounded-xl bg-gray-50 hover:border-blue-400 focus:outline-none focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600"
-              required={field.required}
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Accepted formats: .webp, .png, .jpeg, .jpg
-            </p>
-          </div>
-        ) : field.type === "color" ? (
-          <div className="flex gap-3">
-            <input
-              type="color"
-              name={field.name}
-              value={form[field.name] || "#3B82F6"}
-              onChange={handleChange}
-              className="w-16 h-12 border border-gray-200 rounded-lg cursor-pointer"
-              required={field.required}
-            />
-            <input
-              type="text"
-              name={field.name}
-              placeholder="#3B82F6"
-              className={`${baseInputClasses} flex-1`}
-              value={form[field.name] || ""}
-              onChange={handleChange}
-              required={field.required}
-            />
-          </div>
-        ) : (
-          <input
-            type={field.type}
-            name={field.name}
-            placeholder={field.placeholder}
-            className={baseInputClasses}
-            value={form[field.name] || ""}
-            onChange={handleChange}
-            required={field.required}
-          />
-        )}
-      </div>
-    );
-  }, [form, handleChange, handleFileChange, employees]);
+  // Memoize the selected item for delete confirmation
+  const selectedItemForDelete = useMemo(() => {
+    return editIndex !== null ? data[editIndex] : null;
+  }, [editIndex, data]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -219,7 +231,7 @@ export default function CreateForm({
               color="emerald"
               icon={faPlus}
               isActive={activeModify === "add"}
-              onClick={() => handleModify("add")}
+              onClick={handleAddClick}
             >
               Add
             </ActionButton>
@@ -228,7 +240,7 @@ export default function CreateForm({
               color="amber"
               icon={faPen}
               isActive={activeModify === "edit"}
-              onClick={() => handleModify("edit")}
+              onClick={handleEditClick}
             >
               Edit
             </ActionButton>
@@ -237,7 +249,7 @@ export default function CreateForm({
               color="red"
               icon={faTrash}
               isActive={activeModify === "delete"}
-              onClick={() => handleModify("delete")}
+              onClick={handleDeleteClick}
             >
               Delete
             </ActionButton>
@@ -258,7 +270,14 @@ export default function CreateForm({
               </div>
               
               {formFields.map((field) => (
-                <InputField key={field.name} field={field} />
+                <InputField 
+                  key={field.name} 
+                  field={field} 
+                  form={form}
+                  handleChange={handleChange}
+                  handleFileChange={handleFileChange}
+                  employees={employees}
+                />
               ))}
               
               <div className="flex gap-3 pt-4">
@@ -313,7 +332,14 @@ export default function CreateForm({
               {editIndex !== null && (
                 <div className="pt-4 space-y-6 border-t border-gray-100 dark:border-gray-800">
                   {formFields.map((field) => (
-                    <InputField key={field.name} field={field} />
+                    <InputField 
+                      key={field.name} 
+                      field={field}
+                      form={form}
+                      handleChange={handleChange}
+                      handleFileChange={handleFileChange}
+                      employees={employees}
+                    />
                   ))}
                 </div>
               )}
@@ -368,14 +394,14 @@ export default function CreateForm({
                 </select>
               </div>
 
-              {editIndex !== null && (
+              {editIndex !== null && selectedItemForDelete && (
                 <div className="p-4 border border-red-200 bg-red-50 dark:bg-red-900/20 rounded-xl dark:border-red-800">
                   <div className="flex items-start gap-3">
                     <div className="w-5 h-5 text-red-500 mt-0.5">⚠</div>
                     <div>
                       <h4 className="font-semibold text-red-800 dark:text-red-300">Warning</h4>
                       <p className="mt-1 text-sm text-red-700 dark:text-red-400">
-                        You are about to permanently delete <strong>{data[editIndex]?.programCode}</strong>. 
+                        You are about to permanently delete <strong>{selectedItemForDelete.programCode}</strong>. 
                         This action cannot be undone.
                       </p>
                     </div>

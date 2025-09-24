@@ -247,16 +247,23 @@ export const apiPostForm = async (url, formData) => {
 
 // === GET request for blob/file downloads ===
 export const apiGetBlob = async (url) => {
-  const res = await fetch(`${API_URL}${url}`, {
-    method: 'GET',
-    credentials: 'include',
-    headers: {
-      ...authHeaders(),
-    }
-  });
+  try {
+    const res = await fetch(`${API_URL}${url}`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        ...authHeaders(),
+      }
+    });
 
-  if (!res.ok) {
-    throw new Error(`Download failed: ${res.status}`);
+    if (!res.ok) {
+      let errorText = '';
+      try { errorText = await res.text(); } catch {}
+      return { success: false, error: errorText || `Download failed: ${res.status}` };
+    }
+    const blob = await res.blob();
+    return { success: true, data: blob };
+  } catch (err) {
+    return { success: false, error: err.message || 'Network error' };
   }
-  return await res.blob();
 };

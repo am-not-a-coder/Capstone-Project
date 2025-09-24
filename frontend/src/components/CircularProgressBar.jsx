@@ -1,6 +1,5 @@
-import axios from 'axios';
 
-const CircularProgressBar = ({circleWidth, progress}) =>{
+const CircularProgressBar = ({circleWidth, progress, positionX, positionY}) =>{
     const strokeWidth = 7;
     const radius = (circleWidth - strokeWidth) / 2;
     const dashArray = radius * Math.PI * 2;
@@ -13,7 +12,7 @@ const CircularProgressBar = ({circleWidth, progress}) =>{
                 width={circleWidth} 
                 height={circleWidth}
                 viewBox={`0 0 ${circleWidth} ${circleWidth}`}
-                className="absolute top-17 left-3"
+                className={`absolute ${positionX} ${positionY}`} 
             >
                 {/* circle background */}
             <circle
@@ -21,7 +20,7 @@ const CircularProgressBar = ({circleWidth, progress}) =>{
                 cy={circleWidth / 2}
                 strokeWidth={strokeWidth}
                 r={radius}
-                className="fill-neutral-200 stroke-neutral-400"           
+                className="fill-neutral-200 stroke-neutral-400 dark:fill-gray-400 dark:stroke-gray-600"           
             />
             {/* circle progress */}
             <circle
@@ -41,7 +40,7 @@ const CircularProgressBar = ({circleWidth, progress}) =>{
             y="50%" 
             dy='0.3em' 
             textAnchor="middle"
-            className="font-semibold"
+            className="text-sm font-semibold"
             >{progress}%</text>
 
 

@@ -49,7 +49,7 @@ const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate,
         {/* CriteriaGroup div */}
         <div 
         onClick={() => {setCriteriaExpand(isOpen ? null : index)}}
-        className='flex flex-row justify-between p-3 mb-2 ml-5 transition-all duration-300 border shadow-md cursor-pointer rounded-2xl border-neutral-400 text-neutral-800 hover:scale-101 dark:text-white hover:border-neutral-500 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 '>
+        className='flex flex-row justify-between p-3 py-5 mb-2 ml-5 transition-all duration-300 border shadow-md cursor-pointer rounded-2xl border-neutral-400 text-neutral-800 hover:scale-101 dark:text-white hover:border-neutral-500 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 '>
             <h2 className='font-semibold'>{groupName}</h2>
              <div className='mr-3'>
                     <FontAwesomeIcon 
@@ -127,7 +127,7 @@ const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate,
             <button 
                 onClick={() => {setExpanded(prev => !prev); if (onClick) onClick();}}
                 
-                className='flex flex-row justify-between p-3 mb-2 ml-5 transition-all duration-300 border shadow-md cursor-pointer rounded-2xl border-neutral-400 text-neutral-800 hover:scale-101 dark:text-white hover:border-neutral-500 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 '>   
+                className='flex flex-row justify-between p-3 py-5 mb-2 ml-5 transition-all duration-300 border shadow-md cursor-pointer rounded-2xl border-neutral-400 text-neutral-800 hover:scale-101 dark:text-white hover:border-neutral-500 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 '>   
                 <h1 className='font-semibold text-md'>{title}</h1>
                 <div className='mr-3'>
                     <FontAwesomeIcon 

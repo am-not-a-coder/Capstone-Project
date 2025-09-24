@@ -12,8 +12,8 @@
   
   import { apiGet, apiGetBlob } from '../utils/api_utils';
   import { adminHelper } from '../utils/auth_utils';
-  import ProgramCard from '../components/ProgramCard'
-
+  import ProgramCard from '../components/ProgramCard';
+  import { CardSkeleton } from '../components/Skeletons';
   import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer";
   import "@cyntler/react-doc-viewer/dist/index.css";
   import "../../index.css"
@@ -39,6 +39,7 @@
     const [selectedArea, setSelectedArea] = useState(null);
     const [selectedSubarea, setSelectedSubarea] = useState(null);
 
+    const [programLoading, setProgramLoading] = useState(false);
     const [areaRatings, setAreaRatings] = useState({});
     const isAdmin = adminHelper()
 
@@ -47,6 +48,8 @@
     useEffect(() => {
       const fetchProgram = async () => {
         if (!isAdmin) return
+        setProgramLoading(true);
+
         try {
           // Use our centralized API utility - no manual token handling!
           const response = await apiGet('/api/program');
@@ -62,6 +65,8 @@
           } catch (err){
             console.error("Error occurred when fetching programs", err)
     
+          } finally {
+            setProgramLoading(false);
           }
         }
           fetchProgram()
@@ -266,7 +271,10 @@
                          
               <FontAwesomeIcon icon={faHouse}
                onClick={() => {backToPrograms()}}
-               className="p-3 mt-1 text-xl transition-all duration-200 cursor-pointer rounded-xl text-neutral-600 bg-gray-300/90 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 inset-shadow-sm inset-shadow-gray-400 dark:text-white dark:bg-gray-950/50"
+               className={`${visible === "programs" 
+                ? 'text-gray-500 inset-shadow-sm inset-shadow-gray-400 bg-gray-300 dark:inset-shadow-gray-800 dark:bg-gray-800/50 dark:text-gray-400' 
+                : 'cursor-pointer text-gray-500 bg-gray-200 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 shadow-md dark:inset-shadow-sm dark:inset-shadow-gray-400 dark:bg-gray-950/50'
+            } p-4 text-xl transition-all duration-200 border border-neutral-300 rounded-xl dark:border-neutral-500 cursor-pointer`}
                />                                           
             
               {/* Breadcrumbs */}
@@ -353,7 +361,10 @@
               <button
                 title='Self Rate'               
                 onClick={() => setSelfRateMode(prev => !prev)}
-                className={`p-3 px-4 text-xl flex items-center transition-all duration-300 cursor-pointer rounded-xl dark:hover:text-zuccini-500/70 inset-shadow-sm inset-shadow-gray-400 dark:text-white dark:bg-gray-950/50 ${selfRateMode ? 'bg-zuccini-500 hover:text-white text-white' : 'bg-gray-300/90 text-neutral-600 hover:text-zuccini-500'}`}
+                className={`${selfRateMode 
+                ? 'text-gray-500 inset-shadow-sm inset-shadow-gray-400 bg-zuccini-300 dark:inset-shadow-gray-900 dark:bg-gray-800/50 dark:text-gray-400' 
+                : 'cursor-pointer text-gray-500 bg-gray-200 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 shadow-md dark:inset-shadow-sm dark:inset-shadow-gray-400 dark:bg-gray-950/50'
+            } p-3 px-4 text-xl transition-all duration-200 border border-neutral-300 rounded-xl dark:border-neutral-500 cursor-pointer`}
               >                
 
                 <FontAwesomeIcon icon={faStarHalfStroke} className="z-10" />
@@ -370,15 +381,24 @@
                   
                   {/* Program Cards Section */}
                   <div className={`${visible == "programs" ? 'block' : 'hidden'} flex flex-wrap gap-4`}>
-                    
-                    {programs.map(program=> (
-                      <ProgramCard 
-                        program={program} 
-                        key={program.programID} 
-                        onClick={()=> visibleArea(program)} 
-                        className="shadow-xl hover:border-zuccini-700"
-                      />
-                    ))}
+                    {programLoading ? (
+                        <>
+                          <CardSkeleton />
+                          <CardSkeleton />
+                          <CardSkeleton />                  
+                        </>
+                        ) : (
+                        <>
+                          {programs.map(program=> (
+                            <ProgramCard 
+                              program={program} 
+                              key={program.programID} 
+                              onClick={()=> visibleArea(program)} 
+                              className="shadow-xl hover:border-zuccini-700"
+                            />                      
+                          ))} 
+                        </>
+                    )}
                   </div>
 
                   {/* Areas Section */}

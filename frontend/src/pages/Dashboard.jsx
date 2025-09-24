@@ -12,7 +12,8 @@ import {useNavigate} from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useState } from 'react';
 import { apiGet, apiPost } from '../utils/api_utils';
-import toast from 'react-hot-toast'
+import toast from 'react-hot-toast';
+import { Toaster } from 'react-hot-toast'
 import { getCurrentUser, adminHelper } from '../utils/auth_utils';
 import AnnouncementModal from '../components/modals/AnnouncementModal';
 import StatusModal from '../components/modals/StatusModal';

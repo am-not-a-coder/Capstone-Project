@@ -22,11 +22,13 @@ import toast, { Toaster } from 'react-hot-toast'
 
 function App() {
   
-  const AdminRoute = ({ isAdmin, children }) => {
+  const AdminRoute = ({ children }) => {
+    const allowed = adminHelper()
     useEffect(() => {
-      if (!isAdmin) toast.error('You have no permission to access this page.')
-    }, [isAdmin])
-    return isAdmin ? children : <Navigate to="/Dashboard" replace />
+      if (authReady && !allowed) toast.error('You have no permission to access this page.')
+    }, [authReady, allowed])
+    if (!authReady) return <div>Loading...</div>
+    return allowed ? children : <Navigate to="/Dashboard" replace />
   }
 
   console.log('🚀 App component rendering...')

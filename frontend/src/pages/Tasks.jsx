@@ -396,7 +396,7 @@ const Tasks = () => {
 
     
     {/* Calendar */}
-        <div className="relative col-start-2 row-start-2 p-5 transition-all duration-500 bg-transparent border border-neutral-300 rounded-md inset-shadow-sm inset-shadow-gray-400 dark:shadow-sm dark:shadow-zuccini-900 dark:text-white dark:bg-gray-900 ">
+        <div className="relative col-start-2 row-start-2 p-5 transition-all duration-500 bg-transparent border rounded-md border-neutral-300 inset-shadow-sm inset-shadow-gray-400 dark:shadow-sm dark:shadow-zuccini-900 dark:text-white dark:bg-gray-900 ">
             <FullCalendar 
             plugins={[dayGridPlugin]}
             initialView='dayGridMonth'
@@ -433,7 +433,7 @@ export const Area = ({program, areaTitle, desc, progress}) =>{
         <div className="relative mr-4 min-w-[300px] h-[210px] border-black border rounded-lg shadow-lg overflow-hidden transition-all duration-500 hover:scale-105 cursor-pointer">
             <div className='h-[50%] bg-zuccini-600'> 
                 <div className='absolute px-5 font-light border border-black top-2 right-2 bg-neutral-200 rounded-xl dark:bg-gray-900 dark:text-white'>{program}</div>
-                <CircularProgressBar progress={progress} circleWidth="75"/>           
+                <CircularProgressBar progress={progress} circleWidth="75" positionX={"left-3"} positionY={"top-17"}/>           
             </div>      
 
             <div className='text-right h-[50%] p-3 bg-neutral-200 border-t-1 transition-all duration-500  dark:bg-gray-900 dark:text-white dark:border-t-neutral-600'>

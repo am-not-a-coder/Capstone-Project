@@ -36,6 +36,8 @@ class Employee(db.Model):
     isAdmin = db.Column(db.Boolean, default=False)
     isOnline = db.Column(db.Boolean, default=False)
     experiences = db.Column(db.Text)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # MFA/OTP fields
     otpcode = db.Column(db.String(6))
@@ -57,6 +59,7 @@ class Area(db.Model):
 
     program = db.relationship("Program", back_populates="areas")
     subareas = db.relationship("Subarea", back_populates="area", cascade="all, delete-orphan")
+    
 
 class Program(db.Model):
     __tablename__ = 'program'
@@ -91,6 +94,7 @@ class Criteria(db.Model):
     criteriaContent = db.Column(db.Text)
     criteriaType = db.Column(db.String(50))
     rating = db.Column(db.Float)
+    isDone = db.Column(db.Boolean, default=False)
     docID = db.Column(db.Integer, db.ForeignKey('document.docID'), nullable=False)
 
     subarea = db.relationship("Subarea", back_populates="criteria")
@@ -106,6 +110,7 @@ class Document(db.Model):
     docType = db.Column(db.String(50), nullable=False)    
     docPath = db.Column(db.Text)
     isApproved = db.Column(db.Boolean, default=False)
+    upload_date = db.Column(db.DateTime, default=datetime.utcnow)
     content = db.Column(db.Text)
     search_vector = db.Column(TSVECTOR)
     tags = db.Column(ARRAY(db.String))

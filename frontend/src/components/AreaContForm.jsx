@@ -64,10 +64,10 @@ export default function AreaCont({title, onClick, isExpanded, onIconClick, selfR
                                 }}
                                 className={`relative flex flex-row items-center align-center p-3 px-5 text-sm font-semibold overflow-hidden transition-all duration-300 text-gray-600 bg-gray-200 rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-900 dark:text-gray-200 cursor-pointer hover:text-white hover:bg-zuccini-500/80`}
                             >
-                        <FontAwesomeIcon icon={faStar} className={`${ hoveredArea === areaID ? 'translate-x-10' : 'translate-x-0'} mr-3`}/>                                
-                        <h1 className={`${ hoveredArea === areaID ? 'translate-x-10' : 'translate-x-0'} transition-all duration-300`}> 
+                        <FontAwesomeIcon icon={faStar} className={`${ hoveredArea === areaID ? 'translate-x-17' : 'translate-x-0'} mr-3 transition-all duration-300`}/>                                
+                        <h1 className={`${ hoveredArea === areaID ? 'translate-x-17' : 'translate-x-0'} transition-all duration-300`}> 
                             {areaRating.toFixed(1) || 0.0}</h1> {/* Rating */}  
-                         <span className={`absolute ${ hoveredArea === areaID ? "left-9 ml-2" : " ml-0 -left-10"} transition-all duration-300`}> <FontAwesomeIcon icon={faFloppyDisk} className='mr-3'/>  Save</span>                  
+                         <span className={`absolute ${ hoveredArea === areaID ? 'translate-x-0' : '-translate-x-20'} transition-all duration-300`}> <FontAwesomeIcon icon={faFloppyDisk} className='mr-3'/>Save</span>                  
                         
                     </div>
                 )}        
