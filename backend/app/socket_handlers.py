@@ -2,7 +2,8 @@ from flask import Flask, jsonify, request, current_app
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, verify_jwt_in_request, get_jwt_identity, jwt_required
 from flask_socketio import SocketIO, emit, join_room, leave_room, disconnect
-from app import socketio, redis_client
+from app import socketio, redis_client, db
+from app.models import Notification, Employee
 from datetime import datetime
 import threading
 
@@ -44,7 +45,64 @@ def schedule_broadcast_online_users(delay_ms=150):
     pending_broadcast_timer = threading.Timer(delay_ms/1000, broadcast_online_users)
     pending_broadcast_timer.start()
 
+def create_notification(recipient_id, notification_type, title, content, sender_id=None, link=None):
+    """Helper function to create and emit notifications"""
+    try:
+        print(f"Creating notification for user {recipient_id}: {title}")
+        notification = Notification(
+            recipientID=recipient_id,
+            senderID=sender_id,
+            type=notification_type,
+            title=title,
+            content=content,
+            link=link
+        )
+        db.session.add(notification)
+        db.session.commit()
+        print(f"Notification created with ID: {notification.notificationID}")
+        
+        # Get sender info for the notification
+        sender_info = None
+        if sender_id:
+            sender = Employee.query.get(sender_id)
+            if sender:
+                sender_info = {
+                    'employeeID': sender_id,
+                    'name': f"{sender.fName} {sender.lName}"
+                }
+        
+        # Emit real-time notification to the recipient
+        print(f"Emitting notification to room: user:{recipient_id}")
+        socketio.emit('new_notification', {
+            'notificationID': notification.notificationID,
+            'type': notification.type,
+            'title': notification.title,
+            'content': notification.content,
+            'isRead': notification.isRead,
+            'createdAt': notification.createdAt.isoformat(),
+            'link': notification.link,
+            'sender': sender_info
+        }, room=f'user:{recipient_id}')
+        
+        return notification
+    except Exception as e:
+        print(f"Create notification error: {e}")
+        current_app.logger.error(f"Create notification error: {e}")
+        return None
 
+
+
+@socketio.on('join_notifications')
+def join_notifications():
+    try:
+        verify_jwt_in_request(locations=['cookies'])
+        user_id = get_jwt_identity()
+        join_room(f'user:{user_id}')
+        print(f"User {user_id} joined notification room: user:{user_id}")
+        return {'success': True, 'message': 'Joined notification room'}
+    except Exception as e:
+        print(f"Failed to join notification room: {e}")
+        return {'success': False, 'message': 'Failed to join notification room'}
 
 @socketio.on('connect')
 def on_connect():

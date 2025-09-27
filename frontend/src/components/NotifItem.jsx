@@ -1,20 +1,36 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom';
 
-const NotificationItem = ({ notifTitle, content, date, alert, picture, link, onDelete}) => {
-  const navigate = useNavigate(); 
-
-  // Handle click to navigate to the link
+const NotificationItem = ({ 
+  picture, 
+  notifTitle, 
+  content, 
+  date, 
+  alert, 
+  link, 
+  onDelete, 
+  onMarkRead,
+  onClose 
+}) => {
   const handleClick = () => {
+    if (alert && onMarkRead) {
+      onMarkRead(); // Mark as read when clicked
+    }
     if (link) {
-      navigate(link);
+      // Navigate to the link
+      window.location.href = link;
+    }
+    if (onClose) {
+      onClose(); // Close dropdown if in header
     }
   };
 
   const handleDeleteClick = (e) => {
-    e.stopPropagation(); //prevents to navigate
-    onDelete(); //calls the delete function passed as prop
-  }
+    e.stopPropagation(); // Prevent triggering the main click handler
+    if (onDelete) {
+      onDelete();
+    }
+  };
 
   return (
     <div 
