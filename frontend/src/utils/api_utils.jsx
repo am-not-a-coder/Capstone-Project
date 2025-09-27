@@ -267,3 +267,17 @@ export const apiGetBlob = async (url) => {
     return { success: false, error: err.message || 'Network error' };
   }
 };
+
+// === PUT request with FormData (e.g. file uploads) ===
+export async function apiPutForm(url, formData) {
+  const token = localStorage.getItem("token");
+  const response = await fetch(`${API_URL}${url}`, {
+    method: 'PUT',
+    credentials: 'include',
+    headers: {
+      Authorization: `Bearer ${token}`, // 'Content-Type': 'multipart/form-data', // Let browser set this for FormData
+    },
+    body: formData,
+  });
+  return toJson(response);
+}

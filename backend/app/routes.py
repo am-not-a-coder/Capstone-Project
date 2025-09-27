@@ -357,7 +357,7 @@ def register_routes(app):
 
         # get the user input 
         data = request.form
-        profilePic = request.files.get("profilePic")  # ✅ Do not override this
+        profilePic = request.files.get("profilePic")  #  Do not override this
         empID = data.get("employeeID", "").strip()
         password = data.get("password", "").strip()
         first_name = data.get("fName", "").strip()
@@ -389,7 +389,7 @@ def register_routes(app):
         
         # === Handle the Profile Picture (optional) ===
         profilePicPath = None
-        if profilePic:  # ✅ Only validate and upload if provided
+        if profilePic:  #  Only validate and upload if provided
             if profilePic.filename == '':
                 return jsonify({'success': False, 'message': 'No selected file'}), 400
             
@@ -816,61 +816,126 @@ def register_routes(app):
 
                     #INSTITUTES PAGE ROUTES 
     
-    #edit institute base on institute id
-    @app.route('/api/institute/<int:instID>', methods=['PUT'])    
+    #edit institute base on institute 
+    
+    ALLOWED_EXTENSION = {'jpg', 'jpeg', 'png', 'webp'}
+    
+    @app.route('/api/institute/<int:instID>', methods=['PUT'])
+    @jwt_required()    
     def edit_institute(instID):
+    
+        # Edit an existing institute by ID
+        # Expects JSON data with institute information
+        
         try:
-            data = request.get_json()  # Get JSON data from frontend
-            institutes = Institute.query.filter_by(instID=instID).first()  # Find institute by ID
+            # Check admin permissions
+            current_user_id = get_jwt_identity()
+            admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+            if not admin_user or not admin_user.isAdmin:
+                return jsonify({'success': False, 'message': 'Admins only'}), 403
             
-            if institutes:
-                # Update the database fields with new values
-                institutes.instID = data.get('instID')      # Update institute code (e.g., "BSIT")
-                institutes.instCode = data.get('instCode')      # Update institute code (e.g., "BSIT")
-                institutes.instName = data.get('instName')      # Update institute name  
-                institutes.instPic = data.get('instPic')    # Update institute color
-                # Handle employeeID - accept string format like "23-45-678"
+            # Find the institute to edit
+            institute = Institute.query.filter_by(instID=instID).first()
+            
+            if not institute:
+                return jsonify({'success': False, 'message': 'Institute not found'}), 
+            
+            content_type = request.content_type or ''
+            
+            # If request is multipart/form-data (for file upload)
+            if 'multipart/form-data' in request.content_type:
+                data = request.form
+                inst_code = data.get('instCode')
+                inst_name = data.get('instName')
                 employee_id = data.get('employeeID')
-                if employee_id and employee_id.strip():  # Check if not empty
-                    institutes.employeeID = employee_id  # Store as string (matches your DB format)
-                else:
-                    institutes.employeeID = None  # Set to null for empty values
                 
-                db.session.commit()  # Save changes to database
+                inst_pic_file = request.files.get('instPic') # Optional new logo file
+                if inst_code: 
+                    institute.instCode = inst_code
+                if inst_name: 
+                    institute.instName = inst_name
+                if employee_id is not None:
+                    institute.employeeID = employee_id.strip() if employee_id and employee_id.strip() else None
                 
-                # After saving, get the updated dean info via the foreign key relationship
-                dean = institutes.dean  # This uses the relationship defined in your models.py
-                dean_name = f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A"
-                
-                return jsonify({
-                    'success': True,
-                    'message': 'Program Updated Successfully',
-                    'updated_program': {
-                        'instID': institutes.instID,
-                        'instCode': institutes.instCode,
-                        'instName': institutes.instName,
-                        'instPic': institutes.instPic,
-                        'instDean': dean_name,  # Send back the dean's full name for display
-                        'employeeID': institutes.employeeID  # Include the ID for future edits
-                    }
-                })
+                # If user uploaded new logo, save it
+                if inst_pic_file and inst_pic_file.filename:
+                    allowed_extensions = {'jpg', 'jpeg','png', 'webp'}
+                    if '.' not in inst_pic_file.filename:
+                        return jsonify({
+                            'success': False, 
+                            'message': 'Invalid file format'
+                        }), 400
+                    
+                    file_extension = inst_pic_file.filename.rsplit('.', 1)[1].lower()
+                    if file_extension not in allowed_extensions:
+                        return jsonify({
+                            'success': False, 
+                            'message': 'Invalid file format. Only jpg, jpeg, png, webp allowed.'
+                        }), 400
+                    
+                    upload_folder = os.path.join(current_app.root_path, "uploads")
+                    os.makedirs(upload_folder, exist_ok=True)
+                    
+                    # Save file as instCode and extenstion
+                    filename = secure_filename(f"{institute.instCode}.{file_extension}")
+                    save_path = os.path.join(upload_folder, filename)
+                    
+                    # Save file to uploads folder
+                    inst_pic_file.save(save_path)
+                    
+                    # Only store filename in DB
+                    institute.instPic = filename 
+                    
             else:
-                return jsonify({'error': 'Program not found'}), 404
+                # JSON payload (no file)
+                # Get JSON data from frontend
+                data = request.get_json()
+                if 'instCode' in data:
+                    institute.instCode = data.get('instCode')
                 
+                if 'instName' in data:
+                    institute.instName = data.get('instName')
+                
+                # Handle employeeID (Institute Head)
+                if 'employeeID' in data:
+                    employee_id = data.get('employeeID')
+                    institute.employeeID = employee_id.strip() if employee_id and employee_id.strip() else None
+            
+            # Save changes
+            db.session.commit()
+            
+            # Get dean info for response
+            dean = institute.dean if institute.employeeID else None
+            dean_name = f"{dean.fName} {dean.lName} {dean.suffix or ''}".strip() if dean else "N/A"
+            
+            return jsonify({
+                'success': True,
+                'message': 'Institute updated successfully',
+                'data': {
+                    'instID': institute.instID,
+                    'instCode': institute.instCode,
+                    'instName': institute.instName,
+                    'instPic': institute.instPic,
+                    'instDean': dean_name,
+                    'employeeID': institute.employeeID
+                }
+            }), 200
+            
         except Exception as e:
             db.session.rollback()
-            return jsonify({'error': 'Database error occurred'}), 500
+            current_app.logger.error(f"Edit institute error: {str(e)}")
+            return jsonify({'success': False, 'message': f'Database error: {str(e)}'}), 500
 
     @app.route('/api/institutes', methods=['POST'])
+    @jwt_required()
     def create_institute():
         try:
             data = request.form
             instCode = data.get('instCode')
             instName = data.get("instName")
-            instPic = request.files.get('instPic') 
+            instPic = request.files.get('instPic')
             employee_id = data.get('employeeID')
 
-            
             if not instCode or not instName:
                 return jsonify({'success': False, 'message': 'Institute code and name are required'}), 400
 
@@ -880,62 +945,43 @@ def register_routes(app):
             if instPic.filename == '':
                 return jsonify({'success': False, 'message': 'No file selected'}), 400
 
-            # Validate file extension
             allowed_extensions = {'jpg', 'jpeg', 'png', 'webp'}
             if '.' not in instPic.filename:
                 return jsonify({'success': False, 'message': 'Invalid file format'}), 400
 
             file_extension = instPic.filename.rsplit('.', 1)[1].lower()
             if file_extension not in allowed_extensions:
-                return jsonify({'success': False, 'message': 'Invalid file format. Only jpg and png allowed.'}), 400
+                return jsonify({'success': False, 'message': 'Invalid file format. Only jpg, jpeg, png, webp allowed.'}), 400
 
-            # Build Nextcloud path
-            path = "UDMS_Repository/Institute_Logo"
-            encoded_path = safe_path(path)
-            ensure_directories(encoded_path)
+            # Create uploads folder if missing
+            upload_folder = os.path.join(current_app.root_path, "uploads")
+            os.makedirs(upload_folder, exist_ok=True)
 
             filename = f"{instCode}.{file_extension}"
             filename = secure_filename(filename)
 
-            if not filename:
-                return jsonify({'success': False, 'message': 'Invalid filename'}), 400
+            save_path = os.path.join(upload_folder, filename)
+            instPic.save(save_path)
 
-            # Set the filename property for upload
-            instPic.filename = filename
-        
-            # Upload file to Nextcloud
-            response = upload_to_nextcloud(instPic, encoded_path)
-            if response.status_code not in (200, 201, 204):
-                return jsonify({
-                    'success': False,
-                    'message': 'Nextcloud upload failed.',
-                    'status': response.status_code,
-                    'details': response.text
-                }), 400
+            # Save just the filename in DB (not full path)
+            instPicPath = filename
 
-            instPicPath = f"{path}/{filename}"  
-
-            # Handle employeeID
-            final_employee_id = employee_id.strip() if employee_id and employee_id.strip() else None
-
-            # Create new institute object
             new_institute = Institute(
                 instCode=instCode,
                 instName=instName,
                 instPic=instPicPath,
-                employeeID=final_employee_id
+                employeeID=employee_id.strip() if employee_id and employee_id.strip() else None
             )
 
             db.session.add(new_institute)
             db.session.commit()
 
-            # Get dean info
             dean = new_institute.dean
             dean_name = f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A"
 
             return jsonify({
                 'success': True,
-                'message': 'Institutes Created Successfully',
+                'message': 'Institute Created Successfully',
                 'instID': new_institute.instID,
                 'instCode': new_institute.instCode,
                 'instName': new_institute.instName,
@@ -949,63 +995,54 @@ def register_routes(app):
             current_app.logger.error(f"Create Institute error: {str(e)}")
             return jsonify({'error': f'Failed to create institute {str(e)}'}), 500
 
+
+
     #Delete institute by ID
     @app.route('/api/institute/<int:instID>', methods=['DELETE'])
+    @jwt_required()
     def delete_institute(instID):
         try:
-            institutes = Institute.query.filter_by(instID=instID).first()
-            
-            if not institutes:
-                return jsonify({'error': 'Program not found'}), 404
-            
-            # Check dependencies before deletion
+            current_user_id = get_jwt_identity()
+            admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+            if not admin_user or not admin_user.isAdmin:
+                return jsonify({'success': False, 'message': 'Admins only'}), 403
+
+            institute = Institute.query.filter_by(instID=instID).first()
+            if not institute:
+                return jsonify({'error': 'Institute not found'}), 404
+
+            # Check dependencies
             dependencies = []
-            
-            # Check employees
-            employees = Employee.query.filter_by(instID=instID).count()
-            if employees > 0:
-                dependencies.append(f"{employees} employee(s)")
-            
-            # Check areas
+            programs = Program.query.filter_by(instID=instID).count()
+            if programs > 0:
+                dependencies.append(f"{programs} program(s)")
+
             areas = Area.query.filter_by(instID=instID).count()
             if areas > 0:
                 dependencies.append(f"{areas} area(s)")
-            
-            # Check institutes  
-            institutes = Institute.query.filter_by(instID=instID).count()
-            if institutes > 0:
-                dependencies.append(f"{institutes} institute(s)")
-                
-            # Check deadlines
-            deadlines = Deadline.query.filter_by(instID=instID).count()  
+
+            deadlines = Deadline.query.filter_by(instID=instID).count()
             if deadlines > 0:
                 dependencies.append(f"{deadlines} deadline(s)")
-            
-            # If dependencies exist, prevent deletion
+
             if dependencies:
-                dependency_text = ", ".join(dependencies)
                 return jsonify({
                     'error': 'Cannot delete institute',
-                    'reason': f'This institute is referenced by: {dependency_text}',
-                    'suggestion': 'Please reassign or remove dependent records first',
+                    'reason': f'This institute is referenced by: {", ".join(dependencies)}',
                     'canDelete': False,
                     'dependencies': dependencies
                 }), 400
-            
-            # Safe to delete - no dependencies found
-            db.session.delete(institutes)
+
+            # Safe to delete
+            db.session.delete(institute)
             db.session.commit()
-            
-            return jsonify({
-                'success': True,
-                'message': 'Institute deleted successfully',
-                'deletedID': instID
-            })
-                
+
+            return jsonify({'success': True, 'message': 'Institute deleted successfully', 'deletedID': instID}), 200
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Delete institute error: {str(e)}")
             return jsonify({'error': 'Database error occurred'}), 500
+
 
     #Get the institute
     @app.route('/api/institute', methods=["GET"])
@@ -1031,25 +1068,66 @@ def register_routes(app):
             institute_list.append(institute_data)
         return jsonify({"institutes": institute_list}), 200
 
+    # @app.route('/api/institute/logos/<string:instCode>', methods=["GET"])
+    # def get_institute_logo(instCode):
+    #     institute = Institute.query.filter_by(instCode=instCode).first()
+    #     if not institute or not institute.instPic:
+    #         return jsonify({"success": False, "message": "Institute logo not found"}), 404
+
+    #     response = preview_from_nextcloud(institute.instPic)
+
+    #     if response.status_code == 200:
+    #         content_type = response.headers.get("Content-Type", "application/octet-stream")
+    #         return Response(response.content, content_type=content_type)
+    #     else:
+    #         return jsonify({
+    #             "success": False,
+    #             "message": f"Failed to fetch logo for {instCode}",
+    #             "status": response.status_code,
+    #             "detail": getattr(response, "text", "No response text")
+    #         }), response.status_code
+    
+
     @app.route('/api/institute/logos/<string:instCode>', methods=["GET"])
     def get_institute_logo(instCode):
-        institute = Institute.query.filter_by(instCode=instCode).first()
-        if not institute or not institute.instPic:
-            return jsonify({"success": False, "message": "Institute logo not found"}), 404
+        try:
+            institute = Institute.query.filter_by(instCode=instCode).first()
+            if not institute or not institute.instPic:
+                return send_file("uploads/default.png", mimetype="image/png")
 
-        response = preview_from_nextcloud(institute.instPic)
+            file_path = os.path.join("uploads", institute.instPic)
+            if os.path.exists(file_path):
+                ext = institute.instPic.rsplit('.', 1)[-1].lower()
+                mimetype = f"image/{'jpeg' if ext in ['jpg','jpeg'] else ext}"
+                return send_file(file_path, mimetype=mimetype)
+            else:
+                return send_file("uploads/default.png", mimetype="image/png")
+        except Exception as e:
+            current_app.logger.error(f"Error fetching logo for {instCode}: {str(e)}")
+            return jsonify({"success": False, "error": str(e)}), 500
 
-        if response.status_code == 200:
-            content_type = response.headers.get("Content-Type", "application/octet-stream")
-            return Response(response.content, content_type=content_type)
-        else:
-            return jsonify({
-                "success": False,
-                "message": f"Failed to fetch logo for {instCode}",
-                "status": response.status_code,
-                "detail": getattr(response, "text", "No response text")
-            }), response.status_code
 
+    # Fetch programs for the institute
+    @app.route('/api/institute/programs', methods=["GET"])
+    def get_program_for_inst():
+        instID = request.args.get('instID', type=int)
+
+        if not instID:
+            return jsonify({'success': False, 'message': 'instID is required'}), 400
+
+        programs = Program.query.filter_by(instID=instID).all()
+
+        program_list = [
+            {
+                'programID': p.programID,
+                'programCode': p.programCode,
+                'programName': p.programName,
+                'programColor': p.programColor,
+            }
+            for p in programs
+        ]
+
+        return jsonify({'success': True, 'programs': program_list}), 200
 
 
 

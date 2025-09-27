@@ -25,6 +25,7 @@ import { CardSkeleton } from '../components/Skeletons';
     //admin
     const isAdmin = adminHelper()
     // use state function
+  const [institutes, setInstitutes] = useState([]);
   const [programs, setPrograms] = useState([]);
   const [employees, setEmployees] = useState([]); 
   const [areas, setAreas] = useState([]);
@@ -72,6 +73,22 @@ import { CardSkeleton } from '../components/Skeletons';
         fetchProgram()
     }, []);
 
+    // Fetch institutes for Institute dropdown selection
+    useEffect(() => {
+      const fetchInstitutes = async () => {
+        try {
+          const response = await apiGet('/api/institute');
+          
+          Array.isArray(response.data.institutes) ? setInstitutes(response.data.institutes) : setInstitutes([]);
+          
+        } catch (err) {
+          console.error("Unexpected error fetching institutes", err);
+        }
+      }
+      fetchInstitutes();
+    }, []);
+
+    // Fetch employees for program dean dropdown selection
     useEffect(() => {
       const fetchEmployees = async () => {
         try {
@@ -204,7 +221,11 @@ import { CardSkeleton } from '../components/Skeletons';
   });
 
   const handleChange = useCallback((e) => {
-      setForm({...form, [e.target.name]: e.target.value});
+    const { name, value } = e.target;
+    setForm(prevForm => ({
+      ...prevForm,
+      [name]: value
+    }));
   }, []);
 
   const [visible, setVisible] = useState("programs");
@@ -462,7 +483,7 @@ import { CardSkeleton } from '../components/Skeletons';
                 
                 {/* Program Cards Section */}
                 <div className={`${visible == "programs" ? 'block' : 'hidden'} flex flex-wrap gap-4`}>
-            { isAdmin && (<CreateCard form={form} handleChange={handleChange} setShowForm={setShowForm} />)}
+            { isAdmin && (<CreateCard form={form} handleChange={handleChange} setShowForm={setShowForm} title="Program" />)}
               {programLoading ? (
                 <>
                   <CardSkeleton />
@@ -645,6 +666,8 @@ import { CardSkeleton } from '../components/Skeletons';
             <CreateForm 
               title="Program"
               data={programs}
+              employees={employees}
+              institutes={institutes}
               onSubmit={handleSubmit}
               onClose={() => setShowForm(false)}
               onEditSelect={handleEditSelect}

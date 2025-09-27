@@ -4,7 +4,7 @@ import ProgramCard from "../components/ProgramCard";
 import CreateCard from "../components/CreateCard";
 import CreateForm from "../components/CreateForm";
 import CollegeInfoModal from "../components/modals/CollegeInfoModal";
-import { apiGet, apiPut, apiDelete, apiPostForm, apiGetBlob } from "../utils/api_utils";
+import { apiGet, apiPut, apiDelete, apiPostForm, apiGetBlob, apiPutForm } from "../utils/api_utils";
 import StatusModal from "../components/modals/StatusModal";
 import { CardSkeleton } from "../components/Skeletons";
 
@@ -37,34 +37,27 @@ const Institutes = () => {
                 
                 // inside fetchInstitutes
               if (Array.isArray(instituteData)) {
-                  const mappedInstitutes = await Promise.all(
-                    instituteData.map(async (inst) => {
-                      try {
-                        const logoBlobRes = await apiGetBlob(`/api/institute/logos/${inst.instCode}`);
-                          let logoUrl = "../assets/UDM-logo.png";
-                          if (logoBlobRes.success && logoBlobRes.data instanceof Blob) {
-                            logoUrl = URL.createObjectURL(logoBlobRes.data);
-                          }
-                        return {
-                          code: inst.instCode,
-                          name: inst.instName,
-                          img: logoUrl,
-                          instituteHead: inst.instDean,
-                          instID: inst.instID,
-                          employeeID: inst.employeeID
-                        };
-                        
-                      } catch (err) {
-                        console.warn(`Failed to fetch logo for ${inst.instCode}`, err);                        
-                      }
-                    })
-                  );
+                  const mappedInstitutes = instituteData.map((inst) => {
+                  const logoUrl = inst.instPic
+                    ? `/api/institute/logos/${inst.instCode}`
+                    : "../assets/UDM-logo.png";
 
-                  setInstitutes(mappedInstitutes);
+                  return {
+                    code: inst.instCode,
+                    name: inst.instName,
+                    img: logoUrl,
+                    instituteHead: inst.instDean,
+                    instID: inst.instID,
+                    employeeID: inst.employeeID,
+                  };
+                });
+
+                setInstitutes(mappedInstitutes);
+
                 }
                 
               } else {
-              console.error(response.error || "Failed to fetch institutes.");
+              console.error(response.error || "Failed to fetch insegetitutes.");
             }
           } catch (err) {
             console.error("Server error. Please try again.", err);
@@ -91,7 +84,7 @@ const Institutes = () => {
             }
           }
           fetchEmployees();
-        }, [])
+        }, []);
 
 
         // Function to handle create institute
@@ -135,37 +128,69 @@ const Institutes = () => {
 
         // Function to handle edit institute
         const handleEditInstitute = async (e) => {
-          e.preventDefault();
+        e.preventDefault();
 
-          const instituteToEdit = institutes[editIndex];
+        const instituteToEdit = institutes[editIndex];
 
-          // Data to send
-          const instituteData = {            
-            instCode: form.code,
-            instName: form.name,
-            instPic: form.img,
-            employeeID: form.instituteHead
-          };
+        try {
+          let response;
 
-          try {
+          // If instPic is a File, use FormData
+          if (form.instPic instanceof File) {
+
+            const formData = new FormData();
+
+            if (form.instCode) 
+              formData.append("instCode", form.instCode);
+
+            if (form.instName)
+              formData.append("instName", form.instName);
+
+            if (form.employeeID)
+              formData.append("employeeID", form.employeeID);
+            
+            formData.append("instPic", form.instPic); // optional
+
+            // Send POST request with FormData
+            response = await apiPutForm(`/api/institute/${instituteToEdit.instID}`, formData);
+
+          } else {
+            // No new logo file — do a JSON PUT (only changed fields)
+            const instituteData = {};
+            if (form.instCode) instituteData.instCode = form.instCode;
+            if (form.instName) instituteData.instName = form.instName;
+            if (form.employeeID) instituteData.employeeID = form.employeeID;
             // Send PUT request
-            const response = await apiPut(`/api/institute/${instituteToEdit.instID}`, instituteData);
-
-            if (response.success) {
-              // Refetch data              
-              setShowForm(false);
-              setForm({ code: "", name: "", img: "", instituteHead: ""});
-              setEditIndex(null);
-              setActiveModify(null);
-              alert("Institute updated successfully!");
-            } else {
-              alert(response.error || "Failed to update institute.");
-            }
-          } catch (err) {
-            console.error("Error updating institute.", err);
-            alert("Server error. Please try again.");
+            response = await apiPut(`/api/institute/${instituteToEdit.instID}`, instituteData);
           }
-        };
+
+          if (response.success) {
+            // Success handling
+            setShowStatusModal(true);
+            setStatusMessage(response.message || "Institute updated successfully!");
+            setStatusType("success");
+            
+            // Reset form and UI state
+            setShowForm(false);
+            setForm({ instCode: "", instName: "", instPic: "", employeeID: "" });
+            setEditIndex(null);
+            setActiveModify(null);
+
+            // Refresh the institutes list
+            fetchInstitutes();
+          } else {
+            // Handle API errors
+            setShowStatusModal(true);
+            setStatusMessage(response.message || "Failed to update institute.");
+            setStatusType("error");
+          }
+        } catch (err) {
+          console.error("Error updating institute.", err);
+          setShowStatusModal(true);
+          setStatusMessage("Server error. Please try again.");
+          setStatusType("error");
+        }
+      };
 
         // Function to delete an institute
         const handleDelete = async (e) => {
@@ -180,18 +205,27 @@ const Institutes = () => {
             const response = await apiDelete(`/api/institute/${instituteToDelete.instID}`);
 
             if (response.success) {
-              // Refetch data
-              await fetchInstitutes();
+              // Success handling
+              setShowStatusModal(true);
+              setStatusMessage(response.message || "Institute deleted successfully!");
+              setStatusType("success");
+
               setShowForm(false);
               setEditIndex(null);
               setActiveModify(null);
-              alert("institute deleted successfully!"); 
+
+              // Refetch data
+              await fetchInstitutes();
             } else {
-              alert(response.error || "Failed to delete institute.");
+              setShowStatusModal(true);
+              setStatusMessage(response.message || "Failed to delete institute. It may be linked to other records.");
+              setStatusType("error");
             }
           } catch (err) {
             console.error("Error Deleting institute.", err);
-            alert("Server error. Please try again.");
+            setShowStatusModal(true);
+            setStatusMessage("Serve error. Please try again.");
+            setStatusType("error");
           }
         };
 
@@ -224,60 +258,33 @@ const Institutes = () => {
             setEditIndex(null);
             setForm({ code: "", name: "", img: "", instituteHead: "" });
           }
-        }
+        };
 
         function handleEditSelect(e) {
           const idx = e.target.value;
           setEditIndex(idx);
           const institute = institutes[idx];
           setForm({
-            code: institute.code,
-            name: institute.name,
-            img: institute.img,
-            instituteHead: institute.employeeID || institute.instituteHead
+            instCode: institute.code,
+            instName: institute.name,
+            instPic: "", // leave empty, or handle separetely
+            instituteHead: institute.employeeID || "",
           });
-          // setForm({ ...institute });
-        }
+        };
 
         function handleDeleteSelect(e) {
           setEditIndex(e.target.value);
-        }
-
-        // function handleDelete(e) {
-        //   e.preventDefault();
-        //   if (editIndex !== null) {
-        //     setInstitutes(institutes.filter((_, idx) => idx != editIndex));
-        //     setShowForm(false);
-        //     setEditIndex(null);
-        //     setActiveModify(null);
-        //   }
-        // }
+        };
 
         const handleSubmit = (e) => {
           e.preventDefault();
           if (activeModify === "edit" && editIndex !== null) {
             // Edit mode
             handleEditInstitute(e);
-            // const updated = [...institutes];
-            // updated[editIndex] = { ...form };
-            // setInstitutes(updated);
           } else {
             // Add mode
             handleCreateInstitute(e);
-            // setInstitutes([
-            //   ...institutes,
-            //   {
-            //     code: form.code,
-            //     name: form.name,
-            //     img: form.img,
-            //     instituteHead: form.instituteHead,
-            //   },
-            // ]);
           }
-          // setShowForm(false);
-          // setForm({ code: "", name: "", img: "", instituteHead: "" });
-          // setEditIndex(null);
-          // setActiveModify(null);
         };
 
         const [form, setForm] = useState({
@@ -290,6 +297,14 @@ const Institutes = () => {
         const handleChange = (e) => {
           setForm({ ...form, [e.target.name]: e.target.value });
         };
+
+        // FOR FILE/LOGO UPLOAD EDIT
+        // const handleFileChange = (e) => {
+        //   const f = e.target.files && e.target.files[0];
+        //   if (f) {
+        //     setForm(prev => ({ ...prev, instPic: f }));
+        //   }
+        // };
         
     return(
         <>
@@ -302,7 +317,7 @@ const Institutes = () => {
              
                 {/* Main Content */}
               <div className="flex flex-wrap gap-5 mt-20 mb-8 lg:mt-8" >
-                <CreateCard setShowForm={setShowForm}/>
+                <CreateCard setShowForm={setShowForm} title={"Institute"}/>
 
                 {/* Loading  */}
                  {loading ? (
