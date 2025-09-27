@@ -50,6 +50,7 @@ class Area(db.Model):
     __tablename__ = 'area'
 
     areaID = db.Column(db.Integer, primary_key=True, nullable=False)
+    instID = db.Column(db.Integer, db.ForeignKey('institute.instID'), nullable=True)
     programID = db.Column(db.Integer, db.ForeignKey('program.programID'), nullable=False)
     areaName = db.Column(db.String(100))
     areaNum = db.Column(db.String(10))
@@ -59,18 +60,21 @@ class Area(db.Model):
 
     program = db.relationship("Program", back_populates="areas")
     subareas = db.relationship("Subarea", back_populates="area", cascade="all, delete-orphan")
+    institute = db.relationship("Institute", back_populates="areas")
     
 
 class Program(db.Model):
     __tablename__ = 'program'
 
     programID = db.Column(db.Integer, primary_key=True, nullable=False)
+    instID = db.Column(db.Integer, db.ForeignKey('institute.instID'), nullable=True)
     employeeID = db.Column(db.String(10), db.ForeignKey('employee.employeeID'))
     programCode = db.Column(db.String(20))
     programName = db.Column(db.String(100))
     programColor = db.Column(db.String(30))
 
     dean = db.relationship("Employee", foreign_keys=[employeeID], backref="programs")
+    institute = db.relationship("Institute", back_populates="programs")
     areas = db.relationship("Area", back_populates="program", cascade="all, delete-orphan")
 
 class Subarea(db.Model):
@@ -123,22 +127,26 @@ class Institute(db.Model):
 
     instID = db.Column(db.Integer, primary_key=True, nullable=False)
     employeeID = db.Column(db.String(10), db.ForeignKey('employee.employeeID'))
-    programID = db.Column(db.Integer, nullable=False)
     instCode = db.Column(db.String(50), nullable=False)
     instName = db.Column(db.String(100), nullable=False)
     instPic = db.Column(db.Text)
 
-    dean = db.relationship("Employee", backref="institutes")
-
+    dean = db.relationship("Employee", backref="institutes", foreign_keys=[employeeID])
+    programs = db.relationship("Program", back_populates="institute", cascade="all, delete-orphan")
+    areas = db.relationship("Area", back_populates="institute")
+    deadlines = db.relationship("Deadline", back_populates="institute")
 
 class Deadline(db.Model):
     __tablename__ = 'deadline'
 
     deadlineID = db.Column(db.Integer, primary_key=True, nullable=False)
+    instID = db.Column(db.Integer, db.ForeignKey('institute.instID'), nullable=True)
     programID = db.Column(db.Integer, nullable=False)
     areaID = db.Column(db.Integer, nullable=False)
     content = db.Column(db.Text, nullable=False)
     due_date = db.Column(db.Date, nullable=False)
+    
+    institute = db.relationship("Institute", back_populates="deadlines")
 
 class AuditLog(db.Model):
     __tablename__ = 'audit_log'
@@ -211,3 +219,20 @@ class MessageDeletion(db.Model):
     messageID = db.Column(db.Integer, db.ForeignKey('message.messageID'), nullable=False)
     employeeID = db.Column(db.String(50), db.ForeignKey('employee.employeeID'), nullable=False)
     deletedAt = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Notification(db.Model):
+    __tablename__ = 'notification'
+    
+    notificationID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    recipientID = db.Column(db.String(10), db.ForeignKey('employee.employeeID'), nullable=False)
+    senderID = db.Column(db.String(10), db.ForeignKey('employee.employeeID'), nullable=True)  # Null for system notifications
+    type = db.Column(db.String(50), nullable=False)  # 'message', 'announcement', 'system'
+    title = db.Column(db.String(255), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    isRead = db.Column(db.Boolean, default=False)
+    createdAt = db.Column(db.DateTime, default=datetime.utcnow)
+    link = db.Column(db.String(255))  # Optional link to related page
+    
+    # Relationships
+    recipient = db.relationship("Employee", foreign_keys=[recipientID], backref="received_notifications")
+    sender = db.relationship("Employee", foreign_keys=[senderID], backref="sent_notifications")
