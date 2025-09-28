@@ -1,6 +1,6 @@
 //for imports
 import CircularProgressBar from '../components/CircularProgressBar'
-import {useState, useEffect, use} from 'react';
+import {useState, useEffect} from 'react';
 import {
     faAngleRight,
     faCalendarPlus
@@ -13,7 +13,8 @@ import StatusModal from '../components/modals/StatusModal';
 import DeadlineModal from '../components/modals/DeadlineModal';
 import { apiGet, apiPost } from '../utils/api_utils';
 import { adminHelper } from '../utils/auth_utils';
-// the progress bar is currently static  
+import { useNavigate } from 'react-router-dom';
+import AreaProgressPage from './AreaProgress';
 
 const Tasks = () => {
     //admin
@@ -45,7 +46,7 @@ const Tasks = () => {
     const [showDeadline, setShowDeadline] = useState(false);
     const [selectedDeadline, setSelectedDeadline] = useState(null);
 
-
+    const navigate = useNavigate()
 
    
 
@@ -247,15 +248,17 @@ const Tasks = () => {
         
         {uniqueAreas.slice(0,3).map((area) => (                
             <Area 
-            key={area.areaID} 
-            areaTitle={area.areaNum} 
-            desc={area.areaTitle} 
-            program={area.programCode} 
-            progress={area.progress}
+                key={area.areaID} 
+                areaTitle={area.areaNum} 
+                desc={area.areaTitle} 
+                program={area.programCode} 
+                progress={area.progress}
             />
         )
         )}
-            <div className='absolute right-0 col-start-3 flex items-center justify-center min-w-[275px] h-full overflow-hidden opacity-90 transition-all duration-500 hover:min-w-[278px] hover:opacity-95 hover:scale-110 bg-gradient-to-r from-transparent via-neutral-800 to-neutral-900 dark:bg-gradient-to-r dark:from-transparent dark:via-gray-800 dark:to-gray-900 cursor-pointer'>
+            <div 
+            onClick={() => navigate('/Progress')}
+            className='absolute right-0 col-start-3 flex items-center justify-center min-w-[275px] h-full overflow-hidden opacity-90 transition-all duration-500 hover:min-w-[278px] hover:opacity-95 hover:scale-110 bg-gradient-to-r from-transparent via-neutral-800 to-neutral-900 dark:bg-gradient-to-r dark:from-transparent dark:via-gray-800 dark:to-gray-900 cursor-pointer'>
                     <h1 className='z-10 text-xl font-semibold text-neutral-200'>View All</h1>
                 </div>
         </>        
@@ -427,13 +430,15 @@ const Tasks = () => {
 
 //Generates the areas
 
-export const Area = ({program, areaTitle, desc, progress}) =>{
+export const Area = ({onClick, program, areaTitle, desc, progress}) =>{
 
     return(
-        <div className="relative mr-4 min-w-[300px] h-[210px] border-black border rounded-lg shadow-lg overflow-hidden transition-all duration-500 hover:scale-105 cursor-pointer">
-            <div className='h-[50%] bg-zuccini-600'> 
-                <div className='absolute px-5 font-light border border-black top-2 right-2 bg-neutral-200 rounded-xl dark:bg-gray-900 dark:text-white'>{program}</div>
-                <CircularProgressBar progress={progress} circleWidth="75" positionX={"left-3"} positionY={"top-17"}/>           
+        <div 
+        onClick={onClick}
+        className="relative mr-4 min-w-[300px] h-[210px] border-neutral-400 dark:border-neutral-800 border rounded-lg shadow-xl dark:shadow-sm dark:shadow-zuccini-700 overflow-hidden transition-all duration-500 hover:scale-105 cursor-pointer">
+            <div className='h-[50%] bg-zuccini-600 dark:bg-zuccini-700'> 
+                <div className='absolute px-5 font-light border border-neutral-400 top-2 right-2 bg-neutral-200 rounded-xl dark:bg-gray-900 dark:text-white'>{program}</div>
+                <CircularProgressBar progress={progress} circleWidth="75" positionX={"left-3"} positionY={"top-17"} placement={`absolute top-17 left-3`}/>           
             </div>      
 
             <div className='text-right h-[50%] p-3 bg-neutral-200 border-t-1 transition-all duration-500  dark:bg-gray-900 dark:text-white dark:border-t-neutral-600'>

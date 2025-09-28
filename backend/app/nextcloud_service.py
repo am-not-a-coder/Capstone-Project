@@ -76,6 +76,7 @@ def ensure_directories(path: str):
     return True
 
 
+
 def upload_to_nextcloud(file, path):    
     filename = secure_filename(file.filename)  # normalized filename
     target_url = build_nextcloud_url(f"{path}/{filename}")
@@ -138,6 +139,42 @@ def rename_file_nextcloud(old_path, new_path):
     
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+
+# Upload or overwrite (edit) a file in Nextcloud
+def edit_file_nextcloud(file_path, file_content):
+   
+    UDMS_URL = f"{NEXTCLOUD_URL.rstrip('/')}/UDMS_Repository/"
+    file_url = UDMS_URL + '/'.join(quote(part) for part in file_path.split('/'))
+
+    try:
+        # If file_content is string, encode to bytes
+        if isinstance(file_content, str):
+            file_content = file_content.encode("utf-8")
+
+        response = requests.put(
+            file_url,
+            data=file_content,
+            auth=HTTPBasicAuth(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD)
+        )
+
+        if response.status_code in [200, 201, 204]:
+            return jsonify({
+                "success": True,
+                "message": "File updated successfully",
+                "path": file_path
+            }), response.status_code
+        else:
+            return jsonify({
+                "error": f"Failed to update file. Status {response.status_code}",
+                "details": response.text
+            }), response.status_code
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 
 def delete_from_nextcloud(doc_path):
     try:

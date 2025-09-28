@@ -7,8 +7,11 @@ import CollegeInfoModal from "../components/modals/CollegeInfoModal";
 import { apiGet, apiPut, apiDelete, apiPostForm, apiGetBlob } from "../utils/api_utils";
 import StatusModal from "../components/modals/StatusModal";
 import { CardSkeleton } from "../components/Skeletons";
+import { adminHelper } from "../utils/auth_utils";
 
 const Institutes = () => {
+
+        const isAdmin = adminHelper()
 
         // State for institutes data
         const [institutes, setInstitutes] = useState([]);
@@ -302,8 +305,9 @@ const Institutes = () => {
              
                 {/* Main Content */}
               <div className="flex flex-wrap gap-5 mt-20 mb-8 lg:mt-8" >
-                <CreateCard setShowForm={setShowForm}/>
-
+                {isAdmin && (
+                  <CreateCard setShowForm={setShowForm}/>
+                )}
                 {/* Loading  */}
                  {loading ? (
                     <>
@@ -328,7 +332,7 @@ const Institutes = () => {
               
               
               {/*Form*/}
-              {showForm && 
+              {isAdmin && showForm && 
               <CreateForm 
                 title="Institute"
                 data={institutes}

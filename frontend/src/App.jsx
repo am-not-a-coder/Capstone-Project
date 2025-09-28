@@ -13,6 +13,7 @@ import Tasks from './pages/Tasks';
 import Profile from './pages/Profile';
 import Notification from './pages/Notification';
 import Messages from './pages/Messages';
+import AreaProgress from './pages/AreaProgress';
 import { fetchCurrentUser, getCurrentUser } from './utils/auth_utils';
 import { useEffect, useRef, useState } from 'react';
 import { logoutAcc, adminHelper } from './utils/auth_utils';
@@ -346,6 +347,7 @@ const PublicOnlyRoute = ({ children }) => {
             </AdminRoute>
             } />
           <Route path="/Tasks" element={<Tasks />} />
+          <Route path="/Progress" element={<AreaProgress />} />
           <Route path="/Documents" element={<Documents />} />
 
           {/* Profile page */}

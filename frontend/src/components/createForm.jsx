@@ -40,7 +40,7 @@ const ActionButton = memo(({ action, color, icon, isActive, onClick, children })
 });
 
 // Memoized InputField component to prevent unnecessary re-renders
-const InputField = memo(({ field, form, handleChange, handleFileChange, employees }) => {
+const InputField = memo(({ field, form, handleChange, handleFileChange, employees, institutes }) => {
   const baseInputClasses = "w-full px-4 py-3 text-black dark:text-white rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 dark:bg-gray-800 dark:border-gray-600 dark:focus:ring-blue-400";
   
   return (
@@ -49,7 +49,22 @@ const InputField = memo(({ field, form, handleChange, handleFileChange, employee
         {field.label}
         {field.required && <span className="ml-1 text-red-500">*</span>}
       </label>
-      {field.type === "select" ? (
+      
+      {field.type === "institute-select" ? (
+        <select
+        name={field.name}
+        className={baseInputClasses}
+        value={form[field.name] || ""}
+        onChange={handleChange}
+        required={field.required}
+        >
+          {console.log('Institutes data:', institutes)}
+          <option value="" className="text-gray-500">{field.placeholder}</option>
+          {institutes && institutes.map((inst) => (
+            <option key={inst.instID} value={inst.instID}>{inst.instName}</option>
+          ))}
+        </select>
+      ) : field.type === "select" ? (
         <select
           name={field.name}
           className={baseInputClasses}
@@ -119,6 +134,7 @@ export default function CreateForm({
   fields = [], // Array of field configurations
   data = [], // Array of existing data (programs or institutes)
   employees = [], // Array of employees for dropdown
+  institutes = [], // Array of institutes for dropdown
   
   // Event handlers
   onSubmit,
@@ -136,37 +152,49 @@ export default function CreateForm({
 }) {
   
   // Memoize the default fields to prevent recreation on every render
-  const defaultFields = useMemo(() => [
-    {
-      name: title === "Program" ? "programCode" : "instCode",
-      label: `${title} Code`,
-      placeholder: `e.g. ${title === "Program" ? "BSIT" : "CCS"}`,
-      type: "text",
-      required: true
-    },
-    {
-      name: title === "Program" ? "programName" : "instName", 
-      label: `${title} Name`,
-      placeholder: `Full ${title.toLowerCase()} name`,
-      type: "text",
-      required: true
-    },
-    {
+  const defaultFields = useMemo(() => {
+    let arr = [
+      {
+        name: title === "Program" ? "programCode" : "instCode",
+        label: `${title} Code`,
+        placeholder: `e.g. ${title === "Program" ? "BSIT" : "CCS"}`,
+        type: "text",
+        required: true
+      },
+      {
+        name: title === "Program" ? "programName" : "instName", 
+        label: `${title} Name`,
+        placeholder: `Full ${title.toLowerCase()} name`,
+        type: "text",
+        required: true
+      }
+    ];
+    if (title === "Program") {
+      arr.push({
+        name: "instituteID",
+        label: "Institute",
+        placeholder: "Select Institute",
+        type: "institute-select",
+        required: true
+      });
+    }
+    arr.push({
       name: title === "Program" ? "employeeID" : "employeeID", // keep consistent
       label: title === "Program" ? "Program Dean" : "Institute Head",
       placeholder: title === "Program" ? "Select Program Dean" : "Institute Head",
       type: "select",
       required: false
-    },
-    {
+    });
+    arr.push({
       name: title === "Program" ? "programColor" : "instPic",
       label: title === "Program" ? `${title} Color` : `${title} Logo`,
       placeholder: title === "Program" ? `${title} Color` : `Select ${title.toLowerCase()} logo`,
       type: title === "Program" ? "color" : "file",
       accept: title === "Program" ? undefined : ".webp,.png,.jpeg,.jpg",
       required: true
-    }
-  ], [title]);
+    });
+    return arr;
+  }, [title]);
 
 
   // Memoize formFields to prevent recreation
@@ -283,6 +311,7 @@ export default function CreateForm({
                   handleChange={handleChange}
                   handleFileChange={handleFileChange}
                   employees={employees}
+                  institutes={institutes}
                 />
               ))}
               
@@ -345,6 +374,7 @@ export default function CreateForm({
                       handleChange={handleChange}
                       handleFileChange={handleFileChange}
                       employees={employees}
+                      institutes={institutes}
                     />
                   ))}
                 </div>
@@ -393,8 +423,8 @@ export default function CreateForm({
                 >
                   <option value="" disabled className="text-gray-500">Choose a {title.toLowerCase()} to delete</option>
                   {data.map((item, idx) => (
-                    <option value={idx} key={item.programCode}>
-                      {item.programCode} - {item.programName}
+                    <option value={idx} key={item.code || item.programCode}>
+                      {item.code || item.programCode} - {item.name || item.programName}
                     </option>
                   ))}
                 </select>

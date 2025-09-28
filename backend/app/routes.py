@@ -11,9 +11,11 @@ from datetime import timedelta, datetime, timezone
 from app.utils.normalize_path import normalize_path
 from app.utils.file_extractor import extract_pdf, extract_docs, extract_excel, extract_image
 from app.utils.tagging_utils import rule_based_tag, extract_global_tfid_tags
-from app.nextcloud_service import upload_to_nextcloud, preview_from_nextcloud, delete_from_nextcloud, ensure_directories, safe_path, list_files_from_nextcloud, preview_file_nextcloud, download_file_nextcloud, rename_file_nextcloud
+from app.nextcloud_service import upload_to_nextcloud, preview_from_nextcloud, delete_from_nextcloud, ensure_directories, safe_path, list_files_from_nextcloud, preview_file_nextcloud, download_file_nextcloud, rename_file_nextcloud, edit_file_nextcloud
 from sentence_transformers import SentenceTransformer
 import numpy as np
+import pandas as pd
+import joblib
 import mimetypes
 import os
 import re
@@ -341,6 +343,9 @@ def register_routes(app):
         
         except Exception as e:
             return jsonify({'success': False, 'message': f'Failed to fetch announcements, {e}'}), 500
+
+        
+
     
 
                  #USER PAGE ROUTES
@@ -816,50 +821,103 @@ def register_routes(app):
 
                     #INSTITUTES PAGE ROUTES 
     
-    #edit institute base on institute id
-    @app.route('/api/institute/<int:instID>', methods=['PUT'])    
-    def edit_institute(instID):
+    #edit institute base on institute  
+    @app.route('/api/institute/<int:instID>', methods=['PUT'])
+    @jwt_required()
+    def edit_institute(instID):        
         try:
-            data = request.get_json()  # Get JSON data from frontend
-            institutes = Institute.query.filter_by(instID=instID).first()  # Find institute by ID
+            # Check admin permissions
+            current_user_id = get_jwt_identity()
+            admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+            if not admin_user or not admin_user.isAdmin:
+                return jsonify({'success': False, 'message': 'Admins only'}), 403
             
-            if institutes:
-                # Update the database fields with new values
-                institutes.instID = data.get('instID')      # Update institute code (e.g., "BSIT")
-                institutes.instCode = data.get('instCode')      # Update institute code (e.g., "BSIT")
-                institutes.instName = data.get('instName')      # Update institute name  
-                institutes.instPic = data.get('instPic')    # Update institute color
-                # Handle employeeID - accept string format like "23-45-678"
+            # Find the institute to edit
+            institute = Institute.query.filter_by(instID=instID).first()
+            if not institute:
+                return jsonify({'success': False, 'message': 'Institute not found'}), 404
+            
+            # If request is multipart/form-data (for file upload)
+            if request.content_type and 'multipart/form-data' in request.content_type:
+                data = request.form
+                inst_code = data.get('instCode')
+                inst_name = data.get('instName')
                 employee_id = data.get('employeeID')
-                if employee_id and employee_id.strip():  # Check if not empty
-                    institutes.employeeID = employee_id  # Store as string (matches your DB format)
-                else:
-                    institutes.employeeID = None  # Set to null for empty values
+                inst_pic_file = request.files.get('instPic')  # Optional new logo file
                 
-                db.session.commit()  # Save changes to database
+                if inst_code: 
+                    institute.instCode = inst_code
+                if inst_name: 
+                    institute.instName = inst_name
+                if employee_id is not None:
+                    institute.employeeID = employee_id.strip() if employee_id and employee_id.strip() else None
                 
-                # After saving, get the updated dean info via the foreign key relationship
-                dean = institutes.dean  # This uses the relationship defined in your models.py
-                dean_name = f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A"
-                
-                return jsonify({
-                    'success': True,
-                    'message': 'Program Updated Successfully',
-                    'updated_program': {
-                        'instID': institutes.instID,
-                        'instCode': institutes.instCode,
-                        'instName': institutes.instName,
-                        'instPic': institutes.instPic,
-                        'instDean': dean_name,  # Send back the dean's full name for display
-                        'employeeID': institutes.employeeID  # Include the ID for future edits
-                    }
-                })
+                # If user uploaded new logo, push to Nextcloud instead of local
+                if inst_pic_file and inst_pic_file.filename:
+                    allowed_extensions = {'jpg', 'jpeg','png', 'webp'}
+                    if '.' not in inst_pic_file.filename:
+                        return jsonify({'success': False, 'message': 'Invalid file format'}), 400
+                    
+                    file_extension = inst_pic_file.filename.rsplit('.', 1)[1].lower()
+                    if file_extension not in allowed_extensions:
+                        return jsonify({
+                            'success': False, 
+                            'message': 'Invalid file format. Only jpg, jpeg, png, webp allowed.'
+                        }), 400
+
+                    # Construct filename: always based on instCode
+                    filename = secure_filename(f"{institute.instCode}.{file_extension}")
+                    
+                    # Path inside Nextcloud (example: Institutes/logos/<filename>)
+                    nc_path = f"Institutes/logos/{filename}"
+
+                    # Upload/overwrite to Nextcloud
+                    response, status = edit_file_nextcloud(nc_path, inst_pic_file.read())
+                    if status not in (200, 201, 204):
+                        return jsonify({
+                            "success": False,
+                            "message": f"Failed to upload file to Nextcloud: {response.get_json() if response.is_json else response}"
+                        }), status
+
+                    # Store the Nextcloud relative path in DB
+                    institute.instPic = nc_path
+
             else:
-                return jsonify({'error': 'Program not found'}), 404
-                
+                # JSON payload (no file)
+                data = request.get_json()
+                if 'instCode' in data:
+                    institute.instCode = data.get('instCode')
+                if 'instName' in data:
+                    institute.instName = data.get('instName')
+                if 'employeeID' in data:
+                    employee_id = data.get('employeeID')
+                    institute.employeeID = employee_id.strip() if employee_id and employee_id.strip() else None
+            
+            # Save changes
+            db.session.commit()
+            
+            # Get dean info for response
+            dean = institute.dean if institute.employeeID else None
+            dean_name = f"{dean.fName} {dean.lName} {dean.suffix or ''}".strip() if dean else "N/A"
+            
+            return jsonify({
+                'success': True,
+                'message': 'Institute updated successfully',
+                'data': {
+                    'instID': institute.instID,
+                    'instCode': institute.instCode,
+                    'instName': institute.instName,
+                    'instPic': institute.instPic,  # Now stored as Nextcloud path
+                    'instDean': dean_name,
+                    'employeeID': institute.employeeID
+                }
+            }), 200
+            
         except Exception as e:
             db.session.rollback()
-            return jsonify({'error': 'Database error occurred'}), 500
+            current_app.logger.error(f"Edit institute error: {str(e)}")
+            return jsonify({'success': False, 'message': f'Database error: {str(e)}'}), 500
+
 
     @app.route('/api/institutes', methods=['POST'])
     def create_institute():
@@ -959,12 +1017,7 @@ def register_routes(app):
                 return jsonify({'error': 'Program not found'}), 404
             
             # Check dependencies before deletion
-            dependencies = []
-            
-            # Check employees
-            employees = Employee.query.filter_by(instID=instID).count()
-            if employees > 0:
-                dependencies.append(f"{employees} employee(s)")
+            dependencies = []               
             
             # Check areas
             areas = Area.query.filter_by(instID=instID).count()
@@ -1050,8 +1103,23 @@ def register_routes(app):
                 "detail": getattr(response, "text", "No response text")
             }), response.status_code
 
+    # Fetch programs for the institute
+    @app.route('/api/institute/programs', methods=["GET"])
+    def get_program_for_inst():
+        instID = request.args.get('instID', type=int)
 
+        programs = Program.query.filter_by(instID=instID).all()
 
+        program_list = [
+            {
+                'programID': p.programID,
+                'programCode': p.programCode,
+                'programName': p.programName,
+            }
+            for p in programs
+        ]
+
+        return jsonify({'programs': program_list}), 200
 
     
                                         #PROGRAM PAGE ROUTES
@@ -1279,17 +1347,56 @@ def register_routes(app):
         data = request.get_json()
         areaID = data.get("areaID")
         progress = data.get("progress")
-
+        updated_at = datetime.utcnow()
+ 
         if areaID is None or progress is None:
             return jsonify({'success': False, 'message': 'areaID and progress are required'}), 400
         
         area = Area.query.filter_by(areaID=areaID).first()
 
         area.progress = progress
+        area.updated_at = updated_at
+
 
         db.session.commit()
 
         return jsonify({'success': True, 'message': 'Area progress saved!'}), 200
+
+
+    @app.route('/api/program/approve', methods=["PUT"])
+    @jwt_required()
+    def approve_document():
+        data = request.get_json()
+        docID = data.get("docID")
+
+        document = Document.query.filter_by(docID=docID).first()
+
+        document.isApproved = True
+        document.approvedBy = get_jwt_identity()
+        document.evaluate_at = datetime.utcnow()
+
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Document approved!'}), 200
+
+
+    @app.route('/api/program/reject', methods=["PUT"])
+    @jwt_required()
+    def reject_document():
+        data = request.get_json()
+        docID = data.get("docID")
+
+        document = Document.query.filter_by(docID=docID).first()
+
+        document.isApproved = False
+        document.approvedBy = get_jwt_identity()
+        document.evaluate_at = datetime.utcnow()
+
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Document Rejected!'}), 200
+
+
 
     @app.route('/api/criteria', methods=["GET"])
     def get_criteria(): 
@@ -1461,7 +1568,8 @@ def register_routes(app):
                 Document.docID,
                 Document.docName,
                 Document.docType,
-                Document.docPath
+                Document.docPath,
+                Document.isApproved
             )
             .outerjoin(Program, Area.programID == Program.programID)
             .outerjoin(Subarea, Area.areaID == Subarea.areaID)
@@ -1506,6 +1614,7 @@ def register_routes(app):
                     'docID': row.docID,
                     'docName': row.docName,
                     'docPath': row.docPath,
+                    'isApproved': row.isApproved,
                     'rating': row.rating
                 }
 
@@ -1612,9 +1721,7 @@ def register_routes(app):
     @jwt_required()        
     def upload_file():
         current_user_id = get_jwt_identity()
-        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
-        if not admin_user or not admin_user.isAdmin:
-            return jsonify({'success': False, 'message': 'Admins only'}), 403
+        
        # ==== Get and Validate Form Data ====
         # Get form data
         data = request.form
@@ -1727,7 +1834,9 @@ def register_routes(app):
                 doc.docName = file_name
                 doc.content = extracted_text
                 doc.tags = list(tags)
-                doc.embedding = embedding
+                doc.embedding = embedding,
+                doc.isApproved = None,
+                doc.approvedBy = None
             else:
                 # Create new doc
                 doc = Document(
@@ -1737,7 +1846,9 @@ def register_routes(app):
                     content=extracted_text,
                     employeeID=uploader.employeeID,
                     tags=list(tags),
-                    embedding=embedding
+                    embedding=embedding,
+                    isApproved = None,
+                    approvedBy = None
                 )
                 db.session.add(doc)
                 db.session.flush()  # Assign docID before linking
@@ -1806,6 +1917,48 @@ def register_routes(app):
                 'status': response.status_code,
                 'detail': response.text 
             }), response.status_code    
+
+
+    model_path = os.path.join(os.path.dirname(__file__), "machine_learning", "xgb_best_model.pkl")
+    xgb_model = joblib.load(model_path)
+
+    @app.route('/api/accreditation/predict_rating', methods=["POST"])
+    def predict_rating():
+        try:
+            data = request.get_json()
+            # {
+            #   "file_size": 123456,
+            #   "Criteria_Completion_Score": 7,
+            #   "Days_Until_Deadline": 10,
+            #   "isApproved": true,
+            #   "docType": "application/pdf",
+            #   "programID": 2,
+            #   "embedding": [-0.24, -0.28, -0.31, ...]
+            # }
+            
+            # Convert to Data Frame
+
+            df_input = pd.DataFrame([data])
+        
+            emb = pd.DataFrame([df_input["embedding"].iloc[0]])
+            emb.columns = [f"emb_{i}" for i in range(len(emb.columns))]
+
+
+            X_new = pd.concat([
+                df_input[["file_size", "Criteria_Completion_Score", "Days_Until_Deadline", 
+                "isApproved", "docType", "programID"]], emb                
+            ], axis=1
+            )
+
+            # Predict
+
+            prediction = xgb_model.predict(X_new)[0]
+
+            return jsonify({'success': True, "predicted_rating": round(float(prediction), 2)}), 200
+
+        except Exception as e:
+            return jsonify({'success': False, 'message': f'Failed to predict rating: {str(e)}'}), 400
+
 
        
     # === Documents Section ===

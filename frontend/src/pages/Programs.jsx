@@ -28,6 +28,7 @@ import { CardSkeleton } from '../components/Skeletons';
   const [programs, setPrograms] = useState([]);
   const [employees, setEmployees] = useState([]); 
   const [areas, setAreas] = useState([]);
+  const [instituteOption, setInstituteOption] = useState([]);
   const [subareas, setSubareas] = useState([]);
   const [criteria, setCriteria] = useState([]);
 
@@ -71,6 +72,7 @@ import { CardSkeleton } from '../components/Skeletons';
       }
         fetchProgram()
     }, []);
+    
 
     useEffect(() => {
       const fetchEmployees = async () => {
@@ -90,6 +92,27 @@ import { CardSkeleton } from '../components/Skeletons';
         }
       };
       fetchEmployees();
+    }, []); 
+
+    useEffect(() => {
+      const fetchInstitutes = async () => {
+        try {
+         
+          const response = await apiGet('/api/institute');
+          
+          if (response.success) {
+          Array.isArray(response.data.institutes) ? setInstituteOption(response.data.institutes) : setInstituteOption([]);
+          console.log(response.data)
+          } else {
+            console.error("Error fetching institutes:", response.error);
+            setInstituteOption([]);
+          }
+        } catch (err) {
+          console.error("Unexpected error fetching institutes", err);
+          setInstituteOption([]);
+        }
+      };
+      fetchInstitutes();
     }, []); 
 
         
@@ -133,9 +156,9 @@ import { CardSkeleton } from '../components/Skeletons';
         
         
 
-    const refreshAreas = async (programCode) => {
+    const refreshAreas = async (programCode) => {      
       try {
-         const response = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`, {withCredentials: true})
+        const response = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`, {withCredentials: true})
         Array.isArray(response.data) ? setAreas(response.data) : setAreas([]);
       } catch(err) {
         console.error('Error refreshing areas:', err);
@@ -203,8 +226,13 @@ import { CardSkeleton } from '../components/Skeletons';
       programDean: "",
   });
 
-  const handleChange = useCallback((e) => {
-      setForm({...form, [e.target.name]: e.target.value});
+  const handleChange = useCallback((e) => {      
+    const { name, value } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: value
+    }));
+
   }, []);
 
   const [visible, setVisible] = useState("programs");
@@ -260,17 +288,18 @@ import { CardSkeleton } from '../components/Skeletons';
 
   const handleFilePreview = useCallback(async (docName, docPath) => {
     try {
-      console.log('Preview requested for:', docName, docPath);
-      
       setIsLoading(true);
       setError(null);
-      setDocs([]); // Clear previous documents
-      setShowPreview(true); 
+      setDocs([]);
+      setShowPreview(true);
 
-      const blob = await apiGetBlob(`/api/accreditation/preview/${encodeURIComponent(docName)}`);
+      const blobRes = await apiGetBlob(`/api/accreditation/preview/${encodeURIComponent(docName)}`);
 
-      // Construct the full URL
-      const fileURL = URL.createObjectURL(blob);
+      if (!blobRes.success || !(blobRes.data instanceof Blob)) {
+        throw new Error('File preview failed or file is not a valid Blob.');
+      }
+
+      const fileURL = URL.createObjectURL(blobRes.data);
 
       // Helper function to determine file type from filename
       const getFileType = (fileName) => {
@@ -432,25 +461,27 @@ import { CardSkeleton } from '../components/Skeletons';
                 
               </nav>
             </div>
-            { isAdmin && visible !== "programs" && (
-              <button onMouseEnter={() => setShowWord(true)}
-                onMouseLeave={() => setShowWord(false)}
-                onClick={() => setShowCreateModal(true)}
-                className={`p-3 px-4 text-xl flex items-center transition-all duration-300 cursor-pointer rounded-xl text-gray-500 bg-gray-200 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 shadow-md border-neutral-700 dark:border-neutral-500 dark:text-gray-200 dark:inset-shadow-sm dark:inset-shadow-gray-400  dark:bg-gray-950/50`}
-                >
-                  
-                  <span
-                    className={`transition-all duration-500 overflow-hidden whitespace-nowrap ${ showWord ? "opacity-100 max-w-[200px] mr-2" : "opacity-0 max-w-0 mr-0"}`}
+            { isAdmin && visible !== "programs" && (                
+                <button onMouseEnter={() => setShowWord(true)}
+                  onMouseLeave={() => setShowWord(false)}
+                  onClick={() => setShowCreateModal(true)}
+                  className={`p-3 px-4 text-xl flex items-center transition-all duration-300 cursor-pointer rounded-xl text-gray-500 bg-gray-200 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 shadow-md border-neutral-700 dark:border-neutral-500 dark:text-gray-200 dark:inset-shadow-sm dark:inset-shadow-gray-400  dark:bg-gray-950/50`}
                   >
-                    Create</span>
-                  <FontAwesomeIcon icon={faPlus} className='z-10'/>
-              </button>)}
+                    
+                    <span
+                      className={`transition-all duration-500 overflow-hidden whitespace-nowrap ${ showWord ? "opacity-100 max-w-[200px] mr-2" : "opacity-0 max-w-0 mr-0"}`}
+                    >
+                      Create</span>
+                    <FontAwesomeIcon icon={faPlus} className='z-10'/>
+                </button>                
+              )}
             {showCreateModal && (
               <CreateModal 
-                onCreate={refreshAreas} 
+                onCreate={() => refreshAreas(selectedProgram.programCode)} 
                 setShowCreateModal={setShowCreateModal} 
                 onClick={() => setShowCreateModal(false)}
               />
+              
             )}
             </div>
 
@@ -466,6 +497,7 @@ import { CardSkeleton } from '../components/Skeletons';
               {programLoading ? (
                 <>
                   <CardSkeleton />
+                  <CardSkeleton />                                    
                   <CardSkeleton />                                    
                 </>
                 ) : (              
@@ -521,7 +553,7 @@ import { CardSkeleton } from '../components/Skeletons';
                                       subareaName={subarea.subareaName}
                                       onClick={() => {handleSubareaSelect(subarea)}}
                                       onCreate={() => {setShowCreateModal(true)}}
-                                      onRefresh={refreshAreas}
+                                      onRefresh={() => refreshAreas(selectedProgram.programCode)}
                                       onFilePreview={handleFilePreview}
                                       done={done}
                                       setDone={setDone}
@@ -655,6 +687,8 @@ import { CardSkeleton } from '../components/Skeletons';
               form={form}
               handleChange={handleChange}
               handleModify={handleModify}
+              employees={employees}
+              institutes={instituteOption}
             />}
         </div>
       </>

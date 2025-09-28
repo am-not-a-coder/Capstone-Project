@@ -14,6 +14,9 @@ RUN apt-get update && apt-get install -y \
     libopenblas-dev \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
+    
+RUN pip install jupyterlab ipykernel
+
 
 # ==========================
 # Install base dependencies
@@ -22,7 +25,8 @@ FROM base AS deps-base
 COPY requirements-base.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements-base.txt
+    pip install --no-cache-dir -r requirements-base.txt     
+
 
 # ==========================
 # Install ML dependencies

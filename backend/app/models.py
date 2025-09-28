@@ -65,13 +65,17 @@ class Program(db.Model):
     __tablename__ = 'program'
 
     programID = db.Column(db.Integer, primary_key=True, nullable=False)
-    employeeID = db.Column(db.String(10), db.ForeignKey('employee.employeeID'))
+    employeeID = db.Column(db.String(10), db.ForeignKey('employee.employeeID'))    
+    instID = db.Column(db.Integer, db.ForeignKey('institute.instID'))
     programCode = db.Column(db.String(20))
     programName = db.Column(db.String(100))
     programColor = db.Column(db.String(30))
 
     dean = db.relationship("Employee", foreign_keys=[employeeID], backref="programs")
     areas = db.relationship("Area", back_populates="program", cascade="all, delete-orphan")
+    
+    institute = db.relationship("Institute", foreign_keys=[instID], backref="programs")
+
 
 class Subarea(db.Model):
     __tablename__ = 'subarea'
@@ -109,7 +113,9 @@ class Document(db.Model):
     docName = db.Column(db.String(150), nullable=False)
     docType = db.Column(db.String(50), nullable=False)    
     docPath = db.Column(db.Text)
-    isApproved = db.Column(db.Boolean, default=False)
+    isApproved = db.Column(db.Boolean)
+    approvedBy = db.Column(db.String(10), db.ForeignKey('employee.employeeID'))
+    evaluate_at = db.Column(db.DateTime)
     upload_date = db.Column(db.DateTime, default=datetime.utcnow)
     content = db.Column(db.Text)
     search_vector = db.Column(TSVECTOR)
@@ -127,7 +133,7 @@ class Institute(db.Model):
     instName = db.Column(db.String(100), nullable=False)
     instPic = db.Column(db.Text)
 
-    dean = db.relationship("Employee", backref="institutes")
+    dean = db.relationship("Employee", backref="institutes")    
 
 
 class Deadline(db.Model):
