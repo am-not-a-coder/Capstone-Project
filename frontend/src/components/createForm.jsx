@@ -361,7 +361,7 @@ export default function CreateForm({
                 >
                   <option value="" disabled className="text-gray-500">Choose a {title.toLowerCase()} to edit</option>
                   {data.map((item, idx) => (
-                    <option value={idx} key={item.code || item.programCode}>
+                    <option value={idx} key={`${item.programID || idx}-${item.programCode}`}>
                       {item.code || item.programCode} - {item.name || item.programName}
                     </option>
                   ))}
@@ -427,7 +427,7 @@ export default function CreateForm({
                 >
                   <option value="" disabled className="text-gray-500">Choose a {title.toLowerCase()} to delete</option>
                   {data.map((item, idx) => (
-                    <option value={idx} key={item.code || item.programCode}>
+                    <option value={idx} key={`${item.programID || idx}-${item.programCode}`}>
                       {item.code || item.programCode} - {item.name || item.programName}
                     </option>
                   ))}
