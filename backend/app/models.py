@@ -90,12 +90,6 @@ class Subarea(db.Model):
 
     criteria = db.relationship("Criteria", back_populates="subarea", cascade="all, delete-orphan")
 
-criteria_deadline = db.Table(
-    'criteria_deadline',
-    db.Column('criteriaID', db.Integer, db.ForeignKey('criteria.criteriaID'), primary_key=True),
-    db.Column('deadlineID', db.Integer, db.ForeignKey('deadline.deadlineID'), primary_key=True)
-)
-
 class Criteria(db.Model):
     __tablename__ = 'criteria'
 
@@ -107,22 +101,20 @@ class Criteria(db.Model):
     isDone = db.Column(db.Boolean, default=False)
     docID = db.Column(db.Integer, db.ForeignKey('document.docID'), nullable=False)
 
-    subarea = db.relationship("Subarea", back_populates="criteria")
-
-    deadlines = db.relationship("Deadline", secondary=criteria_deadline, back_populates="criteria")
+    subarea = db.relationship("Subarea", back_populates="criteria")    
 
     document = db.relationship("Document", back_populates="criteria")
 
 class Deadline(db.Model):
-    __tablename__ = 'deadline'
+    __tablename__ = "deadline"
 
-    deadlineID = db.Column(db.Integer, primary_key=True, nullable=False)
-    programID = db.Column(db.Integer, nullable=False)
-    areaID = db.Column(db.Integer, nullable=False)
-    content = db.Column(db.Text, nullable=False)
-    due_date = db.Column(db.Date, nullable=False)
-
-    criteria = db.relationship("Criteria", secondary=criteria_deadline, back_populates="deadlines")
+    deadlineID = db.Column(db.Integer, primary_key=True)
+    programID = db.Column(db.Integer, db.ForeignKey("program.programID"), nullable=False)
+    areaID = db.Column(db.Integer, db.ForeignKey("area.areaID"), nullable=False)
+    criteriaID = db.Column(db.Integer, db.ForeignKey("criteria.criteriaID"), nullable=False)
+    content = db.Column(db.Text, nullable=True)
+    due_date = db.Column(db.DateTime, nullable=False)
+      
 
 class Document(db.Model):
     __tablename__ = 'document'

@@ -2,14 +2,15 @@ import {
     faCircleXmark,
     faBookOpen,
     faCalendar,
-    faClock
+    faClock,
+    faBook
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
-const DeadlineModal = ({id, programName, programCode, area, date, color = "#3B82F6", content, onClick, showModal}) => {
+const DeadlineModal = ({id, programName, programCode, area, criteria, date, color = "#3B82F6", content, onClick, showModal}) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className={`relative bg-gray-200 dark:bg-gray-900 rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden ${showModal ? 'fade-in' : 'fade-out'}`}>
+      <div className={`relative bg-gray-200 dark:bg-gray-900 rounded-2xl shadow-2xl max-w-5xl w-full mx-4 max-h-[90vh] overflow-hidden ${showModal ? 'fade-in' : 'fade-out'}`}>
         {/* Header with accent color */}
         <div 
           className="w-full h-2"
@@ -55,13 +56,24 @@ const DeadlineModal = ({id, programName, programCode, area, date, color = "#3B82
             {/* Deadline */}
             <div className="space-y-3">
               <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
+                <FontAwesomeIcon icon={faBook} />
+                <span className="font-medium">Criteria</span>
+              </div>
+              <p className="pl-6 text-lg font-semibold text-gray-900 dark:text-white">
+                {criteria}
+              </p>
+            </div>
+
+             {/* Deadline */}
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
                 <FontAwesomeIcon icon={faCalendar} />
                 <span className="font-medium">Deadline</span>
               </div>
               <p className="pl-6 text-lg font-semibold text-gray-900 dark:text-white">
                 {date}
               </p>
-            </div>
+            </div>        
           </div>
 
           {/* Description */}

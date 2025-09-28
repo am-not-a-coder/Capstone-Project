@@ -25,9 +25,11 @@ const Tasks = () => {
     
     //states for the input values
     const [dueDate, setDueDate] = useState("");
-    const [criteria, setCriteria] = useState("");
     const [program, setProgram] = useState("");
     const [content, setContent] = useState("");
+    const [criteria, setCriteria] = useState("");
+    
+    const [criteriaOption, setCriteriaOption] = useState("");
 
     const [programOption, setProgramOption] = useState([]); // for the form option
     const [selectedProgram, setSelectedProgram] = useState(null);
@@ -81,11 +83,40 @@ const Tasks = () => {
                 Array.isArray(res.data.area) ? setAreaProgressList(res.data.area) : setAreaProgressList([]);
                     
             } catch(err){
-
+                console.error("Failed to fetch area", err);
             }
         }
         fetchArea();
     }, []);
+
+    // FETCH CRITERIA
+    useEffect(() => {
+        const fetchCriteria = async () => {
+            try{
+                const res = await apiGet('/api/criteria', {withCredentials: true})
+                
+                // Fix: Use the correct property name from your API response
+                Array.isArray(res.data) ? setCriteriaOption(res.data) : setCriteriaOption([]);                
+                    
+            } catch(err){
+                console.error("Failed to fetch criteria", err);
+            }
+        }
+        fetchCriteria();
+    }, []);
+
+    const [filteredCriteriaOptions, setFilteredCriteriaOptions] = useState([]);
+
+    useEffect(() => {
+        if(selectedArea && criteriaOption.length > 0) {
+            // Filter criteria based on the selected area
+            // You'll need to adjust this logic based on how your criteria relates to areas
+            // For now, showing all criteria when an area is selected
+            setFilteredCriteriaOptions(criteriaOption);
+        } else {
+            setFilteredCriteriaOptions([]);
+        }
+    }, [selectedArea, criteriaOption]);
 
     // FETCH DEADLINES
     useEffect(() => {
@@ -129,50 +160,48 @@ const Tasks = () => {
 
     // Creates the deadline
     const handleCreateDeadline = async (e) => {
-        e.preventDefault()
-        if (!isAdmin) return 
-        const formData = new FormData()
-            formData.append("program", program)
-            formData.append("area", selectedArea)
-            formData.append("due_date", dueDate)
-            formData.append("content", content)
+            e.preventDefault()
+            if (!isAdmin) return 
+            const formData = new FormData()
+                formData.append("program", program)
+                formData.append("area", selectedArea)
+                formData.append("criteriaID", criteria) // Add this line to include criteria ID
+                formData.append("due_date", dueDate)
+                formData.append("content", content)
 
-        try{
-            //create deadline api
-            const res = await apiPost('/api/deadline', formData, 
-             {withCredentials: true}) 
+            try{
+                //create deadline api
+                const res = await apiPost('/api/deadline', formData, 
+                {withCredentials: true}) 
 
-                setStatusMessage(res.data.message);
+                    setStatusMessage(res.data.message);
+                    setShowStatusModal(true);
+                    setStatusType("success");
+
+                    setSelectedArea("");
+                    setProgram("");
+                    setContent("");
+                    setCriteria("")
+                    setDueDate("");
+
+                // refetch deadline data
+                const deadlineRes = await apiGet("api/deadlines", {withCredentials: true})
+
+                    Array.isArray(deadlineRes.data.deadline) ? setDeadLines(deadlineRes.data.deadline) : setDeadLines([]);   
+                
+                // refetch event data
+                const eventRes = await apiGet("/api/events", 
+                    {withCredentials: true})
+
+                    Array.isArray(eventRes.data) ? setEvent(eventRes.data) : setEvent([]);   
+
+            }catch(err){
+                setStatusMessage("Server error. Please try again");
                 setShowStatusModal(true);
-                setStatusType("success");
-
-                setSelectedArea("");
-                setProgram("");
-                setContent("");
-                setCriteria("")
-                setDueDate("");
-
-            // refetch deadline data
-            const deadlineRes = await apiGet("api/deadlines", {withCredentials: true})
-
-                Array.isArray(deadlineRes.data.deadline) ? setDeadLines(deadlineRes.data.deadline) : setDeadLines([]);   
-            
-            // refetch event data
-            const eventRes = await apiGet("/api/events", 
-                 {withCredentials: true})
-
-                Array.isArray(eventRes.data) ? setEvent(eventRes.data) : setEvent([]);   
-            
-
-
-        }catch(err){
-            setStatusMessage("Server error. Please try again");
-            setShowStatusModal(true);
-            setStatusType("error")
-            console.log(err.res?.data || err.message)
-        }
-
-    } 
+                setStatusType("error")
+                console.log(err.res?.data || err.message)
+            }
+        } 
     
     const handleEventClick = (clickInfo) => {
 
@@ -192,20 +221,24 @@ const Tasks = () => {
     }
 
 
-    const handleViewDeadline = (selectedDeadline) => {
+    const handleViewDeadline = (selectedDeadline) => {    
+        const criteriaItem = criteriaOption.find(
+            c => c.criteriaID === selectedDeadline.criteriaID
+        );
+        
+        const criteriaName = criteriaItem ? criteriaItem.criteriaName : 'N/A';
 
         setSelectedDeadline({
             id: selectedDeadline.deadlineID,
             programName: selectedDeadline.programName,
             programCode: selectedDeadline.programCode,
             color: selectedDeadline.programColor,
+            criteriaName: criteriaName,
             areaName: selectedDeadline.areaName,
             date: selectedDeadline.due_date,
             content: selectedDeadline.content
-            
         })
         setShowDeadline(true);
-
     }
 
     const handleCloseDeadline = () =>{
@@ -227,6 +260,11 @@ const Tasks = () => {
         }
     }, [program, allAreas]);
    
+    const truncateText = (text, maxLength = 50) => {
+        if (text?.length <= maxLength) return text;
+        return text.substring(0, maxLength) + '...';
+    };
+
     
 
     return(
@@ -329,17 +367,24 @@ const Tasks = () => {
                     </select>
                     </div>
 
-
-                    {/* Select Deadline */}
+                    {/* Select Criteria */}
                     <div className="min-h-[100px] p-3 flex flex-col justify-center">
-                        <label htmlFor="due_date"
-                        className='mb-1 text-lg font-extralight'>Criteria</label>
-                        <input type="text" name="criteria" id="criteria"
+                        <label htmlFor="criteria"
+                            className='mb-1 text-lg font-extralight'>Criteria</label>
+                        <select name="criteria" id="criteria"
                             value={criteria}
                             onChange={(e)=> {setCriteria(e.target.value)}}
-                            className='p-2 font-semibold transition-all duration-500 border cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-950/50' 
-                            required/>  
+                            className='p-2 font-semibold transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-950/50'
+                            required>
+                            <option value="">Select a Criteria</option>
+                            {filteredCriteriaOptions.map((criteriaItem) => (
+                                <option key={criteriaItem.criteriaID} value={criteriaItem.criteriaID}>
+                                    {truncateText(criteriaItem.criteriaName)}
+                                </option>
+                            ))}
+                        </select>
                     </div>
+
 
                     {/* Select Criteria */}
                     <div className="min-h-[100px] p-3 flex flex-col justify-center">
@@ -399,6 +444,7 @@ const Tasks = () => {
                     programName={selectedDeadline.programName} 
                     programCode={selectedDeadline.programCode} 
                     area={selectedDeadline.areaName} 
+                    criteria={truncateText(selectedDeadline.criteriaName)}
                     date={selectedDeadline.date} 
                     color={selectedDeadline.color} 
                     content={selectedDeadline.content || 'No description'} 
