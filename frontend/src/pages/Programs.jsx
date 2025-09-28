@@ -175,7 +175,7 @@ import StatusModal from "../components/modals/StatusModal";
       if (e && e.preventDefault) e.preventDefault();
       
       // Check if program already exists
-      const existingProgram = programs.find(p => p.programCode === form.programCode && p.programName === form.programName);
+      const existingProgram = programs.find(p => p.programCode === form.programCode || p.programName === form.programName);
 
       if (existingProgram) {
         setShowStatusModal(true);
