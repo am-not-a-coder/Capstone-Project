@@ -91,6 +91,15 @@ const Institutes = () => {
         const handleCreateInstitute = async (e) => {
           e.preventDefault();
 
+          const existingInstitute = institutes.find(inst => inst.code === form.instCode || inst.name === form.instName);
+
+          if (existingInstitute) {
+            setShowStatusModal(true);
+            setStatusMessage("Institute already exists.");
+            setStatusType("error");
+            return;
+          }
+
           if (!(form.instPic instanceof File)) {
             setShowStatusModal(true);
             setStatusMessage("Please upload a logo before submitting.");
@@ -297,14 +306,6 @@ const Institutes = () => {
         const handleChange = (e) => {
           setForm({ ...form, [e.target.name]: e.target.value });
         };
-
-        // FOR FILE/LOGO UPLOAD EDIT
-        // const handleFileChange = (e) => {
-        //   const f = e.target.files && e.target.files[0];
-        //   if (f) {
-        //     setForm(prev => ({ ...prev, instPic: f }));
-        //   }
-        // };
         
     return(
         <>
