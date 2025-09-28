@@ -29,7 +29,7 @@ from sqlalchemy import cast, String, func, text
 
 
 def register_routes(app):
-                                  #AUTHENTICATION(LOGIN/LOGOUT) PAGE ROUTES 
+    # ============================================ AUTHENTICATION(LOGIN/LOGOUT) PAGE ROUTES ============================================
     
     # JWT Exception Handler
     @app.errorhandler(JWTExtendedException)
@@ -284,7 +284,7 @@ def register_routes(app):
             return jsonify({'success': False, 'error': str(e)}), 500
 
 
-                # DASHBOARD ROUTES
+    # ============================================ DASHBOARD ROUTES ============================================
 
     @app.route('/api/announcement/post', methods=["POST"])
     @jwt_required()
@@ -348,7 +348,7 @@ def register_routes(app):
 
     
 
-                 #USER PAGE ROUTES
+    # ============================================ USER PAGE ROUTES ============================================
 
     # CREATE USER
     @app.route('/api/user', methods=["POST"])
@@ -394,7 +394,7 @@ def register_routes(app):
         
         # === Handle the Profile Picture (optional) ===
         profilePicPath = None
-        if profilePic:  # ✅ Only validate and upload if provided
+        if profilePic:  # Only validate and upload if provided
             if profilePic.filename == '':
                 return jsonify({'success': False, 'message': 'No selected file'}), 400
             
@@ -427,7 +427,7 @@ def register_routes(app):
                     'details': response.text
                 }), 400
             
-            profilePicPath = f"{path}/{filename}"  # ✅ Save path if uploaded
+            profilePicPath = f"{path}/{filename}"  # Save path if uploaded
 
         # Checks if the user already exists
         if Employee.query.filter_by(employeeID=empID).first():
@@ -454,7 +454,7 @@ def register_routes(app):
         return jsonify({
             'success': True,
             'message': 'Employee created successfully!',
-            'profilePic': profilePicPath,  # ✅ Return None if no upload
+            'profilePic': profilePicPath,  # Return None if no upload
         }), 200
 
  
@@ -596,7 +596,7 @@ def register_routes(app):
 
 
 
-                                        #DATA FETCHING ROUTES
+    # ============================================ DATA FETCHING ROUTES ============================================
 
     # Gets the data count for user, programs, and institutes                                        
     @app.route('/api/count', methods=["GET"])
@@ -776,7 +776,6 @@ def register_routes(app):
             db.session.rollback()
             return jsonify({'success': False, 'message': 'Failed to update profile.'})
 
-
                                                             
     #Get the users 
     @app.route('/api/users', methods=["GET"])
@@ -819,9 +818,9 @@ def register_routes(app):
             user_list.append(user_data)
         return jsonify({"users" : user_list}), 200
 
-                    #INSTITUTES PAGE ROUTES 
+    # ============================================ INSTITUTES PAGE ROUTES ============================================
     
-    #edit institute base on institute  
+    # Edit institute base on institute
     @app.route('/api/institute/<int:instID>', methods=['PUT'])
     @jwt_required()
     def edit_institute(instID):        
@@ -1101,7 +1100,7 @@ def register_routes(app):
                 "message": f"Failed to fetch logo for {instCode}",
                 "status": response.status_code,
                 "detail": getattr(response, "text", "No response text")
-            }), response.status_code
+            }), response.status_code            
 
     # Fetch programs for the institute
     @app.route('/api/institute/programs', methods=["GET"])
@@ -1122,7 +1121,7 @@ def register_routes(app):
         return jsonify({'programs': program_list}), 200
 
     
-                                        #PROGRAM PAGE ROUTES
+    # ============================================ PROGRAM PAGE ROUTES ============================================
     
     #edit program base on program id
     @app.route('/api/program/<int:programID>', methods=['PUT'])
@@ -1325,6 +1324,9 @@ def register_routes(app):
             current_app.logger.error(f"Get user program error: {e}")
             return jsonify({'success': False, 'message': 'Failed to fetch programs'}), 500
 
+
+    # ============================================ Criteria And Area Route ============================================
+
     # Mark criteria as done or not done
     @app.route('/api/criteria/<int:criteriaID>/done', methods=["PUT"])
     def mark_criteria_done(criteriaID):
@@ -1397,7 +1399,6 @@ def register_routes(app):
         return jsonify({'success': True, 'message': 'Document Rejected!'}), 200
 
 
-
     @app.route('/api/criteria', methods=["GET"])
     def get_criteria(): 
 
@@ -1409,6 +1410,7 @@ def register_routes(app):
             criteria_data ={
                 'criteriaID': c.criteriaID,
                 'criteriaContent': c.criteriaContent,
+                'criteriaName': f"{c.criteriaID}. {c.criteriaContent}",
                 'isDone': c.isDone
             }
             results.append(criteria_data)
@@ -1463,21 +1465,30 @@ def register_routes(app):
         programID = data.get("program")
         areaID = data.get("area")
         content = data.get("content")
-        due_date = data.get("due_date") 
-
+        criteriaID = data.get("criteria") 
+        due_date = data.get("due_date")             
         
-        #creates a new deadline 
-        new_deadline = Deadline(
-            programID = programID,
-            areaID = areaID,
-            content = content,
-            due_date = due_date
-        )
+        try:
+            # Create a new deadline 
+            new_deadline = Deadline(
+                programID=programID,
+                areaID=areaID,
+                criteriaID=criteriaID,  
+                content=content,
+                due_date=due_date
+            )
 
-        db.session.add(new_deadline)
-        db.session.commit()
+            db.session.add(new_deadline)
+            db.session.commit()
 
-        return jsonify({'success': True, 'message': 'Deadline created successfully!'}), 200
+            return jsonify({'success': True, 'message': 'Deadline created successfully!'}), 200
+
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': f'Failed to create deadline: {str(e)}'}), 500
+
+
+    # ============================================ Tasks Route ============================================
     
 
     @app.route('/api/deadlines', methods=["GET"]) 
@@ -1547,7 +1558,8 @@ def register_routes(app):
         
 
 
-    # Accreditation page
+    # ============================================ Accreditation Routes ============================================
+
     @app.route('/api/accreditation', methods=["GET"])
     def get_areas():
         program_code = request.args.get('programCode')
@@ -1569,7 +1581,8 @@ def register_routes(app):
                 Document.docName,
                 Document.docType,
                 Document.docPath,
-                Document.isApproved
+                Document.isApproved,
+                Document.predicted_rating
             )
             .outerjoin(Program, Area.programID == Program.programID)
             .outerjoin(Subarea, Area.areaID == Subarea.areaID)
@@ -1614,6 +1627,7 @@ def register_routes(app):
                     'docID': row.docID,
                     'docName': row.docName,
                     'docPath': row.docPath,
+                    'predicted_rating': row.predicted_rating,
                     'isApproved': row.isApproved,
                     'rating': row.rating
                 }
@@ -1714,14 +1728,19 @@ def register_routes(app):
 
         return jsonify({'message': 'Criteria created successfully!'}), 200
     
-    # Load the embedding model for semantic searching
-    embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+    # ===== Load Models for Document Processing =====
+
+    # Model for genarating embeddings
+    embedding_model = SentenceTransformer("all-MiniLM-L6-v2") 
+    # Model for predicting document rating
+    model_path = os.path.join(os.path.dirname(__file__), "machine_learning", "xgb_best_model.pkl")
+    xgb_model = joblib.load(model_path)
+
 
     @app.route('/api/accreditation/upload', methods=["POST"])
     @jwt_required()        
-    def upload_file():
-        current_user_id = get_jwt_identity()
-        
+    def upload_file():        
+
        # ==== Get and Validate Form Data ====
         # Get form data
         data = request.form
@@ -1735,21 +1754,29 @@ def register_routes(app):
         subarea_name = data.get("subareaName")
         criteria_type = data.get("criteriaType")
         
-        # === Validate the Data ===   
-        # Check if file exists
+        # === Validate the File ===
         if not file:
             return jsonify({'success': False, 'message': 'No file provided'}), 400
-        
-        # Check if file has a valid name and extension
-        if not file.filename or '.' not in file.filename:        
-            return jsonify({'success': False, 'message': 'Invalid file name'}), 400
-        
+
+        # Make sure filename exists
+        if not getattr(file, "filename", None):
+            return jsonify({'success': False, 'message': 'Invalid file: no filename detected'}), 400
+
+        # Ensure filename has an extension
+        if '.' not in file.filename:
+            return jsonify({'success': False, 'message': 'Invalid file name (missing extension)'}), 400
+
+        # Extract extension safely
+        file_extension = file.filename.rsplit('.', 1)[-1].lower()
         allowed_extensions = {'pdf'}
-        file_extension = file.filename.rsplit('.', 1)[1].lower()
-        
-        if file_extension not in allowed_extensions:            
-            return jsonify({'success': False, 'message': 'Invalid file format. Only PDF files are allowed.'}), 400                
-        
+
+        if file_extension not in allowed_extensions:
+            return jsonify({'success': False, 'message': 'Invalid file format. Only PDF files are allowed.'}), 400
+
+        # Generate a secure filename
+        filename = secure_filename(file.filename)
+        if not filename:
+            return jsonify({'success': False, 'message': 'Invalid filename'}), 400
         
         # Get uploader info
         try:
@@ -1798,11 +1825,12 @@ def register_routes(app):
             file.save(temp_path) 
                 # Extract text then remove the file
             try:
-                extracted_text = extract_pdf(temp_path)
+                extracted_text = extract_pdf(temp_path) 
+                file_size = os.path.getsize(temp_path)                               
             finally:
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
-
+            
             # === Generate Tags === 
             tags = set(rule_based_tag(extracted_text))
             
@@ -1834,9 +1862,7 @@ def register_routes(app):
                 doc.docName = file_name
                 doc.content = extracted_text
                 doc.tags = list(tags)
-                doc.embedding = embedding,
-                doc.isApproved = None,
-                doc.approvedBy = None
+                doc.embedding = embedding            
             else:
                 # Create new doc
                 doc = Document(
@@ -1846,9 +1872,7 @@ def register_routes(app):
                     content=extracted_text,
                     employeeID=uploader.employeeID,
                     tags=list(tags),
-                    embedding=embedding,
-                    isApproved = None,
-                    approvedBy = None
+                    embedding=embedding
                 )
                 db.session.add(doc)
                 db.session.flush()  # Assign docID before linking
@@ -1872,6 +1896,43 @@ def register_routes(app):
                 {"doc_id": doc.docID}
             )
 
+            # ==== Compute Days Until Deadline ====
+            if not hasattr(criteria, "deadlines") or not criteria.deadlines:
+                days_until_deadline = 0  # fallback if no deadlines linked
+            else:
+                nearest_deadline = min(dl.due_date for dl in criteria.deadlines)
+                days_until_deadline = (nearest_deadline - datetime.utcnow().date()).days
+
+            # ===== Compute Criteria Completion Score =====
+            criteria_list = Criteria.query.filter_by(subareaID=criteria.subareaID).count()
+            completed_criteria = Criteria.query.filter_by(subareaID=criteria.subareaID, isDone=True).count()
+            criteria_completion_score = (completed_criteria / criteria_list) * 100 if criteria_list > 0 else 0
+
+            # ====== Get program ID ======
+            program = Program.query.filter_by(programCode=program_code).first()
+            programID = program.programID if program else None
+
+            # =========== Build Feature for Rating Prediction ===============
+
+            df_input = pd.DataFrame([{
+                "file_size": file_size,
+                "Criteria_Completion_Score": criteria_completion_score,
+                "Days_Until_Deadline": days_until_deadline,
+                "isApproved": False,
+                "docType": "application/pdf",
+                "programID": programID     
+            }])
+
+            emb = pd.DataFrame([embedding])
+            emb.columns = [f"emb_{i}" for i in range(len(emb.columns))]
+
+            X_new = pd.concat([df_input, emb], axis=1)
+
+            # Predit the rating
+            predicted_rating = float(xgb_model.predict(X_new)[0])
+
+            doc.predicted_rating = predicted_rating
+            
             # Final commit
             db.session.commit()
 
@@ -1879,7 +1940,8 @@ def register_routes(app):
                 'success': True, 
                 'message': 'File uploaded successfully!', 
                 'filePath': f"{normalized_path}/{filename}",
-                'status': response.status_code, 
+                'predict_rating': round(predicted_rating, 2),
+                'status': response.status_code 
             }), 200
             
         except Exception as e:
@@ -1887,6 +1949,7 @@ def register_routes(app):
             return jsonify({'success': False, 'message': f'Failed to upload file: {str(e)}'}), 400
         
 
+    # Preview file
     @app.route('/api/accreditation/preview/<filename>', methods=["GET"])   
     @jwt_required()   
     def preview_file(filename):                       
@@ -1919,49 +1982,9 @@ def register_routes(app):
             }), response.status_code    
 
 
-    model_path = os.path.join(os.path.dirname(__file__), "machine_learning", "xgb_best_model.pkl")
-    xgb_model = joblib.load(model_path)
-
-    @app.route('/api/accreditation/predict_rating', methods=["POST"])
-    def predict_rating():
-        try:
-            data = request.get_json()
-            # {
-            #   "file_size": 123456,
-            #   "Criteria_Completion_Score": 7,
-            #   "Days_Until_Deadline": 10,
-            #   "isApproved": true,
-            #   "docType": "application/pdf",
-            #   "programID": 2,
-            #   "embedding": [-0.24, -0.28, -0.31, ...]
-            # }
-            
-            # Convert to Data Frame
-
-            df_input = pd.DataFrame([data])
-        
-            emb = pd.DataFrame([df_input["embedding"].iloc[0]])
-            emb.columns = [f"emb_{i}" for i in range(len(emb.columns))]
-
-
-            X_new = pd.concat([
-                df_input[["file_size", "Criteria_Completion_Score", "Days_Until_Deadline", 
-                "isApproved", "docType", "programID"]], emb                
-            ], axis=1
-            )
-
-            # Predict
-
-            prediction = xgb_model.predict(X_new)[0]
-
-            return jsonify({'success': True, "predicted_rating": round(float(prediction), 2)}), 200
-
-        except Exception as e:
-            return jsonify({'success': False, 'message': f'Failed to predict rating: {str(e)}'}), 400
-
 
        
-    # === Documents Section ===
+    # ============================================ Documents Routes ============================================
 
     # display all the documents inside nextcloud repo
     @app.route('/api/documents', methods=["GET"])
@@ -2280,7 +2303,8 @@ def register_routes(app):
         return jsonify(output)
 
 
-    # === Rate criteria ===
+    # ============================================ Rating Routes ============================================
+    
     @app.route('/api/accreditation/rate/criteria', methods=["POST"])
     @jwt_required()
     def save_rating():
@@ -2314,7 +2338,8 @@ def register_routes(app):
                 Criteria.rating,
                 Document.docID,
                 Document.docName,
-                Document.docPath
+                Document.docPath,
+                Document.predicted_rating
             )
             .outerjoin(Document, Criteria.docID == Document.docID)
             .join(Subarea, Criteria.subareaID == Subarea.subareaID)
@@ -2337,6 +2362,7 @@ def register_routes(app):
                 "docID": c.docID,
                 "docName": c.docName,
                 "docPath": c.docPath,
+                'predicted_rating': c.predicted_rating,
                 "rating": c.rating
             }
 
@@ -2422,6 +2448,9 @@ def register_routes(app):
         db.session.commit()
         return jsonify({'success': True, 'message': 'Area rating saved!' }), 200
 
+
+
+    # ============================================ Messages Routes ============================================
 
 
     @app.route('/api/users/online-status', methods=['GET'])

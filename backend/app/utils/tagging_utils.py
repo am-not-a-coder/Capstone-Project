@@ -80,27 +80,26 @@ TAGS = {
 
 # Depends on the list of tags
 def rule_based_tag(text: str) -> List[str]:
-    found_tags = set()
+    if not text:
+        return []
 
+    found_tags = set()
     for tag, keywords in TAGS.items():
         for kw in keywords: 
             if kw.lower() in text.lower():
                 found_tags.add(tag)
             break
 
-    return found_tags
+    return list(found_tags)
+
 
 
 def extract_global_tfid_tags(docs: List[str], doc_index: int, top_n: int = 5) -> List[List[str]]:
-    """
-    Generate TF-IDF tags for all documents at once.
-    Returns: List of tag-lists (one per document).
-    """
-    if not docs:
+    if not docs or not docs[doc_index]:
         return []
 
     vectorizer = TfidfVectorizer(stop_words='english', max_features=50)
-    X = vectorizer.fit_transform(docs)
+    X = vectorizer.fit_transform([doc or "" for doc in docs])
     features = vectorizer.get_feature_names_out()
 
     tags_per_doc = []

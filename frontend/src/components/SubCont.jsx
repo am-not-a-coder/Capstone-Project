@@ -151,24 +151,26 @@ const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate,
             {/* Criteria Rendering */}
             {items.length > 0 ? items.map((item, index) => (
                 <div key={index} 
-                className='flex flex-row justify-between gap-3 p-3 mb-2 ml-5 transition-all duration-300 border shadow-md cursor-default rounded-2xl border-neutral-400 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600'>
-                    <span className='break-words text-[15px] max-w-[65%] whitespace-pre-wrap'>{item.content}</span>
+                className='relative flex flex-row justify-between gap-3 p-3 py-10 mb-2 ml-5 transition-all duration-300 border shadow-md cursor-default rounded-2xl border-neutral-400 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600'>
+                    <span className='break-words align-middle text-[15px] max-w-[65%] whitespace-pre-wrap'>{item.content}</span>
 
                     <div className='flex flex-col items-center justify-center'>
                         <h2 className='font-semibold'>Attached File</h2>
                         {item.docName ? (
                             <button
-                            onClick={() =>{onFilePreview(item.docName, item.docPath)}}
-                            className='text-sm font-light text-center cursor-pointer hover:underline'>{item.docName}</button>
+                                onClick={() =>{onFilePreview(item.docName, item.docPath)}}
+                                className='text-sm font-light text-center cursor-pointer hover:underline'>{item.docName}</button>
 
-                        ) : (
-                            <span className='text-sm text-gray-500'>No file attached</span>
-                        )
+                            ) : (
+                                <span className='text-sm text-gray-500'>No file attached</span>
+                            )
                         }
                         
                     </div>
+                        <span className='absolute text-sm italic text-gray-500 bottom-2 left-3 dark:text-gray-300'>Area ID: {item.criteriaID}</span>
+                        <h1 className='absolute text-sm italic text-gray-500 bottom-2 right-5 dark:text-gray-300'>Predicted rating: {item.predicted_rating?.toFixed(1)}</h1>
 
-                    <div className='flex items-center justify-between gap-5 mr-3 relative'>
+                    <div className='relative flex items-center justify-between gap-5 mr-3'>
                         {isAdmin ? (
                            <>
                                 <FontAwesomeIcon                     
@@ -183,14 +185,14 @@ const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate,
                                 {showApprove === item.criteriaID && (
                                     <div
                                     ref={approveRef}
-                                    className="z-50 flex flex-row gap-5 absolute -top-5 right-5 p-5 rounded-xl border-neutral-400 shadow-xl bg-gray-200/10 backdrop-blur-sm">
+                                    className="absolute z-50 flex flex-row gap-5 p-5 shadow-xl -top-5 right-5 rounded-xl border-neutral-400 bg-gray-200/10 backdrop-blur-sm">
                                         <button 
                                             onClick={() => {
                                                 handleApprove(item.docID);
                                                 console.log(`Approved document ${item.docID}`);
                                                 closeApproveModal();
                                             }}
-                                            className="w-25 rounded-xl p-3 bg-gradient-to-br from-emerald-600 to-emerald-800 hover:from-emerald-400 hover:to-emerald-700 dark:from-emerald-600 font-semibold text-gray-200"
+                                            className="p-3 font-semibold text-gray-200 w-25 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-800 hover:from-emerald-400 hover:to-emerald-700 dark:from-emerald-600"
                                         >
                                             Approve
                                         </button>
@@ -200,7 +202,7 @@ const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate,
                                                 console.log(`Rejected document ${item.docID}`);
                                                 closeApproveModal();
                                             }}
-                                            className='w-25 rounded-xl p-3 bg-gradient-to-br from-red-500 to-red-800 hover:from-red-400 hover:to-red-700 dark:from-red-600 dark:to-red-800 font-semibold text-gray-200'
+                                            className='p-3 font-semibold text-gray-200 w-25 rounded-xl bg-gradient-to-br from-red-500 to-red-800 hover:from-red-400 hover:to-red-700 dark:from-red-600 dark:to-red-800'
                                         >
                                             Reject
                                         </button>

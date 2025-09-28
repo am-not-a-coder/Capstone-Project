@@ -25,6 +25,7 @@ const Tasks = () => {
     
     //states for the input values
     const [dueDate, setDueDate] = useState("");
+    const [criteria, setCriteria] = useState("");
     const [program, setProgram] = useState("");
     const [content, setContent] = useState("");
 
@@ -148,6 +149,7 @@ const Tasks = () => {
                 setSelectedArea("");
                 setProgram("");
                 setContent("");
+                setCriteria("")
                 setDueDate("");
 
             // refetch deadline data
@@ -276,7 +278,7 @@ const Tasks = () => {
     
     { isAdmin &&(<div className="col-span-2 transition-all duration-500 dark:text-white">
         
-            <div className="col-span-2 pt-3 min-h-[100px] border border-neutral-300 rounded-md transition-all duration-500 inset-shadow-sm inset-shadow-gray-400 dark:shadow-sm dark:shadow-zuccini-900 dark:bg-gray-900">
+            <div className="relative col-span-2 pt-3 px-3 min-h-[100px] border border-neutral-300 rounded-md transition-all duration-500 inset-shadow-sm inset-shadow-gray-400 dark:shadow-sm dark:shadow-zuccini-900 dark:bg-gray-900">
                 <h1 className="mx-3 my-1 font-medium text-md">
                     <FontAwesomeIcon icon={faCalendarPlus} className="mr-2" />
                     Create Submission Deadlines
@@ -331,6 +333,17 @@ const Tasks = () => {
                     {/* Select Deadline */}
                     <div className="min-h-[100px] p-3 flex flex-col justify-center">
                         <label htmlFor="due_date"
+                        className='mb-1 text-lg font-extralight'>Criteria</label>
+                        <input type="text" name="criteria" id="criteria"
+                            value={criteria}
+                            onChange={(e)=> {setCriteria(e.target.value)}}
+                            className='p-2 font-semibold transition-all duration-500 border cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-950/50' 
+                            required/>  
+                    </div>
+
+                    {/* Select Criteria */}
+                    <div className="min-h-[100px] p-3 flex flex-col justify-center">
+                        <label htmlFor="due_date"
                         className='mb-1 text-lg font-extralight'>Deadline</label>
                         <input type="date" name="due_date" id="due_date"
                             value={dueDate}
@@ -344,7 +357,7 @@ const Tasks = () => {
                     <input 
                     type="submit" 
                     value="Create Deadline"
-                    className='px-6 py-4 font-semibold transition-all duration-300 cursor-pointer place-self-center rounded-xl bg-zuccini-600 hover:bg-zuccini-800 active:bg-zuccini-700 text-neutral-100'
+                    className='absolute px-6 py-2 font-semibold text-gray-600 transition-all duration-500 border-gray-500 shadow-xl cursor-pointer from-gray-300/50 via-gray-200 to-gray-400/50 dark:text-gray-200 hover:text-gray-200 top-3 right-3 place-self-center rounded-xl bg-gradient-to-br hover:from-zuccini-400 hover:via-zuccini-500 hover:to-zuccini-700'
                     />
                     <div className='flex flex-col col-span-4 px-3 py-3 '>
                         <label htmlFor="content"
