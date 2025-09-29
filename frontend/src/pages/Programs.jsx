@@ -9,7 +9,7 @@ import ProgramCard from "../components/ProgramCard";
 import CreateCard from "../components/CreateCard";
 import CreateForm from "../components/CreateForm";
 import { useState, useEffect, useCallback } from "react";
-import { apiGet, apiGetBlob, apiPut } from '../utils/api_utils';
+import { apiGet, apiGetBlob, apiPut, apiPost, apiDelete } from '../utils/api_utils';
 import { getCurrentUser } from '../utils/auth_utils';
 import AreaCont from "../components/AreaCont";
 import SubCont from "../components/SubCont";
@@ -20,14 +20,17 @@ import "@cyntler/react-doc-viewer/dist/index.css";
 import "../../index.css"
 import { adminHelper } from '../utils/auth_utils';
 import { CardSkeleton } from '../components/Skeletons';
+import StatusModal from "../components/modals/StatusModal";
 
   const Programs = () => {
     //admin
     const isAdmin = adminHelper()
     // use state function
+  const [institutes, setInstitutes] = useState([]);
   const [programs, setPrograms] = useState([]);
   const [employees, setEmployees] = useState([]); 
   const [areas, setAreas] = useState([]);
+  const [instituteOption, setInstituteOption] = useState([]);
   const [subareas, setSubareas] = useState([]);
   const [criteria, setCriteria] = useState([]);
 
@@ -40,6 +43,10 @@ import { CardSkeleton } from '../components/Skeletons';
   const [showWord, setShowWord] = useState(false);
 
   const [programLoading, setProgramLoading] = useState(false);
+  
+  const [showStatusModal, setShowStatusModal] = useState(false); // shows the status modal
+  const [statusMessage, setStatusMessage] = useState(null); // status message
+  const [statusType, setStatusType] = useState("success"); // status type (success/error)
 
   //Preview state functions
   const [docs, setDocs] = useState([]);
@@ -48,30 +55,51 @@ import { CardSkeleton } from '../components/Skeletons';
   const [error, setError] = useState(null);
   const [docViewerKey, setDocViewerKey] = useState(0); 
 
+  // Fetch programs
+  const fetchPrograms = async () => {
+    setProgramLoading(true)
+
+    try {
+      const response = await apiGet(`/api/program`);
+
+      if (response?.success || response?.data?.success) {
+        const programsArr = response.data?.programs ?? response.programs ?? [];
+
+        Array.isArray(programsArr) ? setPrograms(programsArr) : setPrograms([]);
+      } else {
+        console.error('Failed to fetch the programs:', response.error || response);
+        setPrograms([]);
+      }
+
+    } catch (err) {
+      console.error("Error occured when fetching programs", err);
+      setPrograms([]);
+
+    } finally {
+      setProgramLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchProgram = async () => {
-      setProgramLoading(true)
-      try {
-        const response = await apiGet('/api/program');
+    fetchPrograms();
+  }, []);
 
-            if (response.success) {
-              Array.isArray(response.data.programs) ? setPrograms(response.data.programs) : setPrograms([]);
-            } else {
-              console.error('Failed to fetch programs:', response.error);
-              setPrograms([]); // Set empty array on error
-            }
-            
-
-        } catch (err){
-          console.error("Error occurred when fetching programs", err)
-
-        } finally {
-          setProgramLoading(false);
+    // Fetch institutes for Institute dropdown selection
+    useEffect(() => {
+      const fetchInstitutes = async () => {
+        try {
+          const response = await apiGet('/api/institute');
+          
+          Array.isArray(response.data.institutes) ? setInstitutes(response.data.institutes) : setInstitutes([]);
+          
+        } catch (err) {
+          console.error("Unexpected error fetching institutes", err);
         }
       }
-        fetchProgram()
+      fetchInstitutes();
     }, []);
 
+    // Fetch employees for program dean dropdown selection
     useEffect(() => {
       const fetchEmployees = async () => {
         try {
@@ -90,6 +118,27 @@ import { CardSkeleton } from '../components/Skeletons';
         }
       };
       fetchEmployees();
+    }, []); 
+
+    useEffect(() => {
+      const fetchInstitutes = async () => {
+        try {
+         
+          const response = await apiGet('/api/institute');
+          
+          if (response.success) {
+          Array.isArray(response.data.institutes) ? setInstituteOption(response.data.institutes) : setInstituteOption([]);
+          console.log(response.data)
+          } else {
+            console.error("Error fetching institutes:", response.error);
+            setInstituteOption([]);
+          }
+        } catch (err) {
+          console.error("Unexpected error fetching institutes", err);
+          setInstituteOption([]);
+        }
+      };
+      fetchInstitutes();
     }, []); 
 
         
@@ -133,14 +182,167 @@ import { CardSkeleton } from '../components/Skeletons';
         
         
 
-    const refreshAreas = async (programCode) => {
+    const refreshAreas = async (programCode) => {      
       try {
-         const response = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`, {withCredentials: true})
+        const response = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`, {withCredentials: true})
         Array.isArray(response.data) ? setAreas(response.data) : setAreas([]);
       } catch(err) {
         console.error('Error refreshing areas:', err);
       }
     }
+
+    // Function to handle create program
+    const handleCreateProgram = async (e) => {
+      // If called from handleSubmit, pass event. otherwise guard
+      if (e && e.preventDefault) e.preventDefault();
+      
+      // Check if program already exists
+      const existingProgram = programs.find(p => p.programCode === form.programCode || p.programName === form.programName);
+
+      if (existingProgram) {
+        setShowStatusModal(true);
+        setStatusMessage("Program already exists.");
+        setStatusType("error");
+        return;
+      }
+
+      // payload form fields
+      const payload = {
+        programCode: form.programCode,
+        programName: form.programName,
+        programColor: form.programColor,
+        employeeID: form.employeeID || null, // dean employeeID
+        instID: form.instID || null // assocaited institute id
+      };
+
+      try {
+        // send POST request
+        const response = await apiPost(`/api/program`, payload);
+
+        // Handle different possible shapes returned by api helper
+        const success = !!(response?.success || response?.data?.success);
+        const message = response?.message || response?.data?.message || 'Program Created Successfully!';
+
+        if (success) {
+          setShowStatusModal(true);
+          setStatusMessage(message);
+          setStatusType("success");
+
+          // Reset form + reload
+          setShowForm(false);
+          setForm({ code: "", name: "", color: "", programDean: "", instID: "" });
+          setActiveModify(null);
+          setEditIndex(null);
+
+          fetchPrograms();
+        } else {
+          setShowStatusModal(true);
+          setStatusMessage("Failed to create program. Program already exists.");
+          setStatusType("error");
+        }
+
+      } catch (err) {
+        console.error("Error creating program:", err);
+        setShowStatusModal(true);
+        setStatusMessage("Server error. Please try again.")
+        setStatusType("error");
+      }
+    };
+
+    // Function to handle edit program
+    const handleEditProgram = async (e) => {
+      e.preventDefault();
+
+      // payload
+      const payload = {
+        programCode: form.programCode,
+        programName: form.programName,
+        programColor: form.programColor,
+        employeeID: form.employeeID || null,
+        instID: form.instID || null
+      };
+
+      try {
+        // Get programID of program being edited
+        const programId = programs[editIndex].programID;
+
+        // Send PUT request
+        const response = await apiPut(`/api/program/${programId}`, payload);
+
+        const success = !!(response?.success || response?.data?.success);
+        const message = response?.message || response?.data?.message || 'Program updated successfully!'
+
+        if (success) {
+          setShowStatusModal(true);
+          setStatusMessage(message);
+          setStatusType("success");
+
+          // Reset form
+          setShowForm(false);
+          setForm({ programCode: "", programName: "", instID: "", employeeID: "", programColor: "#3B82F6" })
+          setEditIndex(null);
+          setActiveModify(null);
+          
+          fetchPrograms();
+
+        } else {
+          setShowStatusModal(true);
+          setStatusMessage(message || "Failed to update program.");
+          setStatusType("error");
+        }
+
+      } catch (err) {
+        console.error("Error updating program:", err);
+        setShowStatusModal(true);
+        setStatusMessage("Server error. Please try again.");
+        setStatusType("error");
+      }
+    };
+
+    // Function to Delete a program
+    const handleDeleteProgram = async (e) => {
+      e.preventDefault();
+      // no program selected
+      if (editIndex === null) return; 
+
+      try {
+        const programId = programs[editIndex].programID;
+
+        // Send DELETE request
+        const response = await apiDelete(`/api/program/${programId}`);
+
+        // Response handling
+        const success = !!response?.success;
+        const error = response?.error;
+        const reason = response?.reason;
+        const message = response?.message || (success ? 'Program deleted successfully' : error);
+
+        if (success) {
+          setShowStatusModal(true);
+          setStatusMessage(message);
+          setStatusType("success");
+
+          // Reset form + reload
+          setShowForm(false);
+          setEditIndex(null);
+          setActiveModify(null);
+
+          fetchPrograms();
+
+        } else {
+          // Could not delete due to existing dependencies
+          setShowStatusModal(true);
+          setStatusMessage("Cannot delete program. It may have associated institute or other dependencies.");
+          setStatusType("error");
+        }
+
+      } catch (err) {
+        console.error("Error deleting program:", err);
+        setShowStatusModal(true);
+        setStatusMessage("Server error. Please try again.");
+        setStatusType("error");
+      }
+    };
 
     function handleModify(mode) {
       setActiveModify((prev) => (prev === mode ? null : mode));
@@ -162,49 +364,36 @@ import { CardSkeleton } from '../components/Skeletons';
     }
 
   function handleDelete(e) {
-      e.preventDefault();
-      if (editIndex !== null) {
-          setPrograms(programs.filter((_, idx) => idx != editIndex));
-          setShowForm(false);
-          setEditIndex(null);
-          setActiveModify(null);
-      }
-  }
+      handleDeleteProgram(e);
+  };
 
   const handleSubmit = (e) => {
       e.preventDefault();
+
         if (activeModify === "edit" && editIndex !== null) {
           // Edit mode
-          const updated = [...programs];
-        updated[editIndex] = { ...form };
-        setPrograms(updated);
+          handleEditProgram(e);
         } else {
           // Add mode
-        setPrograms([
-          ...programs,
-          {
-            code: form.code,
-            name: form.name,
-            color: form.color,
-            programDean: form.programDean,
-          },
-        ]);
-      }
-        setShowForm(false);
-      setForm({ code: "", name: "", color: "", programDean: "" });
-        setEditIndex(null);
-        setActiveModify(null);
+          handleCreateProgram(e);
+        }
     };
 
+    // form state
     const [form, setForm] = useState({
-      code: "",
-      name: "",
-      color: "",
-      programDean: "",
+      programCode: "",
+      programName: "",
+      instID: "",
+      employeeID: "",
+      programColor: "#3B82F6"
   });
 
   const handleChange = useCallback((e) => {
-      setForm({...form, [e.target.name]: e.target.value});
+    const { name, value } = e.target;
+    setForm(prevForm => ({
+      ...prevForm,
+      [name]: value
+    }));
   }, []);
 
   const [visible, setVisible] = useState("programs");
@@ -260,17 +449,18 @@ import { CardSkeleton } from '../components/Skeletons';
 
   const handleFilePreview = useCallback(async (docName, docPath) => {
     try {
-      console.log('Preview requested for:', docName, docPath);
-      
       setIsLoading(true);
       setError(null);
-      setDocs([]); // Clear previous documents
-      setShowPreview(true); 
+      setDocs([]);
+      setShowPreview(true);
 
-      const blob = await apiGetBlob(`/api/accreditation/preview/${encodeURIComponent(docName)}`);
+      const blobRes = await apiGetBlob(`/api/accreditation/preview/${encodeURIComponent(docName)}`);
 
-      // Construct the full URL
-      const fileURL = URL.createObjectURL(blob);
+      if (!blobRes.success || !(blobRes.data instanceof Blob)) {
+        throw new Error('File preview failed or file is not a valid Blob.');
+      }
+
+      const fileURL = URL.createObjectURL(blobRes.data);
 
       // Helper function to determine file type from filename
       const getFileType = (fileName) => {
@@ -338,166 +528,177 @@ import { CardSkeleton } from '../components/Skeletons';
 
     return (
       <>
-        <div className="relative flex flex-row min-h-screen p-3 px-5 border rounded-[20px] border-neutral-300 dark:bg-gray-900 inset-shadow-sm inset-shadow-gray-400 dark:inset-shadow-gray-500 dark:shadow-md dark:shadow-zuccini-800">
-          
-          {/* Main Content */}
-          <div className="relative flex flex-col w-full pt-2">
-            {/* Navigation route */}
-            <div className='flex flex-row gap-3 mb-5'>             
-              <FontAwesomeIcon icon={faHouse}
-              onClick={() => {backToPrograms()}}
-              className={`${visible === "programs" 
-              ? 'text-gray-500 inset-shadow-sm inset-shadow-gray-400 bg-gray-300 dark:inset-shadow-gray-800 dark:bg-gray-800/50 dark:text-gray-400' 
-              : 'cursor-pointer text-gray-500 bg-gray-200 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 shadow-md dark:inset-shadow-sm dark:inset-shadow-gray-400 dark:bg-gray-950/50'
-          } p-4 text-xl transition-all duration-200 border border-neutral-300 rounded-xl dark:border-neutral-500`}
-              />             
-            
-            {/* Breadcrumbs */}
-            <div className='w-full p-3 font-semibold bg-neutral-300/90 rounded-xl border-neutral-300 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50'>
-              <nav className="flex items-center overflow-hidden font-semibold text-gray-700 gap-x-2 text-md lg:text-lg dark:text-white">
+      {/* Status Modal */}
+          {showStatusModal && (
+            <StatusModal 
+              message={statusMessage}
+              type={statusType}
+              showModal={showStatusModal}
+              onClick={() => setShowStatusModal(false)}
+            />
+          )}
+
+            <div className="relative flex flex-row min-h-screen p-3 px-5 border rounded-[20px] border-neutral-300 dark:bg-gray-900 inset-shadow-sm inset-shadow-gray-400 dark:inset-shadow-gray-500 dark:shadow-md dark:shadow-zuccini-800">
+              
+              {/* Main Content */}
+              <div className="relative flex flex-col w-full pt-2">
+                {/* Navigation route */}
+                <div className='flex flex-row gap-3 mb-5'>             
+                  <FontAwesomeIcon icon={faHouse}
+                  onClick={() => {backToPrograms()}}
+                  className={`${visible === "programs" 
+                  ? 'text-gray-500 inset-shadow-sm inset-shadow-gray-400 bg-gray-300 dark:inset-shadow-gray-800 dark:bg-gray-800/50 dark:text-gray-400' 
+                  : 'cursor-pointer text-gray-500 bg-gray-200 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 shadow-md dark:inset-shadow-sm dark:inset-shadow-gray-400 dark:bg-gray-950/50'
+              } p-4 text-xl transition-all duration-200 border border-neutral-300 rounded-xl dark:border-neutral-500`}
+                  />             
                 
-                {/* Programs Breadcrumb */}
-                <span 
-                  onClick={() => backToPrograms()} 
-                  className="flex items-center flex-shrink-0 transition-all cursor-pointer duration-250 hover:text-zuccini-500"
-                  title="Programs"
-                >
-                  Programs
-                </span>
-                
-                {/* Program Name Breadcrumb */}
-                {selectedProgram && (
-                  <>
-                    <span className="flex-shrink-0 text-gray-400 dark:text-gray-500">/</span>
+                {/* Breadcrumbs */}
+                <div className='w-full p-3 font-semibold bg-neutral-300/90 rounded-xl border-neutral-300 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50'>
+                  <nav className="flex items-center overflow-hidden font-semibold text-gray-700 gap-x-2 text-md lg:text-lg dark:text-white">
+                    
+                    {/* Programs Breadcrumb */}
                     <span 
-                      onClick={() => {
-                        // Stay in areas view but clear area/subarea selections
-                        setSelectedArea(null);
-                        setSelectedSubarea(null);
-                        setExpandedAreaIndex(null);
-                        setShowPreview(false);
-                      }}
-                      className="flex items-center min-w-0 truncate transition-all duration-300 cursor-pointer hover:text-zuccini-500"
-                      title={selectedProgram.programName}
+                      onClick={() => backToPrograms()} 
+                      className="flex items-center flex-shrink-0 transition-all cursor-pointer duration-250 hover:text-zuccini-500"
+                      title="Programs"
                     >
-                      <span className="truncate">
-                        {selectedProgram.programName.length > 25 
-                          ? `${selectedProgram.programName.substring(0, 25)}...` 
-                          : selectedProgram.programName
-                        }
-                      </span>
+                      Programs
                     </span>
-                  </>
-                )}
-                
-                {/* Area Name Breadcrumb */}
-                {selectedArea && (
-                  <>
-                    <span className="flex-shrink-0 text-gray-400 dark:text-gray-500">/</span>
-                    <span 
-                      onClick={() => {        
-                        setSelectedSubarea(null);
-                        setShowPreview(false);            
-                      }}
-                      className="flex items-center min-w-0 truncate transition-all duration-300 cursor-pointer hover:text-zuccini-500"
-                      title={selectedArea.areaName}
+                    
+                    {/* Program Name Breadcrumb */}
+                    {selectedProgram && (
+                      <>
+                        <span className="flex-shrink-0 text-gray-400 dark:text-gray-500">/</span>
+                        <span 
+                          onClick={() => {
+                            // Stay in areas view but clear area/subarea selections
+                            setSelectedArea(null);
+                            setSelectedSubarea(null);
+                            setExpandedAreaIndex(null);
+                            setShowPreview(false);
+                          }}
+                          className="flex items-center min-w-0 truncate transition-all duration-300 cursor-pointer hover:text-zuccini-500"
+                          title={selectedProgram.programName}
+                        >
+                          <span className="truncate">
+                            {selectedProgram.programName.length > 25 
+                              ? `${selectedProgram.programName.substring(0, 25)}...` 
+                              : selectedProgram.programName
+                            }
+                          </span>
+                        </span>
+                      </>
+                    )}
+                    
+                    {/* Area Name Breadcrumb */}
+                    {selectedArea && (
+                      <>
+                        <span className="flex-shrink-0 text-gray-400 dark:text-gray-500">/</span>
+                        <span 
+                          onClick={() => {        
+                            setSelectedSubarea(null);
+                            setShowPreview(false);            
+                          }}
+                          className="flex items-center min-w-0 truncate transition-all duration-300 cursor-pointer hover:text-zuccini-500"
+                          title={selectedArea.areaName}
+                        >
+                          <span className="truncate">
+                            {selectedArea.areaName.length > 20 
+                              ? `${selectedArea.areaName.substring(0, 20)}...` 
+                              : selectedArea.areaName
+                            }
+                          </span>
+                        </span>
+                      </>
+                    )}
+                    
+                    {/* Subarea Name Breadcrumb */}
+                    {selectedSubarea && (
+                      <>
+                        <span className="flex-shrink-0 text-gray-400 dark:text-gray-500">/</span>
+                        <span 
+                          className="flex items-center min-w-0 truncate transition-all duration-200 hover:text-zuccini-500 text-zuccini-600 dark:text-zuccini-400"
+                          title={selectedSubarea.subareaName}
+                        >
+                          <span className="truncate">
+                            {selectedSubarea.subareaName.length > 20 
+                              ? `${selectedSubarea.subareaName.substring(0, 20)}...` 
+                              : selectedSubarea.subareaName
+                            }
+                          </span>
+                        </span>
+                      </>
+                    )}
+                    
+                  </nav>
+                </div>
+                { isAdmin && visible !== "programs" && (
+                  <button onMouseEnter={() => setShowWord(true)}
+                    onMouseLeave={() => setShowWord(false)}
+                    onClick={() => setShowCreateModal(true)}
+                    className={`p-3 px-4 text-xl flex items-center transition-all duration-300 cursor-pointer rounded-xl text-gray-500 bg-gray-200 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 shadow-md border-neutral-700 dark:border-neutral-500 dark:text-gray-200 dark:inset-shadow-sm dark:inset-shadow-gray-400  dark:bg-gray-950/50`}
                     >
-                      <span className="truncate">
-                        {selectedArea.areaName.length > 20 
-                          ? `${selectedArea.areaName.substring(0, 20)}...` 
-                          : selectedArea.areaName
-                        }
-                      </span>
-                    </span>
-                  </>
+                      
+                      <span
+                        className={`transition-all duration-500 overflow-hidden whitespace-nowrap ${ showWord ? "opacity-100 max-w-[200px] mr-2" : "opacity-0 max-w-0 mr-0"}`}
+                      >
+                        Create</span>
+                      <FontAwesomeIcon icon={faPlus} className='z-10'/>
+                  </button>)}
+                {showCreateModal && (
+                  <CreateModal 
+                    onCreate={refreshAreas} 
+                    setShowCreateModal={setShowCreateModal} 
+                    onClick={() => setShowCreateModal(false)}
+                  />
                 )}
-                
-                {/* Subarea Name Breadcrumb */}
-                {selectedSubarea && (
-                  <>
-                    <span className="flex-shrink-0 text-gray-400 dark:text-gray-500">/</span>
-                    <span 
-                      className="flex items-center min-w-0 truncate transition-all duration-200 hover:text-zuccini-500 text-zuccini-600 dark:text-zuccini-400"
-                      title={selectedSubarea.subareaName}
-                    >
-                      <span className="truncate">
-                        {selectedSubarea.subareaName.length > 20 
-                          ? `${selectedSubarea.subareaName.substring(0, 20)}...` 
-                          : selectedSubarea.subareaName
-                        }
-                      </span>
-                    </span>
-                  </>
-                )}
-                
-              </nav>
-            </div>
-            { isAdmin && visible !== "programs" && (
-              <button onMouseEnter={() => setShowWord(true)}
-                onMouseLeave={() => setShowWord(false)}
-                onClick={() => setShowCreateModal(true)}
-                className={`p-3 px-4 text-xl flex items-center transition-all duration-300 cursor-pointer rounded-xl text-gray-500 bg-gray-200 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 shadow-md border-neutral-700 dark:border-neutral-500 dark:text-gray-200 dark:inset-shadow-sm dark:inset-shadow-gray-400  dark:bg-gray-950/50`}
-                >
+                </div>
+
+                {/* Content Area */}
+                <div className="flex flex-row flex-1 gap-4">
                   
-                  <span
-                    className={`transition-all duration-500 overflow-hidden whitespace-nowrap ${ showWord ? "opacity-100 max-w-[200px] mr-2" : "opacity-0 max-w-0 mr-0"}`}
-                  >
-                    Create</span>
-                  <FontAwesomeIcon icon={faPlus} className='z-10'/>
-              </button>)}
-            {showCreateModal && (
-              <CreateModal 
-                onCreate={refreshAreas} 
-                setShowCreateModal={setShowCreateModal} 
-                onClick={() => setShowCreateModal(false)}
-              />
-            )}
-            </div>
+                  {/* Programs/Areas */}
+                  <div className={`flex flex-col transition-all duration-500 ${showPreview ? 'w-1/2' : 'w-full'}`}>
+                    
+                    {/* Program Cards Section */}
+                    <div className={`${visible == "programs" ? 'block' : 'hidden'} flex flex-wrap gap-4`}>
+                { isAdmin && (<CreateCard form={form} handleChange={handleChange} setShowForm={setShowForm} title="Program" />)}
+                  {programLoading ? (
+                    <>
+                      <CardSkeleton />
+                      <CardSkeleton />                                    
+                      <CardSkeleton />                                    
+                    </>
+                    ) : (              
+                    <>
+                      {programs.map(program=> (
+                            <ProgramCard 
+                              program={program} 
+                              key={program.programID} 
+                              onClick={()=> visibleArea(program)}                           
+                            />
+                          ))}
+                    </>
+                  )}
+                  
+                        </div>
 
-            {/* Content Area */}
-            <div className="flex flex-row flex-1 gap-4">
-              
-              {/* Programs/Areas */}
-              <div className={`flex flex-col transition-all duration-500 ${showPreview ? 'w-1/2' : 'w-full'}`}>
-                
-                {/* Program Cards Section */}
-                <div className={`${visible == "programs" ? 'block' : 'hidden'} flex flex-wrap gap-4`}>
-            { isAdmin && (<CreateCard form={form} handleChange={handleChange} setShowForm={setShowForm} />)}
-              {programLoading ? (
-                <>
-                  <CardSkeleton />
-                  <CardSkeleton />                                    
-                </>
-                ) : (              
-                <>
-                  {programs.map(program=> (
-                        <ProgramCard 
-                          program={program} 
-                          key={program.programID} 
-                          onClick={()=> visibleArea(program)}                           
-                        />
-                      ))}
-                </>
-              )}
-              
-                    </div>
+                        {/* Areas Section */}
+                        {selectedProgram && visible === "areas" && (
+                          <div className="flex flex-col w-full overflow-auto">
+                            <div className="w-full p-2 text-gray-700 rounded-xl">
+                              {areas.sort((a, b) => a.areaID - b.areaID).map((area) => {
+                                const allCriteria = Array.isArray(area.subareas)
+                                  ? area.subareas.flatMap(sub => [
+                                      ...(sub.criteria?.inputs || []),
+                                      ...(sub.criteria?.processes || []),
+                                      ...(sub.criteria?.outcomes || []),
+                                    ])
+                                  : [];
 
-                    {/* Areas Section */}
-                    {selectedProgram && visible === "areas" && (
-                      <div className="flex flex-col w-full overflow-auto">
-                        <div className="w-full p-2 text-gray-700 rounded-xl">
-                          {areas.sort((a, b) => a.areaID - b.areaID).map((area) => {
-                            const allCriteria = Array.isArray(area.subareas)
-                              ? area.subareas.flatMap(sub => [
-                                  ...(sub.criteria?.inputs || []),
-                                  ...(sub.criteria?.processes || []),
-                                  ...(sub.criteria?.outcomes || []),
-                                ])
-                              : [];
-
-                            const doneCount = allCriteria.filter(c => done[c.criteriaID]).length;
-                            const doneTotal = allCriteria.length;        
-                            const progress = doneTotal > 0 ? ((doneCount / doneTotal) * 100).toFixed(0) : 0 ;              
+                                const doneCount = allCriteria.filter(c => done[c.criteriaID]).length;
+                                const doneTotal = allCriteria.length;        
+                                const progress = doneTotal > 0 ? ((doneCount / doneTotal) * 100).toFixed(0) : 0 ;              
 
                           return (
                                 <div key={area.areaID} className='flex flex-col'>
@@ -545,118 +746,120 @@ import { CardSkeleton } from '../components/Skeletons';
                     
                 </div>
 
-                {/* Document Viewer */}
-                <div className={`sticky top-0 transition-all duration-500 ease-in-out overflow-hidden ${showPreview ? 'w-1/2 opacity-100' : 'w-0 opacity-0'}`} 
-                     style={{ height: showPreview ? '100vh' : '0' }}>
-                  {showPreview && (
-                    <div className='relative w-full h-full bg-white rounded-lg shadow-lg' style={{ minHeight: '100%', minWidth: '400px' }}>
-                      
-                      {/* Loading State */}
-                      {isLoading && (
-                        <div className="flex items-center justify-center h-full">
-                          <div className="text-lg">Loading document...</div>
-                        </div>
-                      )}
-                      
-                      {/* Error State */}
-                      {error && (
-                        <div className="flex flex-col items-center justify-center h-full p-4">
-                          <div className="mb-2 text-lg text-red-500">Error Loading Document</div>
-                          <div className="text-sm text-center text-gray-600">{error}</div>
-                          <button 
-                            onClick={() => {setShowPreview(false); setError(null);}}
-                            className="px-4 py-2 mt-4 text-white bg-blue-500 rounded hover:bg-blue-600"
-                          >
-                            Close
-                          </button>
-                        </div>
-                      )}
-                      
-                      {/* Document Viewer */}
-                      {!isLoading && !error && docs.length > 0 && (
-                        <>
-                          <div className="absolute inset-0 w-full h-full">
-                            <DocViewer 
-                              key={docViewerKey} // Force re-render when key changes
-                              pluginRenderers={DocViewerRenderers}
-                              documents={docs}    
-                              className="doc-viewer"
-                              prefetchMethod="GET"
-                              config={{
-                                header: {
-                                  disableHeader: false,
-                                  disableFileName: false,
-                                  retainURLParams: false,
-                                },
-                                pdfZoom: {
-                                  defaultZoom: 1.0,
-                                  zoomJump: 0.3,
-                                },
-                                pdfVerticalScrollByDefault: false,
-                                loadingRenderer: {
-                                  showLoadingTimeout: false,
-                                }
-                              }}
-                              style={{ 
-                                height: '100%',
-                                width: '100%',
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0
-                              }}
-                            />
-                          </div>
-
-                          {/* Close Button */}
-                          <FontAwesomeIcon 
-                            icon={faCircleXmark} 
-                            onClick={() => {
-                              setShowPreview(false);
-                              setDocs([]);
-                              setError(null);
-                            }}
-                            className="absolute z-10 text-2xl transition-all duration-300 border-black rounded-full cursor-pointer text-white/50 border-1 top-3 right-4 hover:text-red-400"
-                          /> 
+                    {/* Document Viewer */}
+                    <div className={`sticky top-0 transition-all duration-500 ease-in-out overflow-hidden ${showPreview ? 'w-1/2 opacity-100' : 'w-0 opacity-0'}`} 
+                        style={{ height: showPreview ? '100vh' : '0' }}>
+                      {showPreview && (
+                        <div className='relative w-full h-full bg-white rounded-lg shadow-lg' style={{ minHeight: '100%', minWidth: '400px' }}>
                           
-                          {/* View Full Document Button */}
-                          <button 
-                            onClick={() => {
-                              if(docs.length > 0) {
-                                window.open(docs[0].uri, '_blank');
-                              }
-                            }}
-                            className="absolute z-10 px-4 py-2 font-medium text-white transition-all duration-300 bg-green-600 rounded-lg shadow-lg bottom-4 right-4 hover:bg-green-700"
-                          >
-                            View Full Document
-                          </button>
-                        </>
+                          {/* Loading State */}
+                          {isLoading && (
+                            <div className="flex items-center justify-center h-full">
+                              <div className="text-lg">Loading document...</div>
+                            </div>
+                          )}
+                          
+                          {/* Error State */}
+                          {error && (
+                            <div className="flex flex-col items-center justify-center h-full p-4">
+                              <div className="mb-2 text-lg text-red-500">Error Loading Document</div>
+                              <div className="text-sm text-center text-gray-600">{error}</div>
+                              <button 
+                                onClick={() => {setShowPreview(false); setError(null);}}
+                                className="px-4 py-2 mt-4 text-white bg-blue-500 rounded hover:bg-blue-600"
+                              >
+                                Close
+                              </button>
+                            </div>
+                          )}
+                          
+                          {/* Document Viewer */}
+                          {!isLoading && !error && docs.length > 0 && (
+                            <>
+                              <div className="absolute inset-0 w-full h-full">
+                                <DocViewer 
+                                  key={docViewerKey} // Force re-render when key changes
+                                  pluginRenderers={DocViewerRenderers}
+                                  documents={docs}    
+                                  className="doc-viewer"
+                                  prefetchMethod="GET"
+                                  config={{
+                                    header: {
+                                      disableHeader: false,
+                                      disableFileName: false,
+                                      retainURLParams: false,
+                                    },
+                                    pdfZoom: {
+                                      defaultZoom: 1.0,
+                                      zoomJump: 0.3,
+                                    },
+                                    pdfVerticalScrollByDefault: false,
+                                    loadingRenderer: {
+                                      showLoadingTimeout: false,
+                                    }
+                                  }}
+                                  style={{ 
+                                    height: '100%',
+                                    width: '100%',
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0
+                                  }}
+                                />
+                              </div>
+
+                              {/* Close Button */}
+                              <FontAwesomeIcon 
+                                icon={faCircleXmark} 
+                                onClick={() => {
+                                  setShowPreview(false);
+                                  setDocs([]);
+                                  setError(null);
+                                }}
+                                className="absolute z-10 text-2xl transition-all duration-300 border-black rounded-full cursor-pointer text-white/50 border-1 top-3 right-4 hover:text-red-400"
+                              /> 
+                              
+                              {/* View Full Document Button */}
+                              <button 
+                                onClick={() => {
+                                  if(docs.length > 0) {
+                                    window.open(docs[0].uri, '_blank');
+                                  }
+                                }}
+                                className="absolute z-10 px-4 py-2 font-medium text-white transition-all duration-300 bg-green-600 rounded-lg shadow-lg bottom-4 right-4 hover:bg-green-700"
+                              >
+                                View Full Document
+                              </button>
+                            </>
+                          )}
+                        </div>
                       )}
                     </div>
-                  )}
+
+                  </div>
                 </div>
 
-              </div>
+                {/*Form Modal*/}
+                {showForm && 
+                <CreateForm 
+                  title="Program"
+                  data={programs}
+                  employees={employees}
+                  institutes={institutes}
+                  onSubmit={handleSubmit}
+                  onClose={() => setShowForm(false)}
+                  onEditSelect={handleEditSelect}
+                  onDeleteSelect={handleDeleteSelect}
+                  onDelete={handleDelete}
+                  activeModify={activeModify}
+                  editIndex={editIndex}
+                  form={form}
+                  handleChange={handleChange}
+                  handleModify={handleModify}
+                />}
             </div>
-
-            {/*Form Modal*/}
-            {showForm && 
-            <CreateForm 
-              title="Program"
-              data={programs}
-              onSubmit={handleSubmit}
-              onClose={() => setShowForm(false)}
-              onEditSelect={handleEditSelect}
-              onDeleteSelect={handleDeleteSelect}
-              onDelete={handleDelete}
-              activeModify={activeModify}
-              editIndex={editIndex}
-              form={form}
-              handleChange={handleChange}
-              handleModify={handleModify}
-            />}
-        </div>
       </>
     );
 }

@@ -1,17 +1,31 @@
 import {
  faPlus,
  faChevronDown,
- faChevronUp
+ faChevronUp, 
+ faCheck,
+ faSquareCheck,
+ faXmark
 } from '@fortawesome/free-solid-svg-icons';
 import {faCircleCheck} from '@fortawesome/free-regular-svg-icons';
-import { useState} from 'react';
+import { useRef, useState, useEffect} from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import UploadModal from './modals/UploadModal';
+import { adminHelper } from '../utils/auth_utils';
+import { apiPut } from '../utils/api_utils';
+import StatusModal from './modals/StatusModal';
 
 const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate, onClick, onRefresh, onFilePreview, done, toggleDone, setAreas}) => {
+
+    const approveRef = useRef(null)
+    const isAdmin = adminHelper()
     const [expanded, setExpanded] = useState(false);
     const [criteriaExpand, setCriteriaExpand] = useState(null);
     const [showUpload, setShowUpload] = useState(false);
+    const [showApprove, setShowApprove] = useState(null);
+
+    const [showStatusModal, setShowStatusModal] = useState(false);
+    const [statusMessage, setStatusMessage] = useState("");
+    const [statusType, setStatusType] = useState("success");    
 
     const [selectedCriteriaID, setSelectedCriteriaID] = useState(null); // State to hold the selected criteria ID
     const [selectedProgramCode, setSelectedProgramCode] = useState(null); // State to hold the selected program code
@@ -20,14 +34,79 @@ const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate,
     const [selectedSubareaName, setSelectedSubareaName] = useState(null);
     
 
-    // const [done, setDone] = useState(false);
+        // Handle outside click of the approve modal
+        useEffect( () => {
+            const handleOutsideClick = (e) => {
+                if (
+                    approveRef.current &&
+                    !approveRef.current.contains(e.target)
+                ){
+                    setShowApprove(null)                                        
+                }
+    
+            }
+    
+            document.addEventListener('mousedown', handleOutsideClick)
+            return () => {
+                document.removeEventListener('mousedown', handleOutsideClick)
+            }
+    
+        },[showApprove])
+
     // Function to close the modal
-    const handleCloseModal = () => {
-        setShowUpload(false);
-        setSelectedCriteriaID(null)
-        setSelectedProgramCode(null)
-        
+    const handleCloseModal = () => {        
+        setShowStatusModal(false);
+        setSelectedCriteriaID(null);
+        setSelectedProgramCode(null);
     };
+
+    const closeStatusModal = () => {
+        setShowStatusModal(false);
+        onRefresh()
+    }
+
+    const handleApprove = async (docID) => {
+        try{
+           const res = await apiPut('/api/program/approve', {docID})
+
+            setShowStatusModal(true)
+            setStatusMessage(res.data.message)
+            setStatusType("success")
+
+        } catch(err){
+            console.error("Failed to approve Document: ", err)
+            setShowStatusModal(true)
+            setStatusMessage("An error occurred when approving document")
+            setStatusType("error")
+        }
+    }
+
+    const handleReject = async (docID) => {
+        try{
+           const res = await apiPut('/api/program/reject', {docID})
+
+            setShowStatusModal(true)
+            setStatusMessage(res.data.message)
+            setStatusType("success")
+
+        } catch(err){
+            console.error("Failed to reject Document: ", err)
+            setShowStatusModal(true)
+            setStatusMessage("An error occurred when rejecting document")
+            setStatusType("error")
+        }
+    }
+
+    // Function to toggle approve modal for specific criteria
+    const toggleApproveModal = (criteriaID) => {
+        setShowApprove(showApprove === criteriaID ? null : criteriaID);
+    };
+
+    // Function to close approve modal (you can call this after approve/reject actions)
+    const closeApproveModal = () => {
+        setShowApprove(null);
+    };
+
 
       const handleUploadTrigger = (criteriaID, criteriaType) => {
         setSelectedCriteriaID(criteriaID);
@@ -46,6 +125,12 @@ const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate,
 
         return(
         <>
+
+        {/* Status Modal */}
+            {showStatusModal && (
+                <StatusModal message={statusMessage} type={statusType} showModal={showStatusModal} onClick={closeStatusModal}  />
+
+            )}
         {/* CriteriaGroup div */}
         <div 
         onClick={() => {setCriteriaExpand(isOpen ? null : index)}}
@@ -66,33 +151,77 @@ const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate,
             {/* Criteria Rendering */}
             {items.length > 0 ? items.map((item, index) => (
                 <div key={index} 
-                className='flex flex-row justify-between gap-3 p-3 mb-2 ml-5 transition-all duration-300 border shadow-md cursor-default rounded-2xl border-neutral-400 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600'>
-                    <span className='break-words text-[15px] max-w-[65%] whitespace-pre-wrap'>{item.content}</span>
+                className='relative flex flex-row justify-between gap-3 p-3 py-10 mb-2 ml-5 transition-all duration-300 border shadow-md cursor-default rounded-2xl border-neutral-400 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600'>
+                    <span className='break-words align-middle text-[15px] max-w-[65%] whitespace-pre-wrap'>{item.content}</span>
 
                     <div className='flex flex-col items-center justify-center'>
                         <h2 className='font-semibold'>Attached File</h2>
                         {item.docName ? (
                             <button
-                            onClick={() =>{onFilePreview(item.docName, item.docPath)}}
-                            className='text-sm font-light text-center cursor-pointer hover:underline'>{item.docName}</button>
+                                onClick={() =>{onFilePreview(item.docName, item.docPath)}}
+                                className='text-sm font-light text-center cursor-pointer hover:underline'>{item.docName}</button>
 
-                        ) : (
-                            <span className='text-sm text-gray-500'>No file attached</span>
-                        )
+                            ) : (
+                                <span className='text-sm text-gray-500'>No file attached</span>
+                            )
                         }
                         
                     </div>
+                        <span className='absolute text-sm italic text-gray-500 bottom-2 left-3 dark:text-gray-300'>Area ID: {item.criteriaID}</span>
+                        <h1 className='absolute text-sm italic text-gray-500 bottom-2 right-5 dark:text-gray-300'>Predicted rating: {item.predicted_rating?.toFixed(1)}</h1>
 
-                    <div className='flex items-center justify-between gap-5 mr-3'>
+                    <div className='relative flex items-center justify-between gap-5 mr-3'>
+                        {isAdmin ? (
+                           <>
+                                <FontAwesomeIcon                     
+                                    icon={item.isApproved === true ? faCheck :item.isApproved === false ? faXmark : faCircleCheck}                                     
+                                    title={item.isApproved === true ? 'Approved' : item.isApproved === false ? 'Rejected' : 'Approve Document'}                             
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleApproveModal(item.criteriaID);
+                                    }}
+                                    className={`text-xl cursor-pointer ${item.isApproved === true ? 'text-emerald-500' : item.isApproved === false ? 'text-red-600' : 'text-neutral-500 '}`}
+                                />                            
+                                {showApprove === item.criteriaID && (
+                                    <div
+                                    ref={approveRef}
+                                    className="absolute z-50 flex flex-row gap-5 p-5 shadow-xl -top-5 right-5 rounded-xl border-neutral-400 bg-gray-200/10 backdrop-blur-sm">
+                                        <button 
+                                            onClick={() => {
+                                                handleApprove(item.docID);
+                                                console.log(`Approved document ${item.docID}`);
+                                                closeApproveModal();
+                                            }}
+                                            className="p-3 font-semibold text-gray-200 w-25 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-800 hover:from-emerald-400 hover:to-emerald-700 dark:from-emerald-600"
+                                        >
+                                            Approve
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                handleReject(item.docID);
+                                                console.log(`Rejected document ${item.docID}`);
+                                                closeApproveModal();
+                                            }}
+                                            className='p-3 font-semibold text-gray-200 w-25 rounded-xl bg-gradient-to-br from-red-500 to-red-800 hover:from-red-400 hover:to-red-700 dark:from-red-600 dark:to-red-800'
+                                        >
+                                            Reject
+                                        </button>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            
                         <FontAwesomeIcon
-                        icon={faCircleCheck}
-                        onClick={() => toggleDone(item.criteriaID)}
-                        className={`text-xl ${done[item.criteriaID] ? 'text-zuccini-600' : 'text-neutral-500'} cursor-pointer`}
-                        />
+                            icon={item.isApproved === true ? faCheck :item.isApproved === false ? faXmark : faSquareCheck}
+                            title= {item.isApproved === true ? 'Approved' : item.isApproved === false ? 'Rejected' : 'Mark as done'}
+                            onClick={item.isApproved === true ? undefined : () => toggleDone(item.criteriaID)}                                                        
+                            className={`text-xl ${item.isApproved === false ? 'text-red-600' : done[item.criteriaID] || item.isApproved === true ? 'text-zuccini-600' : 'text-neutral-500'} ${item.isApproved === true ? 'cursor-default' : 'cursor-pointer'}`}
+                        />)}
+                        
                         <FontAwesomeIcon 
                             icon={faPlus} 
                             onClick={(e) => { 
-                                 e.stopPropagation(); // Prevent event bubbling                                
+                                e.stopPropagation(); // Prevent event bubbling                                
                                 handleUploadTrigger(item.criteriaID, groupName);
                                 console.log(`Program Code: ${programCode}`)
                                 console.log(`Area Name: ${areaName}`)
@@ -102,7 +231,7 @@ const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate,
                                 
                                 }
                             } 
-                            className="text-xl transition-colors cursor-pointer hover:text-blue-600" 
+                            className={`${item.isApproved === true ? 'invisible w-0' : ''} text-xl transition-colors cursor-pointer hover:text-blue-600`} 
                         />
                     </div>
                 </div>
@@ -122,6 +251,8 @@ const SubCont = ({title, criteria, programCode, areaName, subareaName, onCreate,
 
 
     return(
+
+
         // subarea container div
         <li className='flex flex-col list-inside'>
             <button 

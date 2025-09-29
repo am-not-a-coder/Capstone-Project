@@ -1,5 +1,5 @@
 
-export default function CreateCard({ setShowForm, className = "" }) {
+export default function CreateCard({ setShowForm, title, className = "" }) {
   return (
     <button 
       onClick={() => setShowForm(true)}  
@@ -23,7 +23,7 @@ export default function CreateCard({ setShowForm, className = "" }) {
           Add New
         </h3>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Create a new program
+          Create a new {title}
         </p>
       </div>
 

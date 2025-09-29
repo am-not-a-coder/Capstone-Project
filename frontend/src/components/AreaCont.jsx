@@ -20,7 +20,7 @@ export default function AreaCont({title, doneCount, doneTotal, onClick, isExpand
 			<p className='right-[14%] opacity-70 font-semibold absolute'>{doneCount} / {doneTotal}</p>           
 
             <div className='mr-3'>
-                <CircularProgressBar circleWidth="50" progress={progress} positionX={"right-15"} positionY={"top-2"}/>
+                <CircularProgressBar circleWidth="50" progress={progress} placement={`absolute right-15 top-2`}/>
                 <FontAwesomeIcon 
                     icon={isExpanded ? faChevronUp : faChevronDown} 
                     onClick={e => {

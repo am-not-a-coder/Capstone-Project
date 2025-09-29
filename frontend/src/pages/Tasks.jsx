@@ -1,6 +1,6 @@
 //for imports
 import CircularProgressBar from '../components/CircularProgressBar'
-import {useState, useEffect, use} from 'react';
+import {useState, useEffect} from 'react';
 import {
     faAngleRight,
     faCalendarPlus
@@ -13,7 +13,8 @@ import StatusModal from '../components/modals/StatusModal';
 import DeadlineModal from '../components/modals/DeadlineModal';
 import { apiGet, apiPost } from '../utils/api_utils';
 import { adminHelper } from '../utils/auth_utils';
-// the progress bar is currently static  
+import { useNavigate } from 'react-router-dom';
+import AreaProgressPage from './AreaProgress';
 
 const Tasks = () => {
     //admin
@@ -26,6 +27,9 @@ const Tasks = () => {
     const [dueDate, setDueDate] = useState("");
     const [program, setProgram] = useState("");
     const [content, setContent] = useState("");
+    const [criteria, setCriteria] = useState("");
+    
+    const [criteriaOption, setCriteriaOption] = useState("");
 
     const [programOption, setProgramOption] = useState([]); // for the form option
     const [selectedProgram, setSelectedProgram] = useState(null);
@@ -45,7 +49,7 @@ const Tasks = () => {
     const [showDeadline, setShowDeadline] = useState(false);
     const [selectedDeadline, setSelectedDeadline] = useState(null);
 
-
+    const navigate = useNavigate()
 
    
 
@@ -79,11 +83,40 @@ const Tasks = () => {
                 Array.isArray(res.data.area) ? setAreaProgressList(res.data.area) : setAreaProgressList([]);
                     
             } catch(err){
-
+                console.error("Failed to fetch area", err);
             }
         }
         fetchArea();
     }, []);
+
+    // FETCH CRITERIA
+    useEffect(() => {
+        const fetchCriteria = async () => {
+            try{
+                const res = await apiGet('/api/criteria', {withCredentials: true})
+                
+                // Fix: Use the correct property name from your API response
+                Array.isArray(res.data) ? setCriteriaOption(res.data) : setCriteriaOption([]);                
+                    
+            } catch(err){
+                console.error("Failed to fetch criteria", err);
+            }
+        }
+        fetchCriteria();
+    }, []);
+
+    const [filteredCriteriaOptions, setFilteredCriteriaOptions] = useState([]);
+
+    useEffect(() => {
+        if(selectedArea && criteriaOption.length > 0) {
+            // Filter criteria based on the selected area
+            // You'll need to adjust this logic based on how your criteria relates to areas
+            // For now, showing all criteria when an area is selected
+            setFilteredCriteriaOptions(criteriaOption);
+        } else {
+            setFilteredCriteriaOptions([]);
+        }
+    }, [selectedArea, criteriaOption]);
 
     // FETCH DEADLINES
     useEffect(() => {
@@ -127,49 +160,48 @@ const Tasks = () => {
 
     // Creates the deadline
     const handleCreateDeadline = async (e) => {
-        e.preventDefault()
-        if (!isAdmin) return 
-        const formData = new FormData()
-            formData.append("program", program)
-            formData.append("area", selectedArea)
-            formData.append("due_date", dueDate)
-            formData.append("content", content)
+            e.preventDefault()
+            if (!isAdmin) return 
+            const formData = new FormData()
+                formData.append("program", program)
+                formData.append("area", selectedArea)
+                formData.append("criteriaID", criteria) // Add this line to include criteria ID
+                formData.append("due_date", dueDate)
+                formData.append("content", content)
 
-        try{
-            //create deadline api
-            const res = await apiPost('/api/deadline', formData, 
-             {withCredentials: true}) 
+            try{
+                //create deadline api
+                const res = await apiPost('/api/deadline', formData, 
+                {withCredentials: true}) 
 
-                setStatusMessage(res.data.message);
+                    setStatusMessage(res.data.message);
+                    setShowStatusModal(true);
+                    setStatusType("success");
+
+                    setSelectedArea("");
+                    setProgram("");
+                    setContent("");
+                    setCriteria("")
+                    setDueDate("");
+
+                // refetch deadline data
+                const deadlineRes = await apiGet("api/deadlines", {withCredentials: true})
+
+                    Array.isArray(deadlineRes.data.deadline) ? setDeadLines(deadlineRes.data.deadline) : setDeadLines([]);   
+                
+                // refetch event data
+                const eventRes = await apiGet("/api/events", 
+                    {withCredentials: true})
+
+                    Array.isArray(eventRes.data) ? setEvent(eventRes.data) : setEvent([]);   
+
+            }catch(err){
+                setStatusMessage("Server error. Please try again");
                 setShowStatusModal(true);
-                setStatusType("success");
-
-                setSelectedArea("");
-                setProgram("");
-                setContent("");
-                setDueDate("");
-
-            // refetch deadline data
-            const deadlineRes = await apiGet("api/deadlines", {withCredentials: true})
-
-                Array.isArray(deadlineRes.data.deadline) ? setDeadLines(deadlineRes.data.deadline) : setDeadLines([]);   
-            
-            // refetch event data
-            const eventRes = await apiGet("/api/events", 
-                 {withCredentials: true})
-
-                Array.isArray(eventRes.data) ? setEvent(eventRes.data) : setEvent([]);   
-            
-
-
-        }catch(err){
-            setStatusMessage("Server error. Please try again");
-            setShowStatusModal(true);
-            setStatusType("error")
-            console.log(err.res?.data || err.message)
-        }
-
-    } 
+                setStatusType("error")
+                console.log(err.res?.data || err.message)
+            }
+        } 
     
     const handleEventClick = (clickInfo) => {
 
@@ -189,20 +221,24 @@ const Tasks = () => {
     }
 
 
-    const handleViewDeadline = (selectedDeadline) => {
+    const handleViewDeadline = (selectedDeadline) => {    
+        const criteriaItem = criteriaOption.find(
+            c => c.criteriaID === selectedDeadline.criteriaID
+        );
+        
+        const criteriaName = criteriaItem ? criteriaItem.criteriaName : 'N/A';
 
         setSelectedDeadline({
             id: selectedDeadline.deadlineID,
             programName: selectedDeadline.programName,
             programCode: selectedDeadline.programCode,
             color: selectedDeadline.programColor,
+            criteriaName: criteriaName,
             areaName: selectedDeadline.areaName,
             date: selectedDeadline.due_date,
             content: selectedDeadline.content
-            
         })
         setShowDeadline(true);
-
     }
 
     const handleCloseDeadline = () =>{
@@ -224,6 +260,11 @@ const Tasks = () => {
         }
     }, [program, allAreas]);
    
+    const truncateText = (text, maxLength = 50) => {
+        if (text?.length <= maxLength) return text;
+        return text.substring(0, maxLength) + '...';
+    };
+
     
 
     return(
@@ -247,15 +288,17 @@ const Tasks = () => {
         
         {uniqueAreas.slice(0,3).map((area) => (                
             <Area 
-            key={area.areaID} 
-            areaTitle={area.areaNum} 
-            desc={area.areaTitle} 
-            program={area.programCode} 
-            progress={area.progress}
+                key={area.areaID} 
+                areaTitle={area.areaNum} 
+                desc={area.areaTitle} 
+                program={area.programCode} 
+                progress={area.progress}
             />
         )
         )}
-            <div className='absolute right-0 col-start-3 flex items-center justify-center min-w-[275px] h-full overflow-hidden opacity-90 transition-all duration-500 hover:min-w-[278px] hover:opacity-95 hover:scale-110 bg-gradient-to-r from-transparent via-neutral-800 to-neutral-900 dark:bg-gradient-to-r dark:from-transparent dark:via-gray-800 dark:to-gray-900 cursor-pointer'>
+            <div 
+            onClick={() => navigate('/Progress')}
+            className='absolute right-0 col-start-3 flex items-center justify-center min-w-[275px] h-full overflow-hidden opacity-90 transition-all duration-500 hover:min-w-[278px] hover:opacity-95 hover:scale-110 bg-gradient-to-r from-transparent via-neutral-800 to-neutral-900 dark:bg-gradient-to-r dark:from-transparent dark:via-gray-800 dark:to-gray-900 cursor-pointer'>
                     <h1 className='z-10 text-xl font-semibold text-neutral-200'>View All</h1>
                 </div>
         </>        
@@ -273,7 +316,7 @@ const Tasks = () => {
     
     { isAdmin &&(<div className="col-span-2 transition-all duration-500 dark:text-white">
         
-            <div className="col-span-2 pt-3 min-h-[100px] border border-neutral-300 rounded-md transition-all duration-500 inset-shadow-sm inset-shadow-gray-400 dark:shadow-sm dark:shadow-zuccini-900 dark:bg-gray-900">
+            <div className="relative col-span-2 pt-3 px-3 min-h-[100px] border border-neutral-300 rounded-md transition-all duration-500 inset-shadow-sm inset-shadow-gray-400 dark:shadow-sm dark:shadow-zuccini-900 dark:bg-gray-900">
                 <h1 className="mx-3 my-1 font-medium text-md">
                     <FontAwesomeIcon icon={faCalendarPlus} className="mr-2" />
                     Create Submission Deadlines
@@ -324,8 +367,26 @@ const Tasks = () => {
                     </select>
                     </div>
 
+                    {/* Select Criteria */}
+                    <div className="min-h-[100px] p-3 flex flex-col justify-center">
+                        <label htmlFor="criteria"
+                            className='mb-1 text-lg font-extralight'>Criteria</label>
+                        <select name="criteria" id="criteria"
+                            value={criteria}
+                            onChange={(e)=> {setCriteria(e.target.value)}}
+                            className='p-2 font-semibold transition-all duration-500 cursor-pointer dark:inset-shadow-zuccini-900 dark:inset-shadow-sm dark:border-none bg-neutral-300 border-1 rounded-xl focus:outline focus:outline-zuccini-700 focus:border-zuccini-900 dark:bg-gray-950/50'
+                            required>
+                            <option value="">Select a Criteria</option>
+                            {filteredCriteriaOptions.map((criteriaItem) => (
+                                <option key={criteriaItem.criteriaID} value={criteriaItem.criteriaID}>
+                                    {truncateText(criteriaItem.criteriaName)}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
 
-                    {/* Select Deadline */}
+
+                    {/* Select Criteria */}
                     <div className="min-h-[100px] p-3 flex flex-col justify-center">
                         <label htmlFor="due_date"
                         className='mb-1 text-lg font-extralight'>Deadline</label>
@@ -341,7 +402,7 @@ const Tasks = () => {
                     <input 
                     type="submit" 
                     value="Create Deadline"
-                    className='px-6 py-4 font-semibold transition-all duration-300 cursor-pointer place-self-center rounded-xl bg-zuccini-600 hover:bg-zuccini-800 active:bg-zuccini-700 text-neutral-100'
+                    className='absolute px-6 py-2 font-semibold text-gray-600 transition-all duration-500 border-gray-500 shadow-xl cursor-pointer from-gray-300/50 via-gray-200 to-gray-400/50 dark:text-gray-200 hover:text-gray-200 top-3 right-3 place-self-center rounded-xl bg-gradient-to-br hover:from-zuccini-400 hover:via-zuccini-500 hover:to-zuccini-700'
                     />
                     <div className='flex flex-col col-span-4 px-3 py-3 '>
                         <label htmlFor="content"
@@ -383,6 +444,7 @@ const Tasks = () => {
                     programName={selectedDeadline.programName} 
                     programCode={selectedDeadline.programCode} 
                     area={selectedDeadline.areaName} 
+                    criteria={truncateText(selectedDeadline.criteriaName)}
                     date={selectedDeadline.date} 
                     color={selectedDeadline.color} 
                     content={selectedDeadline.content || 'No description'} 
@@ -427,13 +489,15 @@ const Tasks = () => {
 
 //Generates the areas
 
-export const Area = ({program, areaTitle, desc, progress}) =>{
+export const Area = ({onClick, program, areaTitle, desc, progress}) =>{
 
     return(
-        <div className="relative mr-4 min-w-[300px] h-[210px] border-black border rounded-lg shadow-lg overflow-hidden transition-all duration-500 hover:scale-105 cursor-pointer">
-            <div className='h-[50%] bg-zuccini-600'> 
-                <div className='absolute px-5 font-light border border-black top-2 right-2 bg-neutral-200 rounded-xl dark:bg-gray-900 dark:text-white'>{program}</div>
-                <CircularProgressBar progress={progress} circleWidth="75" positionX={"left-3"} positionY={"top-17"}/>           
+        <div 
+        onClick={onClick}
+        className="relative mr-4 min-w-[300px] h-[210px] border-neutral-400 dark:border-neutral-800 border rounded-lg shadow-xl dark:shadow-sm dark:shadow-zuccini-700 overflow-hidden transition-all duration-500 hover:scale-105 cursor-pointer">
+            <div className='h-[50%] bg-zuccini-600 dark:bg-zuccini-700'> 
+                <div className='absolute px-5 font-light border border-neutral-400 top-2 right-2 bg-neutral-200 rounded-xl dark:bg-gray-900 dark:text-white'>{program}</div>
+                <CircularProgressBar progress={progress} circleWidth="75" positionX={"left-3"} positionY={"top-17"} placement={`absolute top-17 left-3`}/>           
             </div>      
 
             <div className='text-right h-[50%] p-3 bg-neutral-200 border-t-1 transition-all duration-500  dark:bg-gray-900 dark:text-white dark:border-t-neutral-600'>

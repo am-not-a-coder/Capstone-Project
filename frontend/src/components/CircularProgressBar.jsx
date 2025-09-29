@@ -1,5 +1,5 @@
 
-const CircularProgressBar = ({circleWidth, progress, positionX, positionY}) =>{
+const CircularProgressBar = ({circleWidth, progress, placement}) =>{
     const strokeWidth = 7;
     const radius = (circleWidth - strokeWidth) / 2;
     const dashArray = radius * Math.PI * 2;
@@ -12,7 +12,7 @@ const CircularProgressBar = ({circleWidth, progress, positionX, positionY}) =>{
                 width={circleWidth} 
                 height={circleWidth}
                 viewBox={`0 0 ${circleWidth} ${circleWidth}`}
-                className={`absolute ${positionX} ${positionY}`} 
+                className={placement} 
             >
                 {/* circle background */}
             <circle

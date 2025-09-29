@@ -124,32 +124,35 @@ const SubContForm = ({title,  selfRateMode, onClick, onFilePreview, subareaID, p
         }`}>
             {/* Criteria Rendering */}
             {items.length > 0 ? items.map((item, index) => (
-                <div key={index} className='flex flex-row justify-between gap-3 p-3 py-5 mb-2 ml-5 transition-all duration-300 border shadow-md cursor-default rounded-2xl border-neutral-400 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600'>
-    <span className='break-words text-[15px] flex-1 min-w-0 whitespace-pre-wrap'>{item.content}</span>
+                <div key={index} className='relative flex flex-row justify-between gap-3 p-3 py-10 mb-2 ml-5 transition-all duration-300 border shadow-md cursor-default rounded-2xl border-neutral-400 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600'>
+                    <span className='break-words text-[15px] flex-1 min-w-0 whitespace-pre-wrap'>{item.content}</span>
 
-    <div className='flex flex-col items-center justify-center min-w-[120px] max-w-[180px] flex-shrink-0'>
-        <h2 className='font-semibold'>Attached File</h2>
-        {item.docName ? (
-            <button
-                onClick={() => {onFilePreview(item.docName, item.docPath)}}
-                className='w-full text-sm font-light leading-tight text-center break-words whitespace-normal cursor-pointer hover:underline'
-            >
-                {item.docName}
-            </button>
-        ) : (
-            <span className='text-sm text-gray-500'>No file attached</span>
-        )}
-    </div>
-        
-    <div className='flex items-center justify-between flex-shrink-0'>
-       {selfRateMode && (
-            <button className={`relative flex flex-row items-center align-center p-3 px-5 text-sm font-semibold overflow-hidden transition-all duration-300 text-gray-600 bg-gray-200 hover:text-white hover:bg-zuccini-500/80 cursor-pointer rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-900 dark:text-gray-200`}>
-                <FontAwesomeIcon icon={faStar} className='mr-3'/>
-                <h1 className='transition-all duration-300'> {item.rating ? parseFloat(item.rating).toFixed(1) : '0.0'}</h1>                                           
-            </button>
-        )} 
-    </div>
-</div>
+                    <div className='flex flex-col items-center justify-center min-w-[120px] max-w-[180px] flex-shrink-0'>
+                        <h2 className='font-semibold'>Attached File</h2>
+                        {item.docName ? (
+                            <button
+                                onClick={() => {onFilePreview(item.docName, item.docPath)}}
+                                className='w-full text-sm font-light leading-tight text-center break-words whitespace-normal cursor-pointer hover:underline'
+                            >
+                                {item.docName}
+                            </button>
+                        ) : (
+                            <span className='text-sm text-gray-500'>No file attached</span>
+                        )}
+                    </div>
+
+                    <span className='absolute text-sm italic text-gray-500 bottom-2 left-3 dark:text-gray-300'>Area ID: {item.criteriaID}</span>
+                    <h1 className='absolute text-sm italic text-gray-500 bottom-2 right-5 dark:text-gray-300'>Predicted rating: {item.predicted_rating?.toFixed(1)}</h1>
+                        
+                    <div className='flex items-center justify-between flex-shrink-0'>
+                    {selfRateMode && (
+                            <button className={`relative flex flex-row items-center align-center p-3 px-5 text-sm font-semibold overflow-hidden transition-all duration-300 text-gray-600 bg-gray-200 hover:text-white hover:bg-zuccini-500/80 cursor-pointer rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-900 dark:text-gray-200`}>
+                                <FontAwesomeIcon icon={faStar} className='mr-3'/>
+                                <h1 className='transition-all duration-300'> {item.rating ? parseFloat(item.rating).toFixed(1) : '0.0'}</h1>                                           
+                            </button>
+                        )} 
+                    </div>
+                </div>
             )) : (
                 <div className='flex flex-col items-center min-h-[150px] justify-center p-5 mb-3 text-neutral-800 bg-neutral-300/50 dark:bg-gray-800/50 dark:text-white rounded-2xl'>
                       <h1 className='text-lg text-gray-500'>No Criteria found</h1>                     

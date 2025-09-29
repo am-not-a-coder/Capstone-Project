@@ -16,7 +16,7 @@
   import { CardSkeleton } from '../components/Skeletons';
   import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer";
   import "@cyntler/react-doc-viewer/dist/index.css";
-  import "../../index.css"
+  import "../../index.css";
   import { Navigate } from 'react-router-dom';
 
   

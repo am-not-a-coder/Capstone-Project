@@ -1,7 +1,9 @@
 export default function ProgramCard({ program, onClick, className = "" }) {
+
+
   return (
     <div 
-      className={`${className} group relative flex flex-col cursor-pointer h-56 overflow-hidden rounded-xl border border-gray-200 bg-gray-200 shadow-sm transition-all duration-300 hover:shadow-xl hover:scale-105 hover:border-gray-300 dark:bg-gray-900 dark:border-gray-700 dark:hover:border-gray-600 sm:w-1/2 md:w-1/3 lg:w-1/5`} 
+      className={`${className} group relative flex flex-col cursor-pointer h-56 overflow-hidden rounded-xl border border-gray-200 bg-gray-200 shadow-sm transition-all duration-300 hover:shadow-xl hover:scale-105 hover:border-gray-300 dark:bg-gray-900 dark:border-gray-700 dark:hover:border-gray-600 sm:w-1/2 md:w-1/3 lg:w-1/5`}             
       onClick={onClick}
     >
       {/* Header Image/Color Section */}
@@ -33,10 +35,10 @@ export default function ProgramCard({ program, onClick, className = "" }) {
         {/* Program Code and Name */}
         <div className="space-y-2">
           <h3 className="text-lg font-bold leading-tight text-gray-900 transition-colors duration-200 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
-            {program.programCode}
+            {program.programCode || program.code}
           </h3>
           <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-300 line-clamp-2">
-            {program.programName}
+            {program.programName || program.name}
           </p>
         </div>
 
@@ -51,7 +53,7 @@ export default function ProgramCard({ program, onClick, className = "" }) {
               <span className="text-gray-600 dark:text-gray-400">
                 {program.instituteHead || program.programDean}
               </span>
-            </div>
+            </div>            
           </div>
         </div>
       </div>

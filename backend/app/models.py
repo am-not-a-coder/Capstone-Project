@@ -51,6 +51,7 @@ class Area(db.Model):
 
     areaID = db.Column(db.Integer, primary_key=True, nullable=False)
     instID = db.Column(db.Integer, db.ForeignKey('institute.instID'), nullable=True)
+    instID = db.Column(db.Integer, db.ForeignKey('institute.instID'), nullable=True)
     programID = db.Column(db.Integer, db.ForeignKey('program.programID'), nullable=False)
     areaName = db.Column(db.String(100))
     areaNum = db.Column(db.String(10))
@@ -76,6 +77,9 @@ class Program(db.Model):
     dean = db.relationship("Employee", foreign_keys=[employeeID], backref="programs")
     institute = db.relationship("Institute", back_populates="programs")
     areas = db.relationship("Area", back_populates="program", cascade="all, delete-orphan")
+    
+    institute = db.relationship("Institute", foreign_keys=[instID], backref="programs")
+
 
 class Subarea(db.Model):
     __tablename__ = 'subarea'
@@ -101,9 +105,20 @@ class Criteria(db.Model):
     isDone = db.Column(db.Boolean, default=False)
     docID = db.Column(db.Integer, db.ForeignKey('document.docID'), nullable=False)
 
-    subarea = db.relationship("Subarea", back_populates="criteria")
+    subarea = db.relationship("Subarea", back_populates="criteria")    
 
     document = db.relationship("Document", back_populates="criteria")
+
+class Deadline(db.Model):
+    __tablename__ = "deadline"
+
+    deadlineID = db.Column(db.Integer, primary_key=True)
+    programID = db.Column(db.Integer, db.ForeignKey("program.programID"), nullable=False)
+    areaID = db.Column(db.Integer, db.ForeignKey("area.areaID"), nullable=False)
+    criteriaID = db.Column(db.Integer, db.ForeignKey("criteria.criteriaID"), nullable=False)
+    content = db.Column(db.Text, nullable=True)
+    due_date = db.Column(db.DateTime, nullable=False)
+      
 
 class Document(db.Model):
     __tablename__ = 'document'
@@ -113,12 +128,15 @@ class Document(db.Model):
     docName = db.Column(db.String(150), nullable=False)
     docType = db.Column(db.String(50), nullable=False)    
     docPath = db.Column(db.Text)
-    isApproved = db.Column(db.Boolean, default=False)
+    isApproved = db.Column(db.Boolean)
+    approvedBy = db.Column(db.String(10), db.ForeignKey('employee.employeeID'))
+    evaluate_at = db.Column(db.DateTime)
     upload_date = db.Column(db.DateTime, default=datetime.utcnow)
     content = db.Column(db.Text)
     search_vector = db.Column(TSVECTOR)
     tags = db.Column(ARRAY(db.String))
     embedding = db.Column(Vector(384)) 
+    predicted_rating = db.Column(db.Float)
 
     criteria = db.relationship("Criteria", back_populates="document")
 
