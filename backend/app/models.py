@@ -50,6 +50,7 @@ class Area(db.Model):
     __tablename__ = 'area'
 
     areaID = db.Column(db.Integer, primary_key=True, nullable=False)
+    instID = db.Column(db.Integer, db.ForeignKey('institute.instID'), nullable=True)
     programID = db.Column(db.Integer, db.ForeignKey('program.programID'), nullable=False)
     areaName = db.Column(db.String(100))
     areaNum = db.Column(db.String(10))
@@ -59,6 +60,7 @@ class Area(db.Model):
 
     program = db.relationship("Program", back_populates="areas")
     subareas = db.relationship("Subarea", back_populates="area", cascade="all, delete-orphan")
+    institute = db.relationship("Institute", back_populates="areas")
     
 
 class Program(db.Model):
@@ -72,6 +74,7 @@ class Program(db.Model):
     programColor = db.Column(db.String(30))
 
     dean = db.relationship("Employee", foreign_keys=[employeeID], backref="programs")
+    institute = db.relationship("Institute", back_populates="programs")
     areas = db.relationship("Area", back_populates="program", cascade="all, delete-orphan")
     
     institute = db.relationship("Institute", foreign_keys=[instID], backref="programs")
@@ -145,8 +148,22 @@ class Institute(db.Model):
     instName = db.Column(db.String(100), nullable=False)
     instPic = db.Column(db.Text)
 
-    dean = db.relationship("Employee", backref="institutes")    
+    dean = db.relationship("Employee", backref="institutes", foreign_keys=[employeeID])
+    programs = db.relationship("Program", back_populates="institute", cascade="all, delete-orphan")
+    areas = db.relationship("Area", back_populates="institute")
+    deadlines = db.relationship("Deadline", back_populates="institute")
 
+class Deadline(db.Model):
+    __tablename__ = 'deadline'
+
+    deadlineID = db.Column(db.Integer, primary_key=True, nullable=False)
+    instID = db.Column(db.Integer, db.ForeignKey('institute.instID'), nullable=True)
+    programID = db.Column(db.Integer, nullable=False)
+    areaID = db.Column(db.Integer, nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    due_date = db.Column(db.Date, nullable=False)
+    
+    institute = db.relationship("Institute", back_populates="deadlines")
 
 class AuditLog(db.Model):
     __tablename__ = 'audit_log'

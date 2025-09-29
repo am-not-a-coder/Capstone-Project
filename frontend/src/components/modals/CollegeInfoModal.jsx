@@ -25,20 +25,16 @@ const CollegeInfoModal = ({ college, isOpen, onClose }) => {
     const fetchPrograms = async () => {
       setLoading(true);
       try {
-        const response = await apiGet('/api/program');
+        const response = await apiGet(`/api/institute/programs?instID=${college.instID}`);
+
         if (response.success && Array.isArray(response.data.programs)) {
-          // Filter programs by college code
-          const filtered = response.data.programs.filter(
-            p => p.programCode.startsWith(college.code)
-          );
-          setPrograms(filtered);
+          setPrograms(response.data.programs);
         } else {
           console.error('Failed to fetch programs:', response.error);
-          setPrograms([]); // Set empty array on error
+          setPrograms([]);
         }
-
       } catch (err) {
-        console.error("Error occured when fetching programs", err);
+        console.error("Error occurred when fetching programs", err);
         setPrograms([]);
       } finally {
         setLoading(false);
@@ -46,7 +42,8 @@ const CollegeInfoModal = ({ college, isOpen, onClose }) => {
     };
 
     fetchPrograms();
-  }, [isOpen, college])
+  }, [isOpen, college]);
+
 
   return (
     // modal backdrop

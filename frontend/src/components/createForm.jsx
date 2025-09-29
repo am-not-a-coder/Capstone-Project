@@ -40,7 +40,7 @@ const ActionButton = memo(({ action, color, icon, isActive, onClick, children })
 });
 
 // Memoized InputField component to prevent unnecessary re-renders
-const InputField = memo(({ field, form, handleChange, handleFileChange, employees, institutes }) => {
+const InputField = memo(({ field, form, handleChange, handleFileChange, employees = [], activeModify, institutes = [] }) => {
   const baseInputClasses = "w-full px-4 py-3 text-black dark:text-white rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 dark:bg-gray-800 dark:border-gray-600 dark:focus:ring-blue-400";
   
   return (
@@ -49,22 +49,9 @@ const InputField = memo(({ field, form, handleChange, handleFileChange, employee
         {field.label}
         {field.required && <span className="ml-1 text-red-500">*</span>}
       </label>
-      
-      {field.type === "institute-select" ? (
-        <select
-        name={field.name}
-        className={baseInputClasses}
-        value={form[field.name] || ""}
-        onChange={handleChange}
-        required={field.required}
-        >
-          {console.log('Institutes data:', institutes)}
-          <option value="" className="text-gray-500">{field.placeholder}</option>
-          {institutes && institutes.map((inst) => (
-            <option key={inst.instID} value={inst.instID}>{inst.instName}</option>
-          ))}
-        </select>
-      ) : field.type === "select" ? (
+
+        {/* Institute-select: show institutes list */}
+        {field.type === "institute-select" ? (
         <select
           name={field.name}
           className={baseInputClasses}
@@ -72,13 +59,29 @@ const InputField = memo(({ field, form, handleChange, handleFileChange, employee
           onChange={handleChange}
           required={field.required}
         >
-          <option value="" className="text-gray-500">{field.placeholder}</option>
-          {employees.map((employee) => (
-            <option key={employee.employeeID} value={employee.employeeID}>
-              {employee.name}
+          <option value="" className="text-gray-500">{field.placeholder || "Select Institute"}</option>
+          {institutes && institutes.map((inst) => (
+            <option key={inst.instID} value={inst.instID}>{inst.instName || inst.Code}</option>
+          ))}
+        </select>
+
+      ) :  field.type === "select" ? (
+        <select
+          name={field.name}
+          className={baseInputClasses}
+          value={form[field.name] || ""}
+          onChange={handleChange}
+          required={field.required}
+        >
+          <option value="">{field.placeholder || "Select user"}</option>
+          {employees.map(emp => (
+            // API returns employeeID and name
+            <option key={emp.employeeID} value={emp.employeeID}>
+              {emp.name || `${emp.fName} ${emp.lName || ''}`.trim()}
             </option>
           ))}
         </select>
+
       ) : field.type === "file" ? (
         <div className="space-y-2">
           <input
@@ -87,12 +90,13 @@ const InputField = memo(({ field, form, handleChange, handleFileChange, employee
             accept={field.accept}
             onChange={handleFileChange}
             className="w-full px-4 py-3 text-black transition-colors duration-200 border-2 border-gray-300 border-dashed dark:text-white rounded-xl bg-gray-50 hover:border-blue-400 focus:outline-none focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600"
-            required={field.required}
+            required={activeModify === "add"} // File required only when adding
           />
           <p className="text-xs text-gray-500 dark:text-gray-400">
             Accepted formats: .webp, .png, .jpeg, .jpg
           </p>
         </div>
+        
       ) : field.type === "color" ? (
         <div className="flex gap-3">
           <input
@@ -115,9 +119,9 @@ const InputField = memo(({ field, form, handleChange, handleFileChange, employee
         </div>
       ) : (
         <input
-          type={field.type}
+          type={field.type || "text"}
           name={field.name}
-          placeholder={field.placeholder}
+          placeholder={field.placeholder || ""}
           className={baseInputClasses}
           value={form[field.name] || ""}
           onChange={handleChange}
@@ -169,9 +173,10 @@ export default function CreateForm({
         required: true
       }
     ];
+    // add Institute select if Program
     if (title === "Program") {
       arr.push({
-        name: "instituteID",
+        name: "instID",
         label: "Institute",
         placeholder: "Select Institute",
         type: "institute-select",
@@ -179,7 +184,7 @@ export default function CreateForm({
       });
     }
     arr.push({
-      name: title === "Program" ? "employeeID" : "employeeID", // keep consistent
+      name: "employeeID",
       label: title === "Program" ? "Program Dean" : "Institute Head",
       placeholder: title === "Program" ? "Select Program Dean" : "Institute Head",
       type: "select",
@@ -191,10 +196,10 @@ export default function CreateForm({
       placeholder: title === "Program" ? `${title} Color` : `Select ${title.toLowerCase()} logo`,
       type: title === "Program" ? "color" : "file",
       accept: title === "Program" ? undefined : ".webp,.png,.jpeg,.jpg",
-      required: true
+      required: title === "Program" ? true : activeModify === "add"
     });
     return arr;
-  }, [title]);
+  }, [title, activeModify]);
 
 
   // Memoize formFields to prevent recreation
@@ -209,7 +214,7 @@ export default function CreateForm({
     const allowedTypes = ['.webp', '.png', '.jpeg', '.jpg'];
     const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
     if (allowedTypes.includes(fileExtension)) {
-      // ✅ Save the File object to form state
+      // Save the File object to form state
       handleChange({
       target: {
         name: 'instPic',
@@ -217,9 +222,7 @@ export default function CreateForm({
       }
     });
 
-      // (optional) If you want a preview in UI, 
-      // you can also set a separate state for preview URL
-      // setPreview(URL.createObjectURL(file));
+      
     } else {
       alert('Please select a valid image file (.webp, .png, .jpeg, .jpg)');
       e.target.value = '';
@@ -310,6 +313,7 @@ export default function CreateForm({
                   form={form}
                   handleChange={handleChange}
                   handleFileChange={handleFileChange}
+                  activeModify={activeModify}
                   employees={employees}
                   institutes={institutes}
                 />
@@ -357,8 +361,8 @@ export default function CreateForm({
                 >
                   <option value="" disabled className="text-gray-500">Choose a {title.toLowerCase()} to edit</option>
                   {data.map((item, idx) => (
-                    <option value={idx} key={item.programCode}>
-                      {item.programCode} - {item.programName}
+                    <option value={idx} key={item.code || item.programCode}>
+                      {item.code || item.programCode} - {item.name || item.programName}
                     </option>
                   ))}
                 </select>
