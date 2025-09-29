@@ -1069,25 +1069,6 @@ def register_routes(app):
             } 
             institute_list.append(institute_data)
         return jsonify({"institutes": institute_list}), 200
-
-    # @app.route('/api/institute/logos/<string:instCode>', methods=["GET"])
-    # def get_institute_logo(instCode):
-    #     institute = Institute.query.filter_by(instCode=instCode).first()
-    #     if not institute or not institute.instPic:
-    #         return jsonify({"success": False, "message": "Institute logo not found"}), 404
-
-    #     response = preview_from_nextcloud(institute.instPic)
-
-    #     if response.status_code == 200:
-    #         content_type = response.headers.get("Content-Type", "application/octet-stream")
-    #         return Response(response.content, content_type=content_type)
-    #     else:
-    #         return jsonify({
-    #             "success": False,
-    #             "message": f"Failed to fetch logo for {instCode}",
-    #             "status": response.status_code,
-    #             "detail": getattr(response, "text", "No response text")
-    #         }), response.status_code
     
 
     @app.route('/api/institute/logos/<string:instCode>', methods=["GET"])
@@ -1135,49 +1116,44 @@ def register_routes(app):
     @jwt_required()
     def edit_program(programID):
         try:
+            # Admin only
             current_user_id = get_jwt_identity()
             admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
             if not admin_user or not admin_user.isAdmin:
                 return jsonify({'success': False, 'message': 'Admins only'}), 403
-            data = request.get_json()  # Get JSON data from frontend
-            programs = Program.query.filter_by(programID=programID).first()  # Find program by ID
-            
-            if programs:
-                # Update the database fields with new values
-                programs.programCode = data.get('programCode')      # Update program code (e.g., "BSIT")
-                programs.programName = data.get('programName')      # Update program name  
-                programs.programColor = data.get('programColor')    # Update program color
-                # Handle employeeID - accept string format like "23-45-678"
-                employee_id = data.get('employeeID')
-                if employee_id and employee_id.strip():  # Check if not empty
-                    programs.employeeID = employee_id  # Store as string (matches your DB format)
-                else:
-                    programs.employeeID = None  # Set to null for empty values
-                
-                db.session.commit()  # Save changes to database
-                
-                # After saving, get the updated dean info via the foreign key relationship
-                dean = programs.dean  # This uses the relationship defined in your models.py
-                dean_name = f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A"
-                
-                return jsonify({
-                    'success': True,
-                    'message': 'Program Updated Successfully',
-                    'updated_program': {
-                        'programID': programs.programID,
-                        'programCode': programs.programCode,
-                        'programName': programs.programName,
-                        'programColor': programs.programColor,
-                        'programDean': dean_name,  # Send back the dean's full name for display
-                        'employeeID': programs.employeeID  # Include the ID for future edits
-                    }
-                })
-            else:
-                return jsonify({'error': 'Program not found'}), 404
-                
+
+            data = request.get_json() # Get JSON data from frontend
+            program = Program.query.filter_by(programID=programID).first()
+
+            if not program:
+                return jsonify({'success': False, 'message': 'Program not found'}), 404
+
+            # Update the database fields with new values
+            program.programCode = data.get('programCode', program.programCode)      # Update program code (e.g., "BSIT")
+            program.programName = data.get('programName', program.programName)      # Update program name
+            program.programColor = data.get('programColor', program.programColor)   # Update program color
+            program.employeeID = data.get('employeeID', program.employeeID)         # Handle employeeID - accept string format like "23-45-678"
+            program.instID = data.get('instID', program.instID)
+
+            db.session.commit() # Save changes to database
+
+            return jsonify({        
+                'success': True,
+                'message': 'Program updated successfully',
+                'data': {
+                    'programID': program.programID,
+                    'programCode': program.programCode,
+                    'programName': program.programName,
+                    'programColor': program.programColor,
+                    'employeeID': program.employeeID,
+                    'instID': program.instID
+                }
+            }), 200
+
         except Exception as e:
             db.session.rollback()
-            return jsonify({'error': 'Database error occurred'}), 500
+            current_app.logger.error(f"Edit program error: {str(e)}")
+            return jsonify({'success': False, 'message': f'Database error: {str(e)}'}), 500
 
     #Create new program
     @app.route('/api/program', methods=['POST'])
@@ -1192,36 +1168,46 @@ def register_routes(app):
             
             # Handle employeeID - accept string format like "23-45-678"
             employee_id = data.get('employeeID')
-            if employee_id and employee_id.strip():  # Check if not empty
-                final_employee_id = employee_id  # Store as string
-            else:
-                final_employee_id = None  # Set to null for empty values
+            final_employee_id = employee_id.strip() if employee_id and str(employee_id).strip() else None
             
-            # Create new program object
-            new_institute = Program(
-                programCode=data.get('programCode'),
-                programName=data.get('programName'),
-                programColor=data.get('programColor'),
-                employeeID=final_employee_id
+            # Parse instID and validate it
+            inst_id = data.get('instID')
+            if inst_id is not None:
+                # If provided, ensure institute exists
+                inst = Institute.query.filter_by(instID=inst_id).first()
+                if not inst:
+                    return jsonify({
+                        'success': False,
+                        'message': 'Institute not found'
+                    }), 400
+            
+            # Create new program object with instID to fetch in College modal
+            new_program = Program(
+                programCode = data.get('programCode'),
+                programName = data.get('programName'),
+                programColor = data.get('programColor'),
+                employeeID = final_employee_id,
+                instID = inst_id # associate program with institute
             )
             
-            db.session.add(new_institute)  # Add to database
+            db.session.add(new_program)  # Add to database
             db.session.commit()  # Save changes
             
             # Get the dean info for response (same as edit route)
-            dean = new_institute.dean
+            dean = new_program.dean
             dean_name = f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A"
             
             return jsonify({
                 'success': True,
                 'message': 'Program Created Successfully',
-                'programID': new_institute.programID,
-                'programCode': new_institute.programCode,
-                'programName': new_institute.programName,
-                'programColor': new_institute.programColor,
+                'programID': new_program.programID,
+                'programCode': new_program.programCode,
+                'programName': new_program.programName,
+                'programColor': new_program.programColor,
                 'programDean': dean_name,
-                'employeeID': new_institute.employeeID
-            })
+                'employeeID': new_program.employeeID,
+                'instID': new_program.instID
+            }), 200
             
         except Exception as e:
             db.session.rollback()

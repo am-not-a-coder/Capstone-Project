@@ -60,7 +60,7 @@ const Institutes = () => {
                 }
                 
               } else {
-              console.error(response.error || "Failed to fetch insegetitutes.");
+              console.error(response.error || "Failed to fetch institutes.");
             }
           } catch (err) {
             console.error("Server error. Please try again.", err);
@@ -132,7 +132,7 @@ const Institutes = () => {
           } catch (err) {
             console.error("Error creating institute.", err);
             setShowStatusModal(true);
-            setStatusMessage("Failed to create institute");
+            setStatusMessage("Failed to creawdwte institute");
             setStatusType("error");
           }
         };
