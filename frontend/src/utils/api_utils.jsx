@@ -62,88 +62,77 @@ export const MakeApiCalls = async (endpoint, options = {}) => {
             return { success: false, status: 403, error: msg, data }
         }
 
-// Handle blob responses (for file downloads)
-if (options.responseType === 'blob') {
-    if (response.ok) {
-        const blob = await response.blob()
-        return {
-            success: true,
-            data: blob,
-            status: response.status,
-            headers: response.headers
-        }
-    }
-    
-    // Error Handling for non-JSON responses
-    let errorData
-    try {
-       
-        const errorText = await response.text()
-        
-        // Try to parse as JSON, but fallback to text
-        try {
-            errorData = JSON.parse(errorText)
-        } catch {
-            errorData = { 
-                message: errorText || `HTTP ${response.status}: ${response.statusText}`,
-                status: response.status 
+        // Handle blob responses (for file downloads)
+        if (options.responseType === 'blob') {
+            if (response.ok) {
+                const blob = await response.blob()
+                return {
+                    success: true,
+                    data: blob,
+                    status: response.status,
+                    headers: response.headers
+                }
             }
-        }
-    } catch {
-        errorData = { message: `HTTP ${response.status}: ${response.statusText}` }
-    }
-    
-    if (response.status === 401) {
-        const refreshToken = getRefreshToken()
-        if (refreshToken && endpoint !== '/api/refresh-token') {
+            
+            // Error Handling for non-JSON responses
+            let errorData
             try {
-                const refreshResult = await refreshAccessToken()
-                if (refreshResult.success) {
-                    // Add a retry counter to prevent infinite loops
-                    const retryCount = (options._retryCount || 0) + 1
-                    if (retryCount <= 1) { // Only retry once
-                        return MakeApiCalls(endpoint, { ...options, _retryCount: retryCount })
+                const errorText = await response.text()
+                
+                // Try to parse as JSON, but fallback to text
+                try {
+                    errorData = JSON.parse(errorText)
+                } catch {
+                    errorData = { 
+                        message: errorText || `HTTP ${response.status}: ${response.statusText}`,
+                        status: response.status 
                     }
                 }
-            } catch (refreshError) {
-                console.error('Token refresh failed:', refreshError)
+            } catch {
+                errorData = { message: `HTTP ${response.status}: ${response.statusText}` }
+            }
+            
+            return {
+                success: false,
+                error: errorData.message || errorData.error || 'Request failed',
+                data: errorData,
+                status: response.status
             }
         }
-
-        
-        return {
-            success: false,
-            error: 'Authentication expired. Please login again.',
-            status: 401,
-            needsAuth: true // Flag to indicate auth is needed
-        }
-    }
-    
-    return {
-        success: false,
-        error: errorData.message || errorData.error || 'Request failed',
-        data: errorData,
-        status: response.status
-    }
-}
 
         // Regular JSON response handling
         const data = await response.json()
 
-            if (response.ok) {
-                return { success: true, data, status: response.status}
-            }
+        if (response.ok) {
+            return { success: true, data, status: response.status}
+        }
 
-            return {
-                success: false,
-                error: data.message || data.error || 'Request failed',
-                data,
-                status: response.status
-            }
+        return {
+            success: false,
+            error: data.message || data.error || 'Request failed',
+            data,
+            status: response.status
+        }
     }catch(error) {
         return { success: false, error: 'Network error. Please check your connection.'}
     }
 
+}
+
+const getRefreshToken = () => {
+    return getCookie('refresh_token')
+}
+
+const storeToken = (tokenData) => {
+    if (tokenData.access_token) {
+        document.cookie = `access_token=${tokenData.access_token}; path=/; max-age=3600; SameSite=Lax`
+    }
+    if (tokenData.refresh_token) {
+        document.cookie = `refresh_token=${tokenData.refresh_token}; path=/; max-age=604800; SameSite=Lax`
+    }
+    if (tokenData.user) {
+        localStorage.setItem('user', JSON.stringify(tokenData.user))
+    }
 }
 
 const refreshAccessToken = async () => {
