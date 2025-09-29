@@ -51,6 +51,7 @@ class Area(db.Model):
 
     areaID = db.Column(db.Integer, primary_key=True, nullable=False)
     instID = db.Column(db.Integer, db.ForeignKey('institute.instID'), nullable=True)
+    instID = db.Column(db.Integer, db.ForeignKey('institute.instID'), nullable=True)
     programID = db.Column(db.Integer, db.ForeignKey('program.programID'), nullable=False)
     areaName = db.Column(db.String(100))
     areaNum = db.Column(db.String(10))
@@ -67,8 +68,8 @@ class Program(db.Model):
     __tablename__ = 'program'
 
     programID = db.Column(db.Integer, primary_key=True, nullable=False)
-    employeeID = db.Column(db.String(10), db.ForeignKey('employee.employeeID'))    
-    instID = db.Column(db.Integer, db.ForeignKey('institute.instID'))
+    instID = db.Column(db.Integer, db.ForeignKey('institute.instID'), nullable=True)
+    employeeID = db.Column(db.String(10), db.ForeignKey('employee.employeeID'))
     programCode = db.Column(db.String(20))
     programName = db.Column(db.String(100))
     programColor = db.Column(db.String(30))
@@ -236,3 +237,20 @@ class MessageDeletion(db.Model):
     messageID = db.Column(db.Integer, db.ForeignKey('message.messageID'), nullable=False)
     employeeID = db.Column(db.String(50), db.ForeignKey('employee.employeeID'), nullable=False)
     deletedAt = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Notification(db.Model):
+    __tablename__ = 'notification'
+    
+    notificationID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    recipientID = db.Column(db.String(10), db.ForeignKey('employee.employeeID'), nullable=False)
+    senderID = db.Column(db.String(10), db.ForeignKey('employee.employeeID'), nullable=True)  # Null for system notifications
+    type = db.Column(db.String(50), nullable=False)  # 'message', 'announcement', 'system'
+    title = db.Column(db.String(255), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    isRead = db.Column(db.Boolean, default=False)
+    createdAt = db.Column(db.DateTime, default=datetime.utcnow)
+    link = db.Column(db.String(255))  # Optional link to related page
+    
+    # Relationships
+    recipient = db.relationship("Employee", foreign_keys=[recipientID], backref="received_notifications")
+    sender = db.relationship("Employee", foreign_keys=[senderID], backref="sent_notifications")
