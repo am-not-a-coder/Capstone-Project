@@ -14,8 +14,10 @@ import avatar3 from '../assets/avatar3.png';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentUser } from '../utils/auth_utils';
-import { apiGet } from '../utils/api_utils';
+import { apiGet, apiPut } from '../utils/api_utils';
 import { getSocket } from '../utils/websocket_utils';
+import NotifItem from './NotifItem';
+import notificationSound from '../utils/notificationSound';
 
 
 const Header = ({title}) => {    
@@ -25,6 +27,10 @@ const Header = ({title}) => {
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+    const [notifications, setNotifications] = useState([]);
+    const [notificationsLoading, setNotificationsLoading] = useState(true);
 
     //state for message read status
     const [messageReadStatus, setMessageReadStatus] = useState({});
@@ -60,8 +66,90 @@ const Header = ({title}) => {
 
     },[showProfile, showNotification, showMessages])
 
-    //closes tab when scrolling
+
+    // Fetch notifications for header dropdown
+    const fetchNotifications = async () => {
+        try {
+            setNotificationsLoading(true);
+            console.log('🔔 Fetching notifications...');
+            const response = await apiGet('/api/notifications?page=1&per_page=5');
+            console.log('🔔 Notifications response:', response);
+            if (response && response.success && response.data) {
+                const notifications = response.data.notifications || [];
+                setNotifications(notifications);
+                console.log('🔔 Notifications set:', notifications);
+            } else {
+                console.error('Failed to fetch notifications:', response);
+                setNotifications([]);
+            }
+        } catch (error) {
+            console.error('Error fetching notifications:', error);
+            setNotifications([]);
+        } finally {
+            setNotificationsLoading(false);
+        }
+    };
+
+    // Mark all notifications as read
+    const markAllNotificationsAsRead = async () => {
+        try {
+            console.log('🔔 Marking all notifications as read...');
+            const response = await apiPut('/api/notifications/mark-all-read');
+            console.log('🔔 Mark as read response:', response);
+            if (response && response.success) {
+                setUnreadCount(0);
+                console.log('🔔 All notifications marked as read - unread count set to 0');
+            } else {
+                console.error('🔔 Failed to mark notifications as read:', response);
+            }
+        } catch (error) {
+            console.error('Error marking notifications as read:', error);
+        }
+    };
+
+    // Fetch unread count
+    const fetchUnreadCount = async () => {
+        try {
+          console.log('🔔 Fetching unread count...');
+          const response = await apiGet('/api/notifications/unread-count');
+          console.log('🔔 Unread count response:', response);
+          if (response && response.success && response.data) {
+            const count = response.data.count || 0;
+            setUnreadCount(count);
+            console.log('🔔 Unread count set:', count);
+          } else {
+            setUnreadCount(0);
+          }
+        } catch (error) {
+          console.error('Failed to fetch unread count:', error);
+          setUnreadCount(0);
+        }
+      };
+
+    //closes tab when scrolling /notif header
     useEffect(() => {
+        
+          fetchUnreadCount();
+          fetchNotifications();
+          
+          // Listen for real-time updates
+          const socket = getSocket();
+          if (socket) {
+            // Join notification room
+            console.log('🔔 Joining notification room...');
+            socket.emit('join_notifications', (response) => {
+              console.log('🔔 Join notifications response:', response);
+            });
+            
+            socket.on('new_notification', (notification) => {
+              console.log('🔔 New notification received:', notification);
+              // Play notification sound
+              notificationSound.playNotification();
+              fetchUnreadCount();
+              fetchNotifications();
+            });
+          }
+
         const handleScroll = () =>{
             setShowProfile(false)
             setShowNotification(false)
@@ -101,7 +189,11 @@ const Header = ({title}) => {
                     }
                 })
             );
-            setMessages(withLast.map(c => ({ ...c, alert: false })));
+            const messagesWithAlerts = withLast.map(c => ({ ...c, alert: false }));
+            setMessages(messagesWithAlerts);
+            // Calculate unread message count (messages with alerts)
+            const unreadCount = messagesWithAlerts.filter(c => c.alert).length;
+            setUnreadMessageCount(unreadCount);
           } catch (err) {
             if (!alive) return;
             setError('Failed to load messages');
@@ -130,9 +222,15 @@ const Header = ({title}) => {
                 };
                 if (!isOwn && !showMessages) {
                     conv.alert = true
+                    // Play message sound
+                    notificationSound.playMessageSound();
                 }
                 copy.splice(idx, 1);
-                return [conv, ...copy];
+                const updatedMessages = [conv, ...copy];
+                // Update unread count
+                const unreadCount = updatedMessages.filter(m => m.alert).length;
+                setUnreadMessageCount(unreadCount);
+                return updatedMessages;
             });
         };
         socket.on('new_message', onNewMessage);
@@ -141,33 +239,6 @@ const Header = ({title}) => {
         
 
 
-    //static notif data
-    const notifications = [
-        {
-            profilePic: avatar1,
-            title: "Programs",
-            content: "BSIT department has completed the Area I.",
-            date: "06/20/2025",
-            alert: true,
-            link: "/Programs"
-        },
-        {
-            profilePic: avatar2,
-            title: "New Announcement",
-            content: "Admin has uploaded a new announcement.",
-            date: "06/20/2025",
-            alert: false,
-            link: "/Dashboard"
-        },
-        {
-            profilePic: avatar3,
-            title: "Documents",
-            content: "New document has been uploaded to the system.",
-            date: "06/29/2025",
-            alert: true,
-            link: "/Documents"
-        }
-    ]
 
     return(
         <header className="fixed z-10 flex items-center w-full col-span-5 col-start-2 p-4 pl-10 mb-3 -mt-5 lg:relative lg:pl-5">
@@ -178,32 +249,59 @@ const Header = ({title}) => {
             ref={iconContainerRef}
             className="absolute top-0 right-0 flex items-center justify-around w-full p-2 bg-gray-200 border border-gray-300 shadow-lg lg:rounded-3xl lg:top-4 lg:right-10 lg:w-45 lg:h-16 h-19 dark:bg-gray-900 dark:border-gray-800 dark:inset-shadow-sm dark:inset-shadow-zuccini-900 ">
                 {/* Message button */}
-                <FontAwesomeIcon 
-                    icon={faComment} 
-                    className="p-2 text-lg transition-all duration-500 rounded-lg cursor-pointer inset-shadow-sm inset-shadow-gray-400 bg-neutral-300 text-zuccini-800 lg:text-xl dark:text-zuccini-700 dark:bg-gray-800 dark:shadow-sm dark:shadow-zuccini-800"
-                    onClick={() => {
-                        setShowMessages((current) => {
-                            const next = !current
-                            if (next) {
-                                setMessages(prev => prev.map(m => ({ ...m, alert: false })))
-                                setMessageReadStatus({})
-                            }
-                            return next
-                        });
-                        setShowNotification(false);
-                        setShowProfile(false);
-                    }} 
-            />
+                <div className="relative">
+                    <FontAwesomeIcon 
+                        icon={faComment} 
+                        className="p-2 text-lg transition-all duration-500 rounded-lg cursor-pointer inset-shadow-sm inset-shadow-gray-400 bg-neutral-300 text-zuccini-800 lg:text-xl dark:text-zuccini-700 dark:bg-gray-800 dark:shadow-sm dark:shadow-zuccini-800"
+                        onClick={() => {
+                            setShowMessages((current) => {
+                                const next = !current
+                                if (next) {
+                                    setMessages(prev => prev.map(m => ({ ...m, alert: false })))
+                                    setMessageReadStatus({})
+                                    setUnreadMessageCount(0); // Clear unread count when opened
+                                }
+                                return next
+                            });
+                            setShowNotification(false);
+                            setShowProfile(false);
+                        }} 
+                    />
+                    {unreadMessageCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                            {unreadMessageCount}
+                        </span>
+                    )}
+                </div>
                 {/* Notification button */}
-                <FontAwesomeIcon 
-                    icon={faBell} 
-                    className="p-2 ml-2 text-xl text-center transition-all duration-500 rounded-lg cursor-pointer inset-shadow-sm inset-shadow-gray-400 bg-neutral-300 text-zuccini-800 dark:text-zuccini-700 dark:bg-gray-800 dark:shadow-sm dark:shadow-zuccini-800" 
-                    onClick={ () => {
-                        setShowNotification ((current) => !current)
-                        setShowMessages(false);
-                        setShowProfile(false);
-                    }}
-            />
+                <div className="relative">
+                    <FontAwesomeIcon 
+                        icon={faBell} 
+                        className="p-2 ml-2 text-xl text-center transition-all duration-500 rounded-lg cursor-pointer inset-shadow-sm inset-shadow-gray-400 bg-neutral-300 text-zuccini-800 dark:text-zuccini-700 dark:bg-gray-800 dark:shadow-sm dark:shadow-zuccini-800" 
+                        onClick={ async () => {
+                            setShowNotification ((current) => {
+                                const next = !current;
+                                if (next) {
+                                    // Immediately clear the unread count when opening dropdown
+                                    setUnreadCount(0);
+                                    console.log('🔔 Notification dropdown opened - unread count set to 0');
+                                    // Refresh notifications when opening dropdown
+                                    fetchNotifications();
+                                    // Mark all notifications as read when opening dropdown
+                                    markAllNotificationsAsRead();
+                                }
+                                return next;
+                            })
+                            setShowMessages(false);
+                            setShowProfile(false);
+                        }}
+                    />
+                    {unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                            {unreadCount}
+                        </span>
+                    )}
+                </div>
                 {/* Profile button */}
                 <FontAwesomeIcon 
                     icon={faCircleUser}
@@ -276,12 +374,24 @@ const Header = ({title}) => {
                             </Link>
                         </div>
                        <div className='flex flex-col min-h-[300px] p-3 bg-neutral-300 w-full rounded-xl inset-shadow-sm inset-shadow-neutral-400 transition-all duration-500 dark:text-white dark:border-gray-800 dark:bg-gray-950 dark:inset-shadow-zuccini-900 dark:inset-shadow-sm'>
-                            {notifications && notifications.length > 0 ? (
-                            notifications.map((notification, index) => (
-                                <Notifications key={index} picture={notification.profilePic} notifTitle={notification.title} content={notification.content} date={notification.date} alert={notification.alert} link={notification.link} onClose={() => setShowNotification(false)}/>
-                            )) 
-                        ) : ( <h1 className='text-xl text-center text-neutral-600'>No new notifications</h1> 
-                        )}
+                            {notificationsLoading ? (
+                                <h1 className='text-xl text-center text-neutral-600'>Loading notifications...</h1>
+                            ) : notifications && notifications.length > 0 ? (
+                                notifications.map((notification, index) => (
+                                    <NotifItem 
+                                        key={notification.notificationID || index} 
+                                        picture={notification.sender?.profilePic || avatar1} 
+                                        notifTitle={notification.title} 
+                                        content={notification.content} 
+                                        date={new Date(notification.createdAt).toLocaleDateString()} 
+                                        alert={!notification.isRead} 
+                                        link={notification.link} 
+                                        onClose={() => setShowNotification(false)}
+                                    />
+                                )) 
+                            ) : ( 
+                                <h1 className='text-xl text-center text-neutral-600'>No new notifications</h1> 
+                            )}
                         </div>
                 </div>
             )}
@@ -324,6 +434,7 @@ const Header = ({title}) => {
                     </div>
                 </div>
             )}
+
         </div>
         </header>
     )
