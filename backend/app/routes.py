@@ -3107,3 +3107,23 @@ def register_routes(app):
         except Exception as e:
             current_app.logger.error(f"Get unread count error: {e}")
             return jsonify({'success': False, 'message': 'Failed to get unread count'}), 500
+
+    # Get all audit logs
+    @app.route('/api/auditLogs', methods=['GET'])
+    def get_audit_logs():
+        try:
+            logs = AuditLog.query.order_by(AuditLog.createdAt.desc()).all()
+            logs_list = [{
+                'logID': log.logID,
+                'employeeID': log.employeeID,
+                'action': log.action,
+                'createdAt': log.createdAt
+            } for log in logs]
+
+            return jsonify({'success': True, 'logs': logs_list}), 200
+        except Exception as e:
+            current_app.logger.error(f"Error getting logs: {e}")
+            return jsonify({'success': False, 'message': 'Failed to get audit logs'}), 500
+
+    #Get all pending documents
+    

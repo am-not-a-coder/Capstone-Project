@@ -1,5 +1,5 @@
 from app import db
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.dialects.postgresql import TSVECTOR, ARRAY
 from sqlalchemy.types import UserDefinedType
 class Vector(UserDefinedType):
@@ -37,7 +37,7 @@ class Employee(db.Model):
     isOnline = db.Column(db.Boolean, default=False)
     experiences = db.Column(db.Text)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     
     # MFA/OTP fields
     otpcode = db.Column(db.String(6))
@@ -131,7 +131,7 @@ class Document(db.Model):
     isApproved = db.Column(db.Boolean)
     approvedBy = db.Column(db.String(10), db.ForeignKey('employee.employeeID'))
     evaluate_at = db.Column(db.DateTime)
-    upload_date = db.Column(db.DateTime, default=datetime.utcnow)
+    upload_date = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     content = db.Column(db.Text)
     search_vector = db.Column(TSVECTOR)
     tags = db.Column(ARRAY(db.String))
@@ -170,10 +170,9 @@ class AuditLog(db.Model):
     __tablename__ = 'audit_log'
 
     logID = db.Column(db.Integer, primary_key=True, nullable=False)
-    employeeID = db.Column(db.String(10), nullable=False)
+    employeeID = db.Column(db.String(10), db.ForeignKey('employee.employeeID'), nullable=False)
     action = db.Column(db.String(255))
-    timestamp = db.Column(db.DateTime)
-
+    createdAt = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 class Announcement(db.Model):
     __tablename__ = 'announcement'
 
@@ -191,7 +190,7 @@ class Conversation(db.Model):
     conversationName = db.Column(db.String(100))  # For group chats
     conversationType = db.Column(db.String(20), nullable=False)  # 'direct' or 'group'
     createdBy = db.Column(db.String(50), db.ForeignKey('employee.employeeID'), nullable=False)
-    createdAt = db.Column(db.DateTime, default=datetime.utcnow)
+    createdAt = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     isActive = db.Column(db.Boolean, default=True)
     
     # Relationships
@@ -205,7 +204,7 @@ class ConversationParticipant(db.Model):
     participantID = db.Column(db.Integer, primary_key=True, nullable=False)
     conversationID = db.Column(db.Integer, db.ForeignKey('conversation.conversationID'), nullable=False)
     employeeID = db.Column(db.String(50), db.ForeignKey('employee.employeeID'), nullable=False)
-    joinedAt = db.Column(db.DateTime, default=datetime.utcnow)
+    joinedAt = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     lastReadAt = db.Column(db.DateTime)
     isActive = db.Column(db.Boolean, default=True)
     
@@ -221,7 +220,7 @@ class Message(db.Model):
     senderID = db.Column(db.String(50), db.ForeignKey('employee.employeeID'), nullable=False)
     messageContent = db.Column(db.Text, nullable=False)
     messageType = db.Column(db.String(20), default='text')  # 'text', 'file', 'image'
-    sentAt = db.Column(db.DateTime, default=datetime.utcnow)
+    sentAt = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     editedAt = db.Column(db.DateTime)
     isDeleted = db.Column(db.Boolean, default=False)
     
@@ -236,7 +235,7 @@ class MessageDeletion(db.Model):
     id = db.Column(db.Integer, primary_key=True, nullable=False)
     messageID = db.Column(db.Integer, db.ForeignKey('message.messageID'), nullable=False)
     employeeID = db.Column(db.String(50), db.ForeignKey('employee.employeeID'), nullable=False)
-    deletedAt = db.Column(db.DateTime, default=datetime.utcnow)
+    deletedAt = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
 class Notification(db.Model):
     __tablename__ = 'notification'
@@ -248,7 +247,7 @@ class Notification(db.Model):
     title = db.Column(db.String(255), nullable=False)
     content = db.Column(db.Text, nullable=False)
     isRead = db.Column(db.Boolean, default=False)
-    createdAt = db.Column(db.DateTime, default=datetime.utcnow)
+    createdAt = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     link = db.Column(db.String(255))  # Optional link to related page
     
     # Relationships
