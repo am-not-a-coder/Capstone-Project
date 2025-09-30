@@ -8,7 +8,7 @@ from flask import Response, stream_with_context, send_file, jsonify
 from app.models import Document
 
 
-NEXTCLOUD_URL = os.getenv('HOME_NEXTCLOUD_URL') or os.getenv('NEXTCLOUD_URL') or os.getenv('LIBRARY_NEXTCLOUD_URL')
+NEXTCLOUD_URL = os.getenv('NEXTCLOUD_URL')
 NEXTCLOUD_USER = os.getenv('NEXTCLOUD_USER')
 NEXTCLOUD_PASSWORD = os.getenv('NEXTCLOUD_PASSWORD')
 
