@@ -51,7 +51,6 @@ class Area(db.Model):
 
     areaID = db.Column(db.Integer, primary_key=True, nullable=False)
     instID = db.Column(db.Integer, db.ForeignKey('institute.instID'), nullable=True)
-    instID = db.Column(db.Integer, db.ForeignKey('institute.instID'), nullable=True)
     programID = db.Column(db.Integer, db.ForeignKey('program.programID'), nullable=False)
     areaName = db.Column(db.String(100))
     areaNum = db.Column(db.String(10))
@@ -78,7 +77,6 @@ class Program(db.Model):
     institute = db.relationship("Institute", back_populates="programs")
     areas = db.relationship("Area", back_populates="program", cascade="all, delete-orphan")
     
-    institute = db.relationship("Institute", foreign_keys=[instID], backref="programs")
 
 
 class Subarea(db.Model):
@@ -152,19 +150,7 @@ class Institute(db.Model):
     dean = db.relationship("Employee", backref="institutes", foreign_keys=[employeeID])
     programs = db.relationship("Program", back_populates="institute", cascade="all, delete-orphan")
     areas = db.relationship("Area", back_populates="institute")
-    deadlines = db.relationship("Deadline", back_populates="institute")
 
-class Deadline(db.Model):
-    __tablename__ = 'deadline'
-
-    deadlineID = db.Column(db.Integer, primary_key=True, nullable=False)
-    instID = db.Column(db.Integer, db.ForeignKey('institute.instID'), nullable=True)
-    programID = db.Column(db.Integer, nullable=False)
-    areaID = db.Column(db.Integer, nullable=False)
-    content = db.Column(db.Text, nullable=False)
-    due_date = db.Column(db.Date, nullable=False)
-    
-    institute = db.relationship("Institute", back_populates="deadlines")
 
 class AuditLog(db.Model):
     __tablename__ = 'audit_log'
