@@ -57,6 +57,7 @@ import StatusModal from "../components/modals/StatusModal";
 
   // Fetch programs
   const fetchPrograms = async () => {
+    
     setProgramLoading(true)
 
     try {
@@ -101,6 +102,7 @@ import StatusModal from "../components/modals/StatusModal";
 
     // Fetch employees for program dean dropdown selection
     useEffect(() => {
+      
       const fetchEmployees = async () => {
         try {
          
@@ -418,9 +420,9 @@ import StatusModal from "../components/modals/StatusModal";
     setVisible("areas");
     setSelectedProgram(program);
     fetchAreasForProgram(program.programCode);
-  
+    
   }
-
+ 
   // Clear navigation route to programs
   const backToPrograms = () => {
     setVisible("programs");
@@ -647,7 +649,7 @@ import StatusModal from "../components/modals/StatusModal";
                   </button>)}
                 {showCreateModal && (
                   <CreateModal 
-                    onCreate={refreshAreas} 
+                    onCreate={() => refreshAreas(selectedProgram.programCode)} 
                     setShowCreateModal={setShowCreateModal} 
                     onClick={() => setShowCreateModal(false)}
                   />
@@ -675,7 +677,7 @@ import StatusModal from "../components/modals/StatusModal";
                             <ProgramCard 
                               program={program} 
                               key={program.programID} 
-                              onClick={()=> visibleArea(program)}                           
+                              onClick={()=> visibleArea(program)}
                             />
                           ))}
                     </>
@@ -722,7 +724,7 @@ import StatusModal from "../components/modals/StatusModal";
                                       subareaName={subarea.subareaName}
                                       onClick={() => {handleSubareaSelect(subarea)}}
                                       onCreate={() => {setShowCreateModal(true)}}
-                                      onRefresh={refreshAreas}
+                                      onRefresh={() => refreshAreas(selectedProgram.programCode)}
                                       onFilePreview={handleFilePreview}
                                       done={done}
                                       setDone={setDone}
