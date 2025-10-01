@@ -29,19 +29,10 @@ services:
       watch:
       - path: ./backend
         target: /app
-        action: sync
-    volumes:
-      - ./uploads:/app/uploads        
+        action: sync        
 
   redis:
     image: redis:alpine
     ports:
       - '6379:6379'
-    volumes:
-      - redis_data:/data
     command: redis-server --appendonly yes
-
-volumes:
-  nextcloud_data:
-  redis_data:
-  pip-cache:
