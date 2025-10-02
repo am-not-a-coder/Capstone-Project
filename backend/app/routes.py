@@ -254,6 +254,17 @@ def register_routes(app):
             }), 200
             
         except Exception as e:
+            # Audit failed token refresh instead of repeating new token
+            if current_user_id:
+                user = Employee.query.filter_by(employeeID=current_user_id).first()
+                if user:
+                    new_log = AuditLog(
+                        employeeID=current_user_id,
+                        action=f"{user.lName}, {user.fName} {user.suffix or ''}. TOKEN REFRESH FAILED. Admin={user.isAdmin}"
+                    )
+                    db.session.add(new_log)
+                    db.session.commit()
+
             current_app.logger.error(f"Token refresh error: {e}")
             return jsonify({'success': False, 'message': 'Token refresh failed'}), 500
     
@@ -263,7 +274,44 @@ def register_routes(app):
         session_id = request.json.get('sessionId') if request.is_json else None
         return session_id
 
-    #LOGOUT API
+    #Audit session expired
+    @app.route('/api/session-expired', methods=["POST"])
+    def sessionExpired():
+        try:
+            data = request.get_json() or {}
+            empID = data.get('employeeID')
+            session_id = data.get('session_id')
+
+            # Clean up session from Redis
+            if session_id:
+                redis_key = f'session:{session_id}'
+                redis_client.delete(redis_key)
+                redis_client.hdel('user_status', empID)
+
+            # Clean up user from online users (if empID provided)
+            if empID:
+                redis_client.srem('online_users', empID)
+            
+            # Always return success for logout (even if empID missing)
+            resp = jsonify({'success': True})
+            unset_jwt_cookies(resp) 
+
+            # Audit session expired
+            user = Employee.query.filter_by(employeeID=empID).first()
+            new_log = AuditLog(
+                employeeID = empID,
+                action = f"{user.lName}, {user.fName} {user.suffix}. SESSION EXPIRED. Admin={user.isAdmin}"
+            )
+            db.session.add(new_log)
+            db.session.commit()
+
+            return resp
+            
+        except Exception as e:
+            print(f"Logout error: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+        
+    # Audit Logout
     @app.route('/api/logout', methods=["POST"])
     @jwt_required()
     def logout():
@@ -300,6 +348,7 @@ def register_routes(app):
         except Exception as e:
             print(f"Logout error: {e}")
             return jsonify({'success': False, 'error': str(e)}), 500
+
 
 
     # ============================================ DASHBOARD ROUTES ============================================
@@ -3125,5 +3174,24 @@ def register_routes(app):
             current_app.logger.error(f"Error getting logs: {e}")
             return jsonify({'success': False, 'message': 'Failed to get audit logs'}), 500
 
+
+
     #Get all pending documents
+    @app.route('/api/pendingDocs', methods=['GET'])
+    def get_pending_docs():
+        try:
+            pendingDocs = Document.query.filter(Document.isApproved == None).all()
+            pendingDocs_list = [{
+                'pendingDocID': pendingDoc.docID,
+                'pendingDocName': pendingDoc.docName
+            } for pendingDoc in pendingDocs]
+        
+            return jsonify({'success': True, 'pendingDocs': pendingDocs_list}), 200
+        except Exception as e:
+            current_app.logger.error(f"Error getting pending documents: {e}")
+            return jsonify({'success': False, 'message': 'Failed to get pending documents'}), 500
+
+
+
+
     

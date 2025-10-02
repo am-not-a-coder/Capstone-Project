@@ -141,6 +141,29 @@ const Dashboard = () => {
         }
     };
 
+    // Fetch logs
+    const [logs, setLogs] = useState([])
+    useEffect(()=> {
+        const fetchLogs = async ()=> {
+            try {
+                const response = await apiGet('/api/auditLogs')
+                setLogs(response.data.logs)
+            } catch(err) {console.error('Error getting logs ', err)}
+        } 
+        fetchLogs()
+    }, [])
+
+    // Fetch pending documents
+    const [pendingDocs, setPendingDocs] = useState([])
+    useEffect(()=> {
+        const fetchPendingDocs = async ()=> {
+            try {
+                const response = await apiGet('/api/pendingDocs')
+                setPendingDocs(response.data.pendingDocs)
+            } catch(err) {console.error('Error getting pending documents ', err)}
+        } 
+        fetchPendingDocs()
+    }, [])
     
     return (
         <>
@@ -223,8 +246,10 @@ const Dashboard = () => {
                         <FontAwesomeIcon icon={faHourglassHalf}  className="p-2 transition-all duration-500 dark:text-white" />
                         <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Pending Documents</h2>
                     </div>
-                    <div className="flex items-center justify-center p-5 transition-all duration-500 rounded-lg h-60 bg-neutral-300 dark:bg-gray-950/50">
-                        <p className="p-5 m-auto text-center text-gray-700 transition-all duration-500 dark:text-white">No pending documents.</p>
+                    <div className="flex flex-col p-1 gap-1 transition-all duration-500 rounded-lg h-60 bg-neutral-300 dark:bg-gray-950/50">
+                        {pendingDocs.map((pendingDoc)=> (
+                            <p key={pendingDoc.pendingDocID} className=" text-gray-700 hover:bg-gray-400 transition-all duration-500 dark:text-white">{pendingDoc.pendingDocName}</p>
+                        ))}
                     </div>
                 </div>
                 {/* Audit Logs */}
@@ -235,9 +260,21 @@ const Dashboard = () => {
                         <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Audit Logs</h2>
                     </div>
 
-                    <div className="flex items-center justify-center p-4 rounded-lg h-60 bg-neutral-300 dark:border-gray-900 dark:bg-gray-950/50">
-                        <p className="p-5 text-center text-gray-700 transition-all duration-500 dark:text-white">No logs at the moment.</p>
-                    </div> 
+                    {/* Display logs */}
+                    <table className="overflow-auto gap-1 relative whitespace-nowrap flex flex-col p-2 rounded-lg h-60 bg-neutral-300 dark:border-gray-900 dark:bg-gray-950/50">
+                        <tr className=' flex justify-around w-[150%] lg:w-[110%]'>
+                            <th>Action</th>
+                            <th className='ml-30'>Date & Time</th>
+                        </tr>
+                        {logs.map((log)=> (
+                            <tr key={log.logID} className='flex w-[150%] lg:w-[110%] justify-between hover:bg-gray-400'>
+                                <td  className=" text-gray-700 transition-all duration-500 dark:text-white" >{log.action}</td>
+                                <td className=" flex text-gray-700 transition-all duration-500 dark:text-white"  >{log.createdAt}</td>
+                            </tr>
+                        ))}
+                    </table>
+                    
+                     
                 </div>
                 </section>
             )}

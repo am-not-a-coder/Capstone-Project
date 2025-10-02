@@ -78,7 +78,7 @@ class Program(db.Model):
     institute = db.relationship("Institute", back_populates="programs")
     areas = db.relationship("Area", back_populates="program", cascade="all, delete-orphan")
     
-    institute = db.relationship("Institute", foreign_keys=[instID], backref="programs")
+    # institute = db.relationship("Institute", foreign_keys=[instID], backref="programs")
 
 
 class Subarea(db.Model):
@@ -108,17 +108,6 @@ class Criteria(db.Model):
     subarea = db.relationship("Subarea", back_populates="criteria")    
 
     document = db.relationship("Document", back_populates="criteria")
-
-class Deadline(db.Model):
-    __tablename__ = "deadline"
-
-    deadlineID = db.Column(db.Integer, primary_key=True)
-    programID = db.Column(db.Integer, db.ForeignKey("program.programID"), nullable=False)
-    areaID = db.Column(db.Integer, db.ForeignKey("area.areaID"), nullable=False)
-    criteriaID = db.Column(db.Integer, db.ForeignKey("criteria.criteriaID"), nullable=False)
-    content = db.Column(db.Text, nullable=True)
-    due_date = db.Column(db.DateTime, nullable=False)
-      
 
 class Document(db.Model):
     __tablename__ = 'document'
@@ -152,19 +141,20 @@ class Institute(db.Model):
     dean = db.relationship("Employee", backref="institutes", foreign_keys=[employeeID])
     programs = db.relationship("Program", back_populates="institute", cascade="all, delete-orphan")
     areas = db.relationship("Area", back_populates="institute")
-    deadlines = db.relationship("Deadline", back_populates="institute")
+    # deadlines = db.relationship("Deadline", back_populates="institute")
 
 class Deadline(db.Model):
     __tablename__ = 'deadline'
 
     deadlineID = db.Column(db.Integer, primary_key=True, nullable=False)
-    instID = db.Column(db.Integer, db.ForeignKey('institute.instID'), nullable=True)
+    # instID = db.Column(db.Integer, db.ForeignKey('institute.instID'), nullable=True)
+    criteriaID = db.Column(db.Integer, db.ForeignKey('criteria.criteriaID'), nullable=True)
     programID = db.Column(db.Integer, nullable=False)
     areaID = db.Column(db.Integer, nullable=False)
     content = db.Column(db.Text, nullable=False)
     due_date = db.Column(db.Date, nullable=False)
     
-    institute = db.relationship("Institute", back_populates="deadlines")
+    # institute = db.relationship("Institute", back_populates="deadlines")
 
 class AuditLog(db.Model):
     __tablename__ = 'audit_log'
