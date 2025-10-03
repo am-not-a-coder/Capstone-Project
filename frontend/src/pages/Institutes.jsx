@@ -322,7 +322,7 @@ const Institutes = () => {
                 {/* Main Content */}
               <div className="flex flex-wrap gap-5 mt-20 mb-8 lg:mt-8" >
                 {isAdmin && (
-                  <CreateCard setShowForm={setShowForm}/>
+                  <CreateCard setShowForm={setShowForm} title="Institute"/>
                 )}
                 {/* Loading  */}
                  {loading ? (

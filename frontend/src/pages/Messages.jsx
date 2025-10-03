@@ -4,7 +4,7 @@ import avatar3 from '../assets/avatar3.png';
 import MessagesItem from '../components/MessagesItem';
 import { useState, useRef, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSquareXmark, faPaperPlane } from '@fortawesome/free-solid-svg-icons';
+import { faXmark, faPaperPlane, faMessage, faTrash, faComments } from '@fortawesome/free-solid-svg-icons';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { apiGet, apiPost, apiDelete } from '../utils/api_utils';
 import { subscribePresence, getOnlineIds, getSocket } from '../utils/websocket_utils';
@@ -412,257 +412,285 @@ const Messages = () => {
   : messages.filter(user => onlineIds.has(String(user.id))); //show users
     
   return (
-    <div className="flex flex-row relative border border-neutral-800 rounded-[20px] min-w-[950px] min-h-[90%] shadow-md p-2 pb-4 bg-neutral-200 text-neutral-900 dark:text-white dark:bg-gray-900 dark:inset-shadow-sm dark:inset-shadow-zuccini-800">
+    <>      
 
-      {/* Messages section */}
-      <div className={`transition-all duration-300 ${selectedConversation ? 'w-[600px]' : 'w-full'}`}>
-
-      <div className='flex gap-4 mt-2'>
-        <button
-          onClick={handleViewAll}
-          className={`px-4 py-1 font-medium transition-colors rounded-full cursor-pointer ${view === 'all' ? 'bg-blue-500 text-white' : 'text-black bg-neutral-300 dark:text-white dark:bg-neutral-800' } `}
-        >
-          See All
-        </button>
-
-        <button
-          onClick={handleViewActive}
-          className={`px-4 py-1 font-medium transition-colors rounded-full cursor-pointer ${view === 'active' ? 'bg-green-600 text-white' : 'text-black bg-neutral-300 dark:text-white dark:bg-neutral-800' }`}
-        >
-          Active Users
-        </button>
-      </div>
-      
-      {/* delete all messages, this only renders in see all */}
-      {view === 'all' && (
-        <button
-        onClick={handleDeleteAll}
-        className='absolute z-0 px-2 text-base font-bold text-red-500 rounded-full cursor-pointer top-5 right-5 hover:bg-neutral-300 dark:hover:bg-neutral-800'>
-        Delete All
-      </button>
-      )}
-
-      {/* Messages List */}
-      <div className='grid gap-1 pt-3'>
-        {view === 'all' ? (
-          <>
-            {/* Pinned New Message item */}
-            <div
-              key={'new_message_button'}
-              className='flex items-center gap-3 p-2 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer'
-              onClick={() => setShowNewMsgModal(true)}
+      {/* Main Content */}
+      <div className="flex flex-row gap-4 flex-1 min-h-[600px]">
+        {/* Messages List Section */}
+        <div className={`bg-gray-200 dark:bg-gray-800 rounded-2xl shadow-md border border-gray-200 dark:border-gray-700 p-5 transition-all duration-300 ${selectedConversation ? 'w-[400px]' : 'flex-1'}`}>
+          
+          {/* View Toggle Buttons */}
+          <div className='flex gap-3 mb-4'>
+            <button
+              onClick={handleViewAll}
+              className={`flex items-center gap-2 px-4 py-2 font-medium transition-all rounded-lg ${view === 'all' ? 'bg-emerald-600 text-white shadow-md' : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
             >
-              <div className='flex flex-col'>
-                <div className='font-medium text-neutral-900 dark:text-white'>New Message</div>
-                <div className='text-sm text-neutral-500'>Start a new conversation</div>
-              </div>
-            </div>
+              <FontAwesomeIcon icon={faComments} />
+              See All
+            </button>
 
-            {filteredMessages.length > 0 ? (
-              filteredMessages.map((item, index) => {
-                //if in 'see all', item is a messg obj, if in 'active users', item is a user obj
-                const messageObj = view === 'all'
-                ? item
-                : messages.find(msg => msg.id === item.id);
-
-                return (
-                  <MessagesItem
-                    key={item.id}
-                    picture={item.profilePic}
-                    userName={item.user}
-                    message={messageObj ? messageObj.message : ""}
-                    time={messageObj ? messageObj.time : ""}
-                    alert={messageObj ? messageObj.alert : false}
-                    isOnline={onlineIds.has(String(item.id))}
-                    status={userStatus.get(String(item.id)) || 'active'}
-                    
-                    onDelete={view === 'all' ? () => handleDeleteConversation() : undefined}
-                    onOpenConversation={() => handleOpenConversation(item)}
-                    isSelected={selectedConversation ?.id === item.id} //check if this messg is selelcted
-                    showMessagePreview={view === 'all'}
-                  />
-                )
-              })
-            ) : (
-              <p className='text-lg italic text-gray-500 text-center'>No new messages</p>
-            )}
-          </>
-        ) : (
-          filteredMessages.length > 0 ? (
-            filteredMessages.map((item, index) => {
-              // in active users view, item is a user obj
-              return (
-                <MessagesItem 
-                  key={item.id}
-                  picture={item.profilePic}
-                  userName={item.user}
-                  message=""
-                  time=""
-                  alert={false}
-                  isOnline={onlineIds.has(String(item.id))}
-                  status={userStatus.get(String(item.id)) || 'active'}
-                  onOpenConversation={() => handleOpenConversation(item)}
-                  isSelected={selectedConversation?.id === item.id}
-                  showMessagePreview={false}
-                />
-              );
-            })
-          ) : (
-            <p className='text-lg italic text-gray-500 text-center'>No active users</p>
-          )
-        )}
-        
-        </div>
-      </div>
-      
-      {/* Converstaion Area this will only show if a conversation is selected */}
-      {selectedConversation && (  
-        <div className='flex flex-col z-0 w-2/3 ml-4 border border-neutral-400 rounded-xl bg-white dark:bg-gray-800 overflow-hidden'>
-
-          {/* Convo header */}
-          <div className='flex items-center p-2 border border-b border-neutral-400 dark:border-neutral-600 bg-neutral-400 dark:bg-neutral-800'>
-            
-            {/* profile pic */}
-            <img 
-            src={selectedConversation.profilePic}
-            className='w-12 h-12 mr-3 rounded-full'
-            alt="Profile Picture" />
-
-            {/* Name and Status*/}
-            <div className='flex-1'>
-              <h2
-              className='font-semibold text-lg text-neutral-900 dark:text-white'
-              >{selectedConversation.user}
-              </h2>
-              
-              <div className='flex items-center'>
-              <div className={`w-2.5 h-2.5 mr-2 rounded-full ${selectedDotClass}`}></div>
-              <p className='text-neutral-700 text-sm dark:text-neutral-400'>
-                {selectedText}
-              </p>
-              </div>
-            </div>
-
-            {/* close button */}
-            <FontAwesomeIcon icon={faSquareXmark}
-              className='p-1.5 text-neutral-900 bg-red-500 hover:text-neutral-700 cursor-pointer text-2xl transition-colors dark:hover:bg-neutral-400 rounded-full'
-              onClick={handleCloseConversation}
-              title='Close Chat'
-            />
+            <button
+              onClick={handleViewActive}
+              className={`flex items-center gap-2 px-4 py-2 font-medium transition-all rounded-lg ${view === 'active' ? 'bg-emerald-600 text-white shadow-md' : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'}`}
+            >
+              <FontAwesomeIcon icon={faMessage} />
+              Active Users
+            </button>
           </div>
+          
+          {/* Delete All Button - Only in See All view */}
+          {view === 'all' && (
+            <button
+              onClick={handleDeleteAll}
+              className='flex items-center gap-2 px-3 py-2 mb-3 text-sm font-medium text-red-600 transition-all rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30'>
+              <FontAwesomeIcon icon={faTrash} />
+              Delete All
+            </button>
+          )}
 
-          {/* Dynamic Messages display */}
-          <div className='flex-1 p-4 bg-neutral-300 overflow-y-auto  dark:bg-neutral-900' style={{maxHeight: '400px'}}>
-            {/* Display logic - shows only selected conversation */}
-            {conversationThreads[selectedConversation.conversationId]?.map((msg) => (
-              <div key={msg.id}>
-                {msg.sender === "sent" ? (
-                  //Sent messages (right side)
-                  <div className='flex justify-end mb-4'>
-                    <div className='flex flex-col items-end'>
-                      <div className='flex items-start gap-2'>
-                        <div className='text-white px-4 py-3 bg-blue-500 max-w-xs shadow-sm rounded-2xl'>
-                          <p className='text-sm'>{msg.message}</p>
-                        </div>
-                        <button
-                          title='Delete for me'
-                          className='text-xs px-2 py-1 rounded bg-neutral-300 hover:bg-neutral-400 text-neutral-800 dark:bg-neutral-700 dark:text-white'
-                          onClick={async () => {
-                            if (!window.confirm('Delete this message for you only?')) return
-                            try {
-                              const res = await apiDelete(`/api/messages/${msg.id}`)
-                              if (res && res.success) {
-                                const convId = selectedConversation?.conversationId
-                                if (!convId) return
-                                setConversationThreads(prev => ({
-                                  ...prev,
-                                  [convId]: (prev[convId] || []).filter(m => m.id !== msg.id)
-                                }))
-                                window.dispatchEvent(new CustomEvent('app:toast', { detail: { type: 'success', msg: 'Message deleted for you' } }))
-                              } else {
-                                window.dispatchEvent(new CustomEvent('app:toast', { detail: { type: 'error', msg: (res && res.error) || 'Failed to delete message' } }))
-                              }
-                            } catch (e) {
-                              window.dispatchEvent(new CustomEvent('app:toast', { detail: { type: 'error', msg: 'Failed to delete message' } }))
-                            }
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                      <p className='mt-1 text-xs text-neutral-500'>You • {msg.time}</p>
-                    </div>
+          {/* Messages List */}
+          <div className='space-y-2 overflow-y-auto max-h-[calc(100vh-280px)]'>
+            {view === 'all' ? (
+              <>
+                {/* Pinned New Message Button */}
+                <div
+                  className='flex items-center gap-3 p-3 transition-all border cursor-pointer bg-emerald-50 border-emerald-200 rounded-xl hover:bg-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-800 dark:hover:bg-emerald-900/30'
+                  onClick={() => setShowNewMsgModal(true)}
+                >
+                  <div className='flex items-center justify-center w-12 h-12 rounded-full bg-emerald-500'>
+                    <FontAwesomeIcon icon={faMessage} className='text-xl text-white' />
                   </div>
+                  <div className='flex flex-col'>
+                    <div className='font-semibold text-gray-800 dark:text-white'>New Message</div>
+                    <div className='text-sm text-gray-500 dark:text-gray-400'>Start a new conversation</div>
+                  </div>
+                </div>
+
+                {filteredMessages.length > 0 ? (
+                  filteredMessages.map((item) => {
+                    const messageObj = view === 'all' ? item : messages.find(msg => msg.id === item.id);
+
+                    return (
+                      <MessagesItem
+                        key={item.id}
+                        picture={item.profilePic}
+                        userName={item.user}
+                        message={messageObj ? messageObj.message : ""}
+                        time={messageObj ? messageObj.time : ""}
+                        alert={messageObj ? messageObj.alert : false}
+                        isOnline={onlineIds.has(String(item.id))}
+                        status={userStatus.get(String(item.id)) || 'active'}
+                        
+                        onDelete={view === 'all' ? () => handleDeleteConversation() : undefined}
+                        onOpenConversation={() => handleOpenConversation(item)}
+                        isSelected={selectedConversation?.id === item.id}
+                        showMessagePreview={view === 'all'}
+                      />
+                    )
+                  })
                 ) : (
-                  //Received messages (left side)
-                  <div className='flex items-start mb-4'>
+                  <div className='flex flex-col items-center justify-center py-12 text-gray-400 dark:text-gray-500'>
+                    <FontAwesomeIcon icon={faMessage} className='mb-3 text-5xl' />
+                    <p className='text-lg font-medium'>No messages yet</p>
+                  </div>
+                )}
+              </>
+            ) : (
+              filteredMessages.length > 0 ? (
+                filteredMessages.map((item) => {
+                  return (
+                    <MessagesItem 
+                      key={item.id}
+                      picture={item.profilePic}
+                      userName={item.user}
+                      message=""
+                      time=""
+                      alert={false}
+                      isOnline={onlineIds.has(String(item.id))}
+                      status={userStatus.get(String(item.id)) || 'active'}
+                      onOpenConversation={() => handleOpenConversation(item)}
+                      isSelected={selectedConversation?.id === item.id}
+                      showMessagePreview={false}
+                    />
+                  );
+                })
+              ) : (
+                <div className='flex flex-col items-center justify-center py-12 text-gray-400 dark:text-gray-500'>
+                  <FontAwesomeIcon icon={faMessage} className='mb-3 text-5xl' />
+                  <p className='text-lg font-medium'>No active users</p>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+        
+        {/* Conversation Area */}
+        {selectedConversation && (  
+          <div className='flex flex-col flex-1 bg-white border border-gray-200 shadow-md dark:bg-gray-800 dark:border-gray-700 rounded-2xl'>
+
+            {/* Conversation Header */}
+            <div className='flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700'>
+              <div className='flex items-center gap-3'>
+                {/* Profile Picture */}
+                <img 
+                  src={selectedConversation.profilePic}
+                  className='w-12 h-12 rounded-full ring-2 ring-emerald-500'
+                  alt="Profile Picture" 
+                />
+
+                {/* Name and Status */}
+                <div>
+                  <h2 className='text-lg font-semibold text-gray-800 dark:text-white'>
+                    {selectedConversation.user}
+                  </h2>
+                  
+                  <div className='flex items-center gap-2'>
+                    <div className={`w-2 h-2 rounded-full ${selectedDotClass}`}></div>
+                    <p className='text-sm text-gray-600 dark:text-gray-400'>
+                      {selectedText}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Close Button */}
+              <button
+                onClick={handleCloseConversation}
+                className='flex items-center justify-center w-10 h-10 text-white transition-all bg-red-500 rounded-full hover:bg-red-600'
+                title='Close Chat'
+              >
+                <FontAwesomeIcon icon={faXmark} className='text-xl' />
+              </button>
+            </div>
+
+            {/* Messages Display Area */}
+            <div className='flex-1 p-4 overflow-y-auto bg-gray-50 dark:bg-gray-900' style={{maxHeight: 'calc(100vh - 300px)'}}>
+              {conversationThreads[selectedConversation.conversationId]?.map((msg) => (
+                <div key={msg.id}>
+                  {msg.sender === "sent" ? (
+                    // Sent Messages (Right Side)
+                    <div className='flex justify-end mb-4'>
+                      <div className='flex flex-col items-end'>
+                        <div className='flex items-start gap-2'>
+                          <div className='max-w-md px-4 py-3 text-white shadow-sm rounded-2xl bg-emerald-600'>
+                            <p className='text-sm'>{msg.message}</p>
+                          </div>
+                          <button
+                            title='Delete for me'
+                            className='px-2 py-1 text-xs text-gray-800 transition-all bg-gray-200 rounded-lg hover:bg-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600'
+                            onClick={async () => {
+                              if (!window.confirm('Delete this message for you only?')) return
+                              try {
+                                const res = await apiDelete(`/api/messages/${msg.id}`)
+                                if (res && res.success) {
+                                  const convId = selectedConversation?.conversationId
+                                  if (!convId) return
+                                  setConversationThreads(prev => ({
+                                    ...prev,
+                                    [convId]: (prev[convId] || []).filter(m => m.id !== msg.id)
+                                  }))
+                                  window.dispatchEvent(new CustomEvent('app:toast', { detail: { type: 'success', msg: 'Message deleted for you' } }))
+                                } else {
+                                  window.dispatchEvent(new CustomEvent('app:toast', { detail: { type: 'error', msg: (res && res.error) || 'Failed to delete message' } }))
+                                }
+                              } catch (e) {
+                                window.dispatchEvent(new CustomEvent('app:toast', { detail: { type: 'error', msg: 'Failed to delete message' } }))
+                              }
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                        <p className='mt-1 text-xs text-gray-500 dark:text-gray-400'>You • {msg.time}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    // Received Messages (Left Side)
+                    <div className='flex items-start mb-4'>
                       <img 
                         src={msg.profilePic}
                         alt="Profile Pic" 
-                        className='w-8 h-8 mr-3 rounded-full flex-shrink-0 object-cover'
+                        className='flex-shrink-0 object-cover w-10 h-10 mr-3 rounded-full ring-2 ring-gray-200 dark:ring-gray-700'
                       />
-                    <div>
-                      <div className='bg-white px-4 py-3 dark:bg-neutral-700 rounded-2xl max-w-xs shadow-sm'>
-                        <p className='text-sm text-neutral-900 dark:text-neutral-100'>{msg.message}</p>
-                        <span className='text-xs text-neutral-400 ml-2'>{msg.time}</span>
+                      <div>
+                        <div className='max-w-md px-4 py-3 bg-white shadow-sm dark:bg-gray-700 rounded-2xl'>
+                          <p className='text-sm text-gray-800 dark:text-gray-100'>{msg.message}</p>
+                          <span className='text-xs text-gray-400 dark:text-gray-500'>{msg.time}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            ))}
+                  )}
+                </div>
+              ))}
 
-            {/* Invisble element to scroll to */}
-            <div ref={messageEndRef} />
-          </div>
-
-          {/* Input area */}
-          <div className='p-3 border-t border-neutral-300 bg-white dark:border-neutral-600 dark:bg-gray-700'>
-            <div className='flex items-center gap-2'>
-
-              {/* Input field */}
-              <input type="text" 
-                placeholder='Aa'
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                className='flex flex-1 px-4 py-3 border border-neutral-400 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent placeholder-neutral-500 dark:bg-neutral-800 dark:border-neutral-700 dark:placeholder-neutral-400 transition-all'
-              />
-
-              {/* Send button */}
-              <FontAwesomeIcon icon={faPaperPlane} 
-                onClick={handleSendMessage}
-                className='p-3 bg-blue-500 hover:bg-blue-600 text-white rounded-full flex items-center justify-center transition-all dark:border-neutral-200 cursor-pointer'
-                title='Send'
-              />
+              {/* Invisible element to scroll to */}
+              <div ref={messageEndRef} />
             </div>
-          </div>
 
-        </div>  
-      )}
+            {/* Message Input Area */}
+            <div className='p-4 bg-white border-t border-gray-200 dark:border-gray-700 dark:bg-gray-800'>
+              <div className='flex items-center gap-3'>
+                {/* Input Field */}
+                <input 
+                  type="text" 
+                  placeholder='Type a message...'
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  className='flex-1 px-4 py-3 text-sm placeholder-gray-500 transition-all bg-gray-100 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white'
+                />
+
+                {/* Send Button */}
+                <button
+                  onClick={handleSendMessage}
+                  className='flex items-center justify-center w-12 h-12 text-white transition-all rounded-full shadow-md bg-emerald-600 hover:bg-emerald-700'
+                  title='Send'
+                >
+                  <FontAwesomeIcon icon={faPaperPlane} className='text-lg' />
+                </button>
+              </div>
+            </div>
+
+          </div>  
+        )}
+      </div>
 
       {/* New Message Modal */}
       {showNewMsgModal && (
-        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/40'>
-          <div className='w-[560px] max-h-[70vh] bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-neutral-300 dark:border-neutral-700 p-4 flex flex-col'>
-            <div className='flex items-center justify-between mb-3'>
-              <h3 className='text-lg font-semibold text-neutral-900 dark:text-white'>Start a new message</h3>
-              <button className='px-2 py-1 rounded bg-neutral-200 dark:bg-neutral-700' onClick={() => setShowNewMsgModal(false)}>Close</button>
+        <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/50'>
+          <div className='w-[560px] max-h-[70vh] bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6 flex flex-col'>
+            <div className='flex items-center justify-between mb-4'>
+              <div className='flex items-center gap-3'>
+                <div className='flex items-center justify-center w-10 h-10 rounded-full bg-emerald-500'>
+                  <FontAwesomeIcon icon={faMessage} className='text-lg text-white'/>
+                </div>
+                <h3 className='text-2xl font-bold text-gray-800 dark:text-white'>
+                  New Message
+                </h3>
+              </div>
+              <button 
+                className='px-4 py-2 font-semibold text-white transition-all bg-red-500 rounded-lg hover:bg-red-600' 
+                onClick={() => setShowNewMsgModal(false)}
+              >
+                Close
+              </button>
             </div>
+            
             <input
               type='text'
-              placeholder='Search user by name...'
-              className='mb-3 px-3 py-2 rounded border border-neutral-300 dark:border-neutral-600 dark:bg-neutral-900'
+              placeholder='Search users...'
+              className='px-4 py-3 mb-4 transition-all bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white'
               value={userSearch}
               onChange={e => setUserSearch(e.target.value)}
             />
-            <div className='overflow-y-auto flex-1 pr-1'>
+            
+            <div className='flex-1 pr-1 overflow-y-auto'>
               {allUsers
                 .filter(u => u.name.toLowerCase().includes(userSearch.toLowerCase()))
                 .map(u => (
                   <div
                     key={u.id}
-                    className='flex items-center gap-3 p-2 rounded hover:bg-neutral-100 dark:hover:bg-neutral-700 cursor-pointer'
+                    className='flex items-center gap-3 p-3 transition-all rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700'
                     onClick={async () => {
                       const conv = conversation.find(c => String(c.otherParticipant.employeeID) === String(u.id))
                       if (conv) {
@@ -721,22 +749,25 @@ const Messages = () => {
                       }
                     }}
                   >
-                    <img src={u.profilePic} className='w-8 h-8 rounded-full' />
+                    <img src={u.profilePic} className='w-12 h-12 rounded-full ring-2 ring-gray-200 dark:ring-gray-700' alt={u.name} />
                     <div className='flex-1'>
-                      <div className='font-medium text-neutral-900 dark:text-white'>{u.name}</div>
-                      <div className='text-xs text-neutral-500'>{u.isOnline ? 'Online' : 'Offline'}</div>
+                      <div className='font-semibold text-gray-800 dark:text-white'>{u.name}</div>
+                      <div className='flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400'>
+                        <div className={`w-2 h-2 rounded-full ${u.isOnline ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                        {u.isOnline ? 'Online' : 'Offline'}
+                      </div>
                     </div>
                   </div>
                 ))}
               {allUsers.filter(u => u.name.toLowerCase().includes(userSearch.toLowerCase())).length === 0 && (
-                <div className='text-sm text-neutral-500'>No users found</div>
+                <div className='py-8 text-center text-gray-500 dark:text-gray-400'>No users found</div>
               )}
             </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
 
-export default Messages
+export default Messages;
