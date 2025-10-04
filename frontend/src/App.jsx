@@ -48,13 +48,15 @@ function App() {
     console.log('🔄 authReady changed to:', authReady)
   }, [authReady])
 
+  
 
   const handleMouse = async () => {
     if (localStorage.getItem('user')) {
       try {
         // Get existing session ID from localStorage
         const existingSessionId = localStorage.getItem('session_id')
-        
+        const user = JSON.parse(localStorage.getItem('user'))
+
         if (existingSessionId) {
           console.log('Validating existing session:', existingSessionId)
           
@@ -65,6 +67,16 @@ function App() {
 
           if (!validationResponse.success) {
             console.log('Session Expired! Logging out...')
+
+            // Audit session expiration BEFORE clearing storage
+            if (user) {
+              try {
+                  apiPost('/api/session-expired', {
+                  employeeID: user.employeeID,
+                  session_id: existingSessionId
+                })
+              } catch (err) {console.error('Failed to audit session expiration:', err)}
+            }
             
             // Clear all storage
             localStorage.removeItem('session_id')
@@ -312,6 +324,8 @@ const PublicOnlyRoute = ({ children }) => {
   if (!authReady) return <div>Loading...</div>
   return isLoggedIn() ? <Navigate to="/Dashboard" replace /> : children
 }
+
+
   
   return (
     <Router>
