@@ -268,7 +268,7 @@ const Header = ({title}) => {
                         }} 
                     />
                     {unreadMessageCount > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                        <span className="absolute flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full -top-1 -right-1">
                             {unreadMessageCount}
                         </span>
                     )}
@@ -297,7 +297,7 @@ const Header = ({title}) => {
                         }}
                     />
                     {unreadCount > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                        <span className="absolute flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-500 rounded-full -top-1 -right-1">
                             {unreadCount}
                         </span>
                     )}
@@ -328,10 +328,10 @@ const Header = ({title}) => {
                 </h1>
 
                 {/* Profile Preview */}
-                <div className="flex flex-col items-center border-neutral-400 border p-6 mb-6 rounded-xl bg-gray-200 inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-950/50 dark:shadow-md dark:shadow-zuccini-800 ">
+                <div className="flex flex-col items-center p-6 mb-6 bg-gray-200 border border-neutral-400 rounded-xl inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-950/50 dark:shadow-md dark:shadow-zuccini-800 ">
                     <FontAwesomeIcon 
                     icon={user.profilePic == null ? faCircleUser : user.profilePic} 
-                    className="mb-4 text-7xl text-gray-400 dark:text-gray-700" 
+                    className="mb-4 text-gray-400 text-7xl dark:text-gray-700" 
                     />
                     <h1 className="text-lg font-semibold text-gray-900 dark:text-white">{user.firstName} {user.lastName}</h1>
                     <h2 className="text-sm text-gray-600 dark:text-gray-400">{user.email}</h2>
@@ -341,7 +341,7 @@ const Header = ({title}) => {
                 <div className="flex flex-col gap-3">
                     <Link 
                     to="/Profile" 
-                    className="flex items-center gap-3 px-4 py-3 text-gray-700 transition-all duration-200 rounded-xl bg-gray-100 inset-shadow-sm inset-shadow-gray-400 hover:bg-zuccini-700 hover:text-white dark:bg-gray-950/50 dark:shadow-md dark:shadow-zuccini-900 dark:text-gray-200 dark:hover:bg-zuccini-800"
+                    className="flex items-center gap-3 px-4 py-3 text-gray-700 transition-all duration-200 bg-gray-100 rounded-xl inset-shadow-sm inset-shadow-gray-400 hover:bg-zuccini-700 hover:text-white dark:bg-gray-950/50 dark:shadow-md dark:shadow-zuccini-900 dark:text-gray-200 dark:hover:bg-zuccini-800"
                     >
                     <FontAwesomeIcon icon={faAddressCard} className="text-lg" />
                     <span className="font-medium">View Profile</span>
@@ -349,7 +349,7 @@ const Header = ({title}) => {
 
                     <Link 
                     to="/Profile#edit-profile" 
-                    className="flex items-center gap-3 px-4 py-3 text-gray-700 transition-all duration-200 rounded-xl bg-gray-200 inset-shadow-sm inset-shadow-gray-400 hover:bg-zuccini-700 hover:text-white dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50 dark:text-gray-200 dark:hover:bg-zuccini-800"
+                    className="flex items-center gap-3 px-4 py-3 text-gray-700 transition-all duration-200 bg-gray-200 rounded-xl inset-shadow-sm inset-shadow-gray-400 hover:bg-zuccini-700 hover:text-white dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50 dark:text-gray-200 dark:hover:bg-zuccini-800"
                     >
                     <FontAwesomeIcon icon={faPenToSquare} className="text-lg" />
                     <span className="font-medium">Edit Profile</span>

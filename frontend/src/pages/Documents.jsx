@@ -252,7 +252,7 @@ const Documents = () => {
   }
 
   const handleDownload = (file) => {
-    const path = buildPath(currentPath, file.name);
+    const path = buildPath(currentPath, file.name); 
     window.location.href = `http://localhost:5000/api/documents/download/${path}`;
   }
 
