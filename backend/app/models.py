@@ -46,11 +46,78 @@ class Employee(db.Model):
     # Relationships
     program = db.relationship("Program", foreign_keys=[programID], backref="employees")
 
+    # ============================ 
+
+# class AccreditationCycle(db.Model):
+#     __tablename__ = 'accreditationCycle'
+
+#     cycleID = db.Column(db.Integer, primary_key=True, nullable=False)
+#     programID = db.Column(db.Integer, db.ForeignKey('program.programID'), nullable=False)
+#     templateID = db.Column(db.Integer, db.ForeignKey('template.templateID'), nullable=False)
+#     cycleName = db.Column(db.String(255), nullable=False)
+#     startDate = db.Column(db.Date, nullable=False)
+#     endDate = db.Column(db.Date, nullable=False)
+#     status = db.Column(db.String(50), nullable=False)  # e.g., 'active', 'archived'
+                                                 
+    
+class Template(db.Model):
+    __tablename__ = 'template'
+
+    templateID = db.Column(db.Integer, primary_key=True, nullable=False, autoincrement=True)
+    templateName = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=False)    
+    createdBy = db.Column(db.String(10), db.ForeignKey('employee.employeeID'), nullable=False)
+    createdAt = db.Column(db.DateTime, default=datetime.utcnow)
+    isArchived = db.Column(db.Boolean, default=False)
+    
+
+    employee = db.relationship("Employee", backref="templates")
+    areas = db.relationship("Area", back_populates="template")
+
+
+class AreaBlueprint(db.Model):
+    __tablename__ = "areaBlueprint"
+    areaBlueprintID = db.Column(db.Integer, primary_key=True)
+    areaName = db.Column(db.String(255), nullable=False)
+    areaNum = db.Column(db.String(10))
+    templateID = db.Column(db.Integer, db.ForeignKey("template.templateID"))
+    subareas = db.relationship("SubareaBlueprint", backref="area", cascade="all, delete-orphan")
+
+class SubareaBlueprint(db.Model):
+    __tablename__ = "subareaBlueprint"
+    subareaBlueprintID = db.Column(db.Integer, primary_key=True)
+    subareaName = db.Column(db.String(255), nullable=False)
+    areaBlueprintID = db.Column(db.Integer, db.ForeignKey("areaBlueprint.areaBlueprintID"))
+    criteria = db.relationship("CriteriaBlueprint", backref="subarea", cascade="all, delete-orphan")
+
+class CriteriaBlueprint(db.Model):
+    __tablename__ = "criteriaBlueprint"
+    criteriaBlueprintID = db.Column(db.Integer, primary_key=True)
+    criteriaContent = db.Column(db.Text, nullable=False)
+    criteriaType = db.Column(db.String(50))
+    subareaBlueprintID = db.Column(db.Integer, db.ForeignKey("subareaBlueprint.subareaBlueprintID"))
+
+
+class AppliedTemplate(db.Model):
+    __tablename__ = "appliedTemplate"
+
+    appliedTemplateID = db.Column(db.Integer, primary_key=True)
+    programID = db.Column(db.Integer, db.ForeignKey("program.programID"))
+    templateID = db.Column(db.Integer, db.ForeignKey("template.templateID"))
+    templateName = db.Column(db.String(100))
+    description = db.Column(db.Text)
+    appliedAt = db.Column(db.DateTime, default=datetime.utcnow)
+    appliedBy = db.Column(db.Integer, db.ForeignKey("employee.employeeID"))
+
+    areas = db.relationship("Area", back_populates="appliedTemplate", cascade="all, delete-orphan")
+
+
 class Area(db.Model):
     __tablename__ = 'area'
 
     areaID = db.Column(db.Integer, primary_key=True, nullable=False)
-    instID = db.Column(db.Integer, db.ForeignKey('institute.instID'), nullable=True)
+    templateID = db.Column(db.Integer, db.ForeignKey('template.templateID'), nullable=True)
+    appliedTemplateID = db.Column(db.Integer, db.ForeignKey("appliedTemplate.appliedTemplateID", ondelete="CASCADE"), nullable=False)
     instID = db.Column(db.Integer, db.ForeignKey('institute.instID'), nullable=True)
     programID = db.Column(db.Integer, db.ForeignKey('program.programID'), nullable=False)
     areaName = db.Column(db.String(100))
@@ -58,10 +125,14 @@ class Area(db.Model):
     progress = db.Column(db.Integer)
     subareaID = db.Column(db.Integer)
     rating = db.Column(db.Float)
+    archived = db.Column(db.Boolean, default=False)
 
+
+    appliedTemplate = db.relationship("AppliedTemplate", back_populates="areas")
     program = db.relationship("Program", back_populates="areas")
     subareas = db.relationship("Subarea", back_populates="area", cascade="all, delete-orphan")
     institute = db.relationship("Institute", back_populates="areas")
+    template = db.relationship("Template", back_populates="areas")
     
 
 class Program(db.Model):
@@ -78,7 +149,6 @@ class Program(db.Model):
     institute = db.relationship("Institute", back_populates="programs")
     areas = db.relationship("Area", back_populates="program", cascade="all, delete-orphan")
     
-    # institute = db.relationship("Institute", foreign_keys=[instID], backref="programs")
 
 
 class Subarea(db.Model):
@@ -89,6 +159,7 @@ class Subarea(db.Model):
     subareaName = db.Column(db.String(100))
     criteriaID = db.Column(db.Integer)
     rating = db.Column(db.Float)
+    archived = db.Column(db.Boolean, default=False)
 
     area = db.relationship("Area", back_populates="subareas")
 
@@ -104,6 +175,7 @@ class Criteria(db.Model):
     rating = db.Column(db.Float)
     isDone = db.Column(db.Boolean, default=False)
     docID = db.Column(db.Integer, db.ForeignKey('document.docID'), nullable=False)
+    archived = db.Column(db.Boolean, default=False)
 
     subarea = db.relationship("Subarea", back_populates="criteria")    
 
@@ -140,21 +212,17 @@ class Institute(db.Model):
 
     dean = db.relationship("Employee", backref="institutes", foreign_keys=[employeeID])
     programs = db.relationship("Program", back_populates="institute", cascade="all, delete-orphan")
-    areas = db.relationship("Area", back_populates="institute")
-    # deadlines = db.relationship("Deadline", back_populates="institute")
+    areas = db.relationship("Area", back_populates="institute")    
 
 class Deadline(db.Model):
     __tablename__ = 'deadline'
 
-    deadlineID = db.Column(db.Integer, primary_key=True, nullable=False)
-    # instID = db.Column(db.Integer, db.ForeignKey('institute.instID'), nullable=True)
+    deadlineID = db.Column(db.Integer, primary_key=True, nullable=False)    
     criteriaID = db.Column(db.Integer, db.ForeignKey('criteria.criteriaID'), nullable=True)
     programID = db.Column(db.Integer, nullable=False)
     areaID = db.Column(db.Integer, nullable=False)
     content = db.Column(db.Text, nullable=False)
-    due_date = db.Column(db.Date, nullable=False)
-    
-    # institute = db.relationship("Institute", back_populates="deadlines")
+    due_date = db.Column(db.Date, nullable=False)       
 
 class AuditLog(db.Model):
     __tablename__ = 'audit_log'

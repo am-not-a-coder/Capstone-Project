@@ -34,6 +34,7 @@ const Dashboard = () => {
         institutes: 0,
         deadlines: 0
     })
+    const [countLoading, setCountLoading] = useState(true)
     const user = getCurrentUser()
     const key = user?.employeeID ? `welcomeShown:${user.employeeID}` : 'WelcomeShown'
     // Fetch announcements
@@ -72,10 +73,19 @@ const Dashboard = () => {
     useEffect(()=> {
         const fetchCounts = async () => {
             try{
+                setCountLoading(true);
                 const response = await apiGet('/api/count');
-                setCount(response.data)                
+                if (response.success) {
+                    setCount(response.data);
+                } else {
+                    console.error("Failed fetching counts", response.error);
+                    // Keep default values (0) if API fails
+                }
             } catch(err){
                 console.error("Failed fetching counts", err)
+                // Keep default values (0) if API fails
+            } finally {
+                setCountLoading(false);
             }
         }
         fetchCounts();
@@ -175,10 +185,10 @@ const Dashboard = () => {
 
             {/* Dashboard links */}
             <section className='grid grid-rows-4 gap-1 mt-20 mb-5 lg:mt-8 lg:grid-cols-4 lg:grid-rows-1'>   
-                <DashboardLinks icon={faUsers} text="Users" page="Users" count={count.employees}/>            
-                <DashboardLinks icon={faGraduationCap} text="Programs" page="Programs" count={count.programs}/>            
-                <DashboardLinks icon={faSchool} text="Institutes" page="Institutes" count={count.institutes}/>               
-                <DashboardLinks icon={faCalendarDays} text="Deadlines" page="Tasks" count={count.deadlines} />            
+                <DashboardLinks icon={faUsers} text="Users" page="Users" count={count?.employees || 0} loading={countLoading}/>            
+                <DashboardLinks icon={faGraduationCap} text="Programs" page="Programs" count={count?.programs || 0} loading={countLoading}/>            
+                <DashboardLinks icon={faSchool} text="Institutes" page="Institutes" count={count?.institutes || 0} loading={countLoading}/>               
+                <DashboardLinks icon={faCalendarDays} text="Deadlines" page="Tasks" count={count?.deadlines || 0} loading={countLoading}/>            
             </section>
 
             {/* Announcements */}
@@ -284,7 +294,7 @@ const Dashboard = () => {
     );
 }
 
-export const DashboardLinks = ({icon, text, page, count}) =>{
+export const DashboardLinks = ({icon, text, page, count, loading = false}) =>{
     const navigate = useNavigate();
 
     return (
@@ -297,7 +307,7 @@ export const DashboardLinks = ({icon, text, page, count}) =>{
             </div>
             <h1 className="text-xl font-semibold transition-all duration-500 text-shadow-sm dark:text-white">{text}</h1>
             <span className="absolute text-lg transition-all duration-500 right-6 dark:text-white">
-                {count}
+                {loading ? '...' : count}
             </span>
         </div>
     

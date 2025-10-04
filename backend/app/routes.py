@@ -1,6 +1,5 @@
 import json
 from flask import jsonify, request, session, send_from_directory, current_app, Response, render_template
-from app.models import Employee
 from app import db, redis_client, socketio, mail
 from werkzeug.security import check_password_hash, generate_password_hash, _hash_internal
 from werkzeug.utils import secure_filename
@@ -24,9 +23,9 @@ import redis
 from app.otp_utils import generate_random
 from flask_mail import Message as MailMessage
 from app.login_handlers import complete_user_login
-from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message, MessageDeletion, Notification
+from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message, MessageDeletion, Template, AreaBlueprint, SubareaBlueprint, CriteriaBlueprint, AppliedTemplate
 from sqlalchemy import cast, String, func, text
-from app.socket_handlers import create_notification
+
 
 def register_routes(app):
     # ============================================ AUTHENTICATION(LOGIN/LOGOUT) PAGE ROUTES ============================================
@@ -365,12 +364,13 @@ def register_routes(app):
 
             duration = datetime.strptime(duration, "%Y-%m-%d").date()
 
+
             new_announcement = Announcement(
                 employeeID = userID,
                 announceTitle = title, 
                 announceText = message, 
                 duration = duration
-            )
+                )
             db.session.add(new_announcement)
 
             # Audit new announcement
@@ -381,24 +381,6 @@ def register_routes(app):
             )
             db.session.add(new_log)
             db.session.commit()
-
-            # Get sender info
-            sender = Employee.query.get(userID)
-            sender_name = f"{sender.fName} {sender.lName}" if sender else "Admin"
-
-            # Create notifications for all non-admin users
-            non_admin_users = Employee.query.filter_by(isAdmin=False).all()
-            
-            for user in non_admin_users:
-                create_notification(
-                    recipient_id=user.employeeID,
-                    notification_type='announcement',
-                    title='New Announcement',
-                    content=f"{sender_name}: {title}",
-                    sender_id=userID,
-                    link="/Dashboard"
-                )
-
             return jsonify({'success': True, 'message': 'Announcement created successfully'}), 200 
         except Exception as e:
             return jsonify({'success': False, 'message': f'Failed to create announcement, {e}'}), 500
@@ -1733,33 +1715,34 @@ def register_routes(app):
         program_code = request.args.get('programCode')
 
         data = (
-            db.session.query(
-                Area.areaID,
-                Program.programCode,
-                Area.areaName,
-                Area.areaNum,
-                Area.progress,
-                Subarea.subareaID,
-                Subarea.subareaName,
-                Criteria.criteriaID,
-                Criteria.criteriaContent,
-                Criteria.criteriaType,
-                Criteria.rating,
-                Document.docID,
-                Document.docName,
-                Document.docType,
-                Document.docPath,
-                Document.isApproved,
-                Document.predicted_rating
-            )
-            .outerjoin(Program, Area.programID == Program.programID)
-            .outerjoin(Subarea, Area.areaID == Subarea.areaID)
-            .outerjoin(Criteria, Subarea.subareaID == Criteria.subareaID)
-            .outerjoin(Document, Criteria.docID == Document.docID)       
-            .order_by(Area.areaID.asc(), Subarea.subareaID.asc(), Criteria.criteriaID.asc())
-            .filter(Program.programCode == program_code)
-            .all() 
+        db.session.query(
+            Area.areaID,
+            Program.programCode,
+            Area.areaName,
+            Area.areaNum,
+            Area.progress,
+            Subarea.subareaID,
+            Subarea.subareaName,
+            Criteria.criteriaID,
+            Criteria.criteriaContent,
+            Criteria.criteriaType,
+            Criteria.rating,
+            Document.docID,
+            Document.docName,
+            Document.docType,
+            Document.docPath,
+            Document.isApproved,
+            Document.predicted_rating
         )
+        .outerjoin(Program, Area.programID == Program.programID)
+        .outerjoin(Subarea, (Area.areaID == Subarea.areaID) & (Subarea.archived == False))
+        .outerjoin(Criteria, (Subarea.subareaID == Criteria.subareaID) & (Criteria.archived == False))
+        .outerjoin(Document, Criteria.docID == Document.docID)       
+        .filter(Program.programCode == program_code, Area.archived == False)
+        .order_by(Area.areaID.asc(), Subarea.subareaID.asc(), Criteria.criteriaID.asc())
+        .all()
+    )
+
 
         result = {}
         for row in data:
@@ -2936,17 +2919,6 @@ def register_routes(app):
         db.session.add(new_message)
         db.session.commit()
 
-        # Get sender info for notification
-        sender = Employee.query.get(current_user_id)
-        sender_name = f"{sender.fName} {sender.lName}" if sender else "Unknown User"
-
-        # Get all participants except the sender
-        participants = ConversationParticipant.query.filter_by(
-            conversationID=conversation_id
-        ).filter(ConversationParticipant.employeeID != current_user_id).all()
-
-        # Note: Message notifications removed - using separate message system instead
-
         socketio.emit('new_message', {
             'conversationID': conversation_id,
             'message': {
@@ -3021,142 +2993,445 @@ def register_routes(app):
         socketio.emit('conversation_deleted', {'conversationID': conversation_id}, room=f'conversation:{conversation_id}')
         return jsonify({'success': True}), 200
            
-    # NOTIFICATION ROUTES
-    @app.route('/api/notifications', methods=['GET'])
+
+    
+    # ============================================ Template Routes ============================================
+
+
+    @app.route('/api/templates', methods=["GET"])
     @jwt_required()
-    def get_notifications():
+    def get_templates():            
+        data = (
+            db.session.query(
+                Template.templateID,
+                Template.templateName,
+                Template.description,
+                Template.createdBy,
+                Template.createdAt,
+                Template.isArchived,
+                Employee.employeeID,
+                Employee.fName,
+                Employee.lName,
+                Employee.suffix,                
+                AreaBlueprint.areaBlueprintID,
+                AreaBlueprint.areaName,
+                AreaBlueprint.areaNum,
+                SubareaBlueprint.subareaBlueprintID,
+                SubareaBlueprint.subareaName,
+                CriteriaBlueprint.criteriaBlueprintID,
+                CriteriaBlueprint.criteriaContent,
+                CriteriaBlueprint.criteriaType,
+            )
+            .outerjoin(Employee, Template.createdBy == Employee.employeeID)
+            .outerjoin(AreaBlueprint, AreaBlueprint.templateID == Template.templateID)
+            .outerjoin(SubareaBlueprint, SubareaBlueprint.areaBlueprintID == AreaBlueprint.areaBlueprintID)
+            .outerjoin(CriteriaBlueprint, CriteriaBlueprint.subareaBlueprintID == SubareaBlueprint.subareaBlueprintID)
+            .order_by(AreaBlueprint.areaBlueprintID.asc(), SubareaBlueprint.subareaBlueprintID.asc(), CriteriaBlueprint.criteriaBlueprintID.asc())
+            .all()
+        )
+
+
+        
+        template_dict = {}
+        
+
+        for row in data:
+            if row.templateID not in template_dict:
+                template_dict[row.templateID]= {
+                    'templateID': row.templateID,
+                    'templateName': row.templateName,
+                    'description': row.description,
+                    'createdBy': f"{row.fName} {row.lName}{row.suffix or ''}",
+                    'createdAt': row.createdAt,
+                    'isArchived': row.isArchived,
+                    'areas': {}
+                }
+
+            template = template_dict[row.templateID]
+
+            if row.areaBlueprintID and row.areaBlueprintID not in template["areas"]:
+                template["areas"][row.areaBlueprintID] = {
+                    "areaID": row.areaBlueprintID,
+                    "areaName": row.areaName,
+                    "areaNum": row.areaNum,
+                    "subareas": {}
+                }    
+            if row.areaBlueprintID:
+                area = template["areas"][row.areaBlueprintID]
+
+                if row.subareaBlueprintID and row.subareaBlueprintID not in area["subareas"]:
+                    area["subareas"][row.subareaBlueprintID] = {
+                        "subareaID": row.subareaBlueprintID,
+                        "subareaName": row.subareaName,
+                        "criteria": []
+                    }
+
+                if row.subareaBlueprintID:
+                    subarea = area["subareas"][row.subareaBlueprintID]
+
+                    if row.criteriaBlueprintID:
+                        subarea["criteria"].append({
+                            "criteriaID": row.criteriaBlueprintID,
+                            "criteriaContent": row.criteriaContent,
+                            "criteriaType": row.criteriaType                        
+                        })
+
+
+        template_list = []
+
+        for temp in template_dict.values():
+            temp["areas"] = list(temp["areas"].values())
+            for area in temp["areas"]:
+                area["subareas"] = list(area["subareas"].values())
+            template_list.append(temp)
+        
+
+        return jsonify(template_list),200
+
+
+    @app.route('/api/templates/create', methods=["POST"])
+    @jwt_required()
+    def create_template():
+        import traceback
+
+        data = request.get_json()
+        
+        templateName = data.get("templateName")
+        description = data.get("description", "")
+        createdBy = get_jwt_identity()
+        areas = data.get("areas", [])
+
+        print("DEBUG incoming data:", data)
+        
+
         try:
-            current_user_id = get_jwt_identity()
-            page = request.args.get('page', 1, type=int)
-            per_page = request.args.get('per_page', 20, type=int)
+            new_template = Template(                
+                templateName=templateName,
+                description=description,
+                createdBy=createdBy,
+                createdAt=datetime.utcnow(),
+                isArchived=False
+            )   
 
-            notifications = Notification.query.filter_by(recipientID=current_user_id)\
-            .order_by(Notification.createdAt.desc())\
-            .paginate(page=page, per_page=per_page, error_out=False)
+            db.session.add(new_template)
+            db.session.flush()
 
-            notification_list = []
-            for notif in notifications.items:
-                sender_info = None
-                if notif.senderID:
-                    sender = Employee.query.get(notif.senderID)
-                    if sender:
-                        sender_info = {
-                            'employeeID': sender.employeeID,
-                            'name': f'{sender.fName} {sender.lName}',
-                            'profilePic': sender.profilePic if sender.profilePic else None
-                        }
-                notification_list.append({
-                    'notificationID': notif.notificationID,
-                    'type': notif.type,
-                    'title': notif.title,
-                    'content': notif.content,
-                    'createdAt': notif.createdAt.isoformat() if notif.createdAt else None,
-                    'isRead': notif.isRead,
-                    'link': notif.link,
-                    'sender': sender_info
+            created_areas = []
+
+            for area in areas:
+                # Parse the area name                                
+            
+                area_bp = AreaBlueprint(
+                    templateID=new_template.templateID,
+                    areaName=area.get("areaName"),
+                    areaNum=area.get("areaNum")            
+                )
+
+                db.session.add(area_bp)
+                db.session.flush()
+
+                created_subareas = []
+
+                for sub in area.get("subareas", []):
+                    subarea_bp = SubareaBlueprint(
+                        areaBlueprintID=area_bp.areaBlueprintID,
+                        subareaName=sub.get("subareaName")
+                    )
+                    db.session.add(subarea_bp)
+                    db.session.flush()
+
+                    created_criteria = []
+
+                    for crit in sub.get("criteria", []):
+                        criteria_bp = CriteriaBlueprint(
+                            subareaBlueprintID=subarea_bp.subareaBlueprintID,
+                            criteriaContent=crit.get("criteriaContent", ""),
+                            criteriaType=crit.get("criteriaType", ""),                            
+                        )
+                        db.session.add(criteria_bp)
+                        db.session.flush()
+
+                        created_criteria.append({
+                            "criteriaBlueprintID": criteria_bp.criteriaBlueprintID,
+                            "criteriaContent": criteria_bp.criteriaContent,
+                            "criteriaType": criteria_bp.criteriaType,                            
+                        })
+
+                    created_subareas.append({
+                        'subareaBlueprintID': subarea_bp.subareaBlueprintID,
+                        'subareaName': subarea_bp.subareaName,
+                        'criteria': created_criteria
+                    })
+                
+                created_areas.append({
+                    "areaBlueprintID": area_bp.areaBlueprintID,
+                    "areaNum": area_bp.areaNum,
+                    "areaName": area_bp.areaName,
+                    "subareas": created_subareas
                 })
+            
+            db.session.commit()
+
             return jsonify({
-                'success': True,
-                'notifications': notification_list,
-                'total': notifications.total,
-                'pages': notifications.pages,
-                'current_page': page
-            }), 200
+                "success": True,
+                "message": "Template saved successfully!",
+                "template": {
+                    "templateID": new_template.templateID,
+                    "templateName": new_template.templateName,
+                    "description": new_template.description,
+                    "createdBy": new_template.createdBy,
+                    "createdAt": new_template.createdAt,
+                    "areas": created_areas
+                }
+            }), 201
+        
+
         except Exception as e:
-            return jsonify({'success': False, 'message': f'Failed to fetch notifications: {e}'}), 500
+            db.session.rollback()
+            print("Save template error:", str(e))
+            traceback.print_exc()
+            return jsonify({"success": False, "message": f"Failed to save template: {str(e)}"}), 500
+
+
+    @app.route('/api/programs/<int:programID>/apply-template/<int:templateID>', methods=["POST"])
+    @jwt_required()
+    def apply_template(programID, templateID):
+        try:
+            # Archive existing areas
+            active_areas = Area.query.filter_by(programID=programID, archived=False).all()
+            for area in active_areas:
+                area.archived = True
+                for sub in area.subareas:
+                    sub.archived = True
+                    for crit in sub.criteria:
+                        crit.archived = True
+
+            # Get template
+            template = Template.query.filter_by(templateID=templateID).first()
+            if not template:
+                return jsonify({"success": False, "message": "Template not found"}), 404
+
+            # Create applied template record
+            applied_template = AppliedTemplate(
+                programID=programID,
+                templateID=template.templateID,
+                templateName=template.templateName,
+                description=template.description,
+                appliedBy=get_jwt_identity()
+            )
+            db.session.add(applied_template)
+            db.session.flush()
+
+            # Copy areas from blueprint
+            area_blueprints = AreaBlueprint.query.filter_by(templateID=templateID).all()
+            for ab in area_blueprints:
+                area = Area(
+                    appliedTemplateID=applied_template.appliedTemplateID,
+                    programID=programID,
+                    areaName=ab.areaName,
+                    areaNum=ab.areaNum,
+                    archived=False
+                )
+                db.session.add(area)
+                db.session.flush()
+
+                # Copy subareas from blueprint
+                subarea_blueprints = SubareaBlueprint.query.filter_by(areaBlueprintID=ab.areaBlueprintID).all()
+                for sb in subarea_blueprints:
+                    subarea = Subarea(
+                        areaID=area.areaID,
+                        subareaName=sb.subareaName,
+                        archived=False
+                    )
+                    db.session.add(subarea)
+                    db.session.flush()
+
+                    # Copy criteria from blueprint (make sure FK matches your model)
+                    criteria_blueprints = CriteriaBlueprint.query.filter_by(subareaBlueprintID=sb.subareaBlueprintID).all()
+                    for cb in criteria_blueprints:
+                        criteria = Criteria(
+                            subareaID=subarea.subareaID,
+                            criteriaContent=cb.criteriaContent,
+                            criteriaType=cb.criteriaType,
+                            archived=False
+                        )
+                        db.session.add(criteria)
+
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Template applied successfully!'}), 201
+
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': f"Failed to apply template {str(e)}"}), 500
+
+
+    # ================== CRUD for Areas/Subares/Criteria per Program ==================
+
+    # ================ Create Routes ================
+
+    @app.route('/api/accreditation/create_subarea', methods=["POST"])
+    @jwt_required()
+    def create_sub_area():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
+        data = request.form
+        areaID = data.get("selectedAreaID")
+        subareaName = data.get("subAreaName")
+
+        area = Area.query.get(areaID)
+        # Check if the area exists
+        if not area:
+            return jsonify({'error': 'Area not found'}), 404
+
+
+        new_subArea = Subarea(subareaName = subareaName)
+        area.subareas.append(new_subArea)
+
+        db.session.add(new_subArea)
+        db.session.commit()
+
+        return jsonify({'message': 'Sub-Area created successfully!'}), 200
+
+        
+    @app.route('/api/accreditation/create_criteria', methods=["POST"])
+    @jwt_required()
+    def create_criteria():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
+        data = request.form
+        subareaID = data.get("selectedSubAreaID")
+        criteriaContent = data.get("criteria")
+        criteriaType = data.get("criteriaType")
+
+        subarea = Subarea.query.get(subareaID)
+
+        if not subarea:
+            return jsonify({'error': 'Subarea not found'}), 404
+        
+        new_criteria = Criteria(
+            subareaID = subareaID,
+            criteriaContent = criteriaContent,
+            criteriaType = criteriaType
+        )
+
+        subarea.criteria.append(new_criteria)
+
+        db.session.add(new_criteria)
+        db.session.commit()
+
+        return jsonify({'message': 'Criteria created successfully!'}), 200
+
+    # ================ Update Routes ================
+
+    # Update area
+    @app.route('/api/areas/<int:areaID>/edit', methods=["PUT"])
+    @jwt_required()
+    def update_area(areaID):
+        data = request.get_json()
+        try:
+            area = Area.query.get(areaID)
+            if not area:
+                return jsonify({'success': False, 'message': 'Area not found.'}), 404
+
+            area.areaName = data.get("areaName")
+            area.areaNum = data.get("areaNum")
+
+            db.session.commit()
+            return jsonify({"success": True, "message": "Area updated"})
+
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"success": False, "message": f"Failed to update: {str(e)}"}), 500
+        
+    # Update subarea   
+    @app.route('/api/subareas/<int:subareaID>/edit', methods=["PUT"])
+    @jwt_required()
+    def update_subarea(subareaID):
+        data = request.get_json()
+        try:
+            subarea = Subarea.query.get(subareaID)
+            if not subarea:
+                return jsonify({'success': False, 'message': 'Subarea not found.'}), 404
+
+            subarea.subareaName = data.get("subareaName")            
+
+            db.session.commit()
+            return jsonify({"success": True, "message": "Subarea updated"})
+
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"success": False, "message": f"Failed to update: {str(e)}"}), 500
+
+   # Update criteria 
+    @app.route('/api/criterias/<int:criteriaID>/edit', methods=["PUT"])
+    @jwt_required()
+    def update_criteria(criteriaID):
+        data = request.get_json()
+        try:
+            criteria = Criteria.query.get(criteriaID)
+            if not criteria:
+                return jsonify({'success': False, 'message': 'Criteria not found.'}), 404
+
+            criteria.criteriaContent = data.get("criteriaContent")            
+
+            db.session.commit()
+            return jsonify({"success": True, "message": "Criteria updated"})
+
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"success": False, "message": f"Failed to update: {str(e)}"}), 500
+          
+    # ================ Delete Routes ================
+
+    # Delete Area
+    @app.route('/api/areas/<int:areaID>/delete', methods=["DELETE"])
+    @jwt_required()
+    def delete_area(areaID):        
+
+        area = Area.query.get(areaID)
+        if not area:
+            return jsonify({"success": False, "message": "Area not found"}), 404    
     
+        db.session.delete(area)
+        db.session.commit()
+
+        return jsonify({"success": True, "message": "Area Deleted"})
     
-    @app.route('/api/notifications/<int:notification_id>/read', methods=['PUT'])
+    # Delete Subarea
+    @app.route('/api/subareas/<int:subareaID>/delete', methods=["DELETE"])
     @jwt_required()
-    def mark_notification_read(notification_id):
-        try:
-            current_user_id = get_jwt_identity()
-            notification = Notification.query.filter_by(
-                notificationID=notification_id,
-                recipientID=current_user_id
-            ).first()
-            
-            if not notification:
-                return jsonify({'success': False, 'message': 'Notification not found'}), 404
-            
-            notification.isRead = True
-            db.session.commit()
-            
-            return jsonify({'success': True, 'message': 'Notification marked as read'}), 200
-            
-        except Exception as e:
-            current_app.logger.error(f"Mark notification read error: {e}")
-            return jsonify({'success': False, 'message': 'Failed to update notification'}), 500
+    def delete_subarea(subareaID):
 
-    @app.route('/api/notifications/<int:notification_id>', methods=['DELETE'])
+        subarea = Subarea.query.get(subareaID)
+        if not subarea:
+            return jsonify({"success": False, "message": "Subarea not found"}), 404    
+    
+        db.session.delete(subarea)
+        db.session.commit()
+
+        return jsonify({"success": True, "message": "Subarea Deleted"})
+    
+    # Delete Criteria
+    @app.route('/api/criterias/<int:criteriaID>/delete', methods=["DELETE"])
     @jwt_required()
-    def delete_notification(notification_id):
-        try:
-            current_user_id = get_jwt_identity()
-            notification = Notification.query.filter_by(
-                notificationID=notification_id,
-                recipientID=current_user_id
-            ).first()
-            
-            if not notification:
-                return jsonify({'success': False, 'message': 'Notification not found'}), 404
-            
-            db.session.delete(notification)
-            db.session.commit()
-            
-            return jsonify({'success': True, 'message': 'Notification deleted'}), 200
-            
-        except Exception as e:
-            current_app.logger.error(f"Delete notification error: {e}")
-            return jsonify({'success': False, 'message': 'Failed to delete notification'}), 500
+    def delete_criteria(criteriaID):        
 
-    @app.route('/api/notifications', methods=['DELETE'])
-    @jwt_required()
-    def delete_all_notifications():
-        try:
-            current_user_id = get_jwt_identity()
-            Notification.query.filter_by(recipientID=current_user_id).delete()
-            db.session.commit()
-            
-            return jsonify({'success': True, 'message': 'All notifications deleted'}), 200
-            
-        except Exception as e:
-            current_app.logger.error(f"Delete all notifications error: {e}")
-            return jsonify({'success': False, 'message': 'Failed to delete notifications'}), 500
+        criteria = Criteria.query.get(criteriaID)
+        if not criteria:
+            return jsonify({"success": False, "message": "Criteri not found"}), 404    
+    
+        db.session.delete(criteria)
+        db.session.commit()
 
-    @app.route('/api/notifications/mark-all-read', methods=['PUT'])
-    @jwt_required()
-    def mark_all_notifications_read():
-        try:
-            current_user_id = get_jwt_identity()
-            Notification.query.filter_by(
-                recipientID=current_user_id,
-                isRead=False
-            ).update({'isRead': True})
-            db.session.commit()
-            
-            return jsonify({'success': True, 'message': 'All notifications marked as read'}), 200
-            
-        except Exception as e:
-            current_app.logger.error(f"Mark all notifications read error: {e}")
-            return jsonify({'success': False, 'message': 'Failed to mark notifications as read'}), 500
+        return jsonify({"success": True, "message": "Criteria Deleted"})
 
-    @app.route('/api/notifications/unread-count', methods=['GET'])
-    @jwt_required()
-    def get_unread_count():
-        try:
-            current_user_id = get_jwt_identity()
-            count = Notification.query.filter_by(
-                recipientID=current_user_id,
-                isRead=False
-            ).count()
-            
-            return jsonify({'success': True, 'count': count}), 200
-            
-        except Exception as e:
-            current_app.logger.error(f"Get unread count error: {e}")
-            return jsonify({'success': False, 'message': 'Failed to get unread count'}), 500
-
+      
+    # ==================================== Audit Log Routes ====================================      
+      
     # Get all audit logs
     @app.route('/api/auditLogs', methods=['GET'])
     def get_audit_logs():
@@ -3190,8 +3465,5 @@ def register_routes(app):
         except Exception as e:
             current_app.logger.error(f"Error getting pending documents: {e}")
             return jsonify({'success': False, 'message': 'Failed to get pending documents'}), 500
-
-
-
 
     

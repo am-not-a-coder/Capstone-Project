@@ -2,7 +2,9 @@
 import {
   faHouse,
   faCircleXmark,
-  faPlus
+  faPlus,
+  faPen,
+  faFolderOpen
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import ProgramCard from "../components/ProgramCard";
@@ -21,6 +23,9 @@ import "../../index.css"
 import { adminHelper } from '../utils/auth_utils';
 import { CardSkeleton } from '../components/Skeletons';
 import StatusModal from "../components/modals/StatusModal";
+import { ApplyTempModal } from '../components/modals/TemplateModal';
+import TemplateBuilder from '../components/TemplateBuilder';
+import toast, { Toaster } from 'react-hot-toast'
 
   const Programs = () => {
     //admin
@@ -42,6 +47,10 @@ import StatusModal from "../components/modals/StatusModal";
   const [expandedAreaIndex, setExpandedAreaIndex] = useState(null);
   const [showWord, setShowWord] = useState(false);
 
+  const [editMode, setEditMode] = useState(false);
+  const [showApplyTempModal, setShowApplyTempModal] = useState(false); // Show Apply template modal
+  
+
   const [programLoading, setProgramLoading] = useState(false);
   
   const [showStatusModal, setShowStatusModal] = useState(false); // shows the status modal
@@ -57,6 +66,7 @@ import StatusModal from "../components/modals/StatusModal";
 
   // Fetch programs
   const fetchPrograms = async () => {
+    
     setProgramLoading(true)
 
     try {
@@ -101,6 +111,7 @@ import StatusModal from "../components/modals/StatusModal";
 
     // Fetch employees for program dean dropdown selection
     useEffect(() => {
+      
       const fetchEmployees = async () => {
         try {
          
@@ -190,6 +201,9 @@ import StatusModal from "../components/modals/StatusModal";
         console.error('Error refreshing areas:', err);
       }
     }
+    
+
+    //  ============================================ Program Create, Edit, Delete ============================================
 
     // Function to handle create program
     const handleCreateProgram = async (e) => {
@@ -211,15 +225,14 @@ import StatusModal from "../components/modals/StatusModal";
         programCode: form.programCode,
         programName: form.programName,
         programColor: form.programColor,
-        employeeID: form.employeeID || null, // dean employeeID
-        instID: form.instID || null // assocaited institute id
+        employeeID: form.employeeID || null,
+        instID: form.instID || null
       };
 
       try {
-        // send POST request
+        
         const response = await apiPost(`/api/program`, payload);
 
-        // Handle different possible shapes returned by api helper
         const success = !!(response?.success || response?.data?.success);
         const message = response?.message || response?.data?.message || 'Program Created Successfully!';
 
@@ -227,8 +240,7 @@ import StatusModal from "../components/modals/StatusModal";
           setShowStatusModal(true);
           setStatusMessage(message);
           setStatusType("success");
-
-          // Reset form + reload
+          
           setShowForm(false);
           setForm({ code: "", name: "", color: "", programDean: "", instID: "" });
           setActiveModify(null);
@@ -396,12 +408,51 @@ import StatusModal from "../components/modals/StatusModal";
     }));
   }, []);
 
+  //  ============================================ Template Functions ============================================
+
+  const [loading, setLoading] = useState(false);
+
+
+  const handleApplyTemplate = async (programID, templateID) => {
+    setLoading(true);
+    try{
+      const res = await apiPost(`/api/programs/${programID}/apply-template/${templateID}`)
+      if (res.success){
+        setLoading(false);
+        await refreshAreas(selectedProgram.programCode);
+        setShowStatusModal(true)
+        setStatusType("success");
+        setStatusMessage("Template applied successfully!");
+        setVisible("areas");
+        setShowApplyTempModal(false);
+      } else {
+        throw new Error(res.message || "Failed to apply template")
+      }
+    } catch(err){
+      setShowStatusModal(true)
+      setStatusType("error");
+      setStatusMessage("Failed to apply template");
+    } finally{
+      setLoading(false);
+    }
+  }
+
+  const handleClose = () => {
+    setVisible("templates")  
+  }
+
+  const handleCreateClick = () => {
+    setShowApplyTempModal(false)  
+    setVisible("canvas")
+  };
+
+
+  //  ============================================ Document Uploading, etc. ============================================
   const [visible, setVisible] = useState("programs");
   const [selectedProgram, setSelectedProgram] = useState(null);
   const [selectedArea, setSelectedArea] = useState(null);
   const [selectedSubarea, setSelectedSubarea] = useState(null);
-
-  
+ 
   const handleDropDown = (area) => {
     const currentExpandedIndex = expandedAreaIndex === area.areaID;
     setExpandedAreaIndex(currentExpandedIndex ? null : area.areaID);
@@ -415,12 +466,12 @@ import StatusModal from "../components/modals/StatusModal";
 
   // Function to set the visible area to "areas" and set the selected program
   const visibleArea = (program) => {
-    setVisible("areas");
+    setVisible(editMode ? "templates" : "areas");
     setSelectedProgram(program);
-    fetchAreasForProgram(program.programCode);
-  
-  }
+    fetchAreasForProgram(program.programCode);      
 
+  }
+ 
   // Clear navigation route to programs
   const backToPrograms = () => {
     setVisible("programs");
@@ -524,10 +575,118 @@ import StatusModal from "../components/modals/StatusModal";
     }
   };
 
+  //  ============================================ CRUD for Areas/Subareas/Criteria ============================================
+
+  // Create is in the CreateModal.jsx
+
+  // ================ Edit ================
+ const handleEditArea = async (areaID, areaName, areaNum) => {
+    try {
+      const res = await apiPut(`/api/areas/${areaID}/edit`, {
+        areaNum,
+        areaName,
+      });
+
+      if (res.success) {
+        toast.success(res.data.message || 'Area edited!');
+        await refreshAreas(selectedProgram.programCode);
+      } else {
+        toast.error(res.data.message || 'Failed to edit area');
+      }
+    } catch (err) {
+      toast.error('An error occurred while editing the area');
+      console.error(err);
+    }
+};
+
+
+  const handleEditSubarea = async (subareaID, subareaName) => {
+    try {
+      const res = await apiPut(`/api/subareas/${subareaID}/edit`, {
+        subareaName,
+      });
+
+      if (res.success) {
+        toast.success(res.data.message || 'Subarea edited!');
+        await refreshAreas(selectedProgram.programCode);
+      } else {
+        toast.error(res.data.message || 'Failed to edit subarea');
+      }
+    } catch (err) {
+      toast.error('An error occurred while editing the subarea');
+      console.error(err);
+    }
+  }
+
+  const handleEditCriteria = async (criteriaID, criteriaContent) => {
+    try {
+      const res = await apiPut(`/api/criterias/${criteriaID}/edit`, {
+        criteriaContent,
+      });
+
+      if (res.success) {
+        toast.success(res.data.message || 'Criteria edited!');
+        await refreshAreas(selectedProgram.programCode);
+      } else {
+        toast.error(res.data.message || 'Failed to edit criteria');
+      }
+    } catch (err) {
+      toast.error('An error occurred while editing the criteria');
+      console.error(err);
+    }
+  }
+
+  // ================ Delete ================
+  const handleDeleteArea = async (areaID) => {
+    try{
+      const res = await apiDelete(`/api/areas/${areaID}/delete`)
+      if(res.success){
+        toast.success(res.data.message || 'Area deleted!')
+        await refreshAreas(selectedProgram.programCode)
+      } else {
+        toast.error(res.data?.message || 'Failed to delete area');
+      }
+    } catch (err) {
+      toast.error('An error occurred when deleting the area');
+      console.error(err)
+    }
+  }
+
+  const handleDeleteSubarea = async (subareaID) => {
+    try{
+      const res = await apiDelete(`/api/subareas/${subareaID}/delete`)
+      if(res.success){
+        toast.success(res.data.message || 'Subarea deleted!')
+        await refreshAreas(selectedProgram.programCode)
+      } else {
+        toast.error(res.data?.message || 'Failed to delete subarea');
+      }
+    } catch (err) {
+      toast.error('An error occurred when deleting the subarea');
+      console.error(err)
+    }
+  }
+
+  const handleDeleteCriteria = async (criteriaID) => {
+    try{
+      const res = await apiDelete(`/api/criterias/${criteriaID}/delete`)
+      if(res.success){
+        toast.success(res.data.message || 'Criteria deleted!')
+        await refreshAreas(selectedProgram.programCode)
+      } else {
+        toast.error(res.data?.message || 'Failed to delete criteria');
+      }
+    } catch (err) {
+      toast.error('An error occurred when deleting the criteria');
+      console.error(err)
+    }
+  }
+  
 
 
     return (
       <>
+      <Toaster />
       {/* Status Modal */}
           {showStatusModal && (
             <StatusModal 
@@ -538,10 +697,22 @@ import StatusModal from "../components/modals/StatusModal";
             />
           )}
 
+          {showApplyTempModal && (
+            <ApplyTempModal
+              loading={loading}
+              createTemp={handleCreateClick}
+              onClick={() => setShowApplyTempModal(false)} 
+              programCode={selectedProgram.programCode}              
+              onApply={(templateID) => handleApplyTemplate(selectedProgram.programID, templateID)}
+            />
+          )}
+          
+
             <div className="relative flex flex-row min-h-screen p-3 px-5 border rounded-[20px] border-neutral-300 dark:bg-gray-900 inset-shadow-sm inset-shadow-gray-400 dark:inset-shadow-gray-500 dark:shadow-md dark:shadow-zuccini-800">
               
               {/* Main Content */}
               <div className="relative flex flex-col w-full pt-2">
+
                 {/* Navigation route */}
                 <div className='flex flex-row gap-3 mb-5'>             
                   <FontAwesomeIcon icon={faHouse}
@@ -632,7 +803,22 @@ import StatusModal from "../components/modals/StatusModal";
                     
                   </nav>
                 </div>
-                { isAdmin && visible !== "programs" && (
+
+                 {isAdmin && visible !== "templates" && (
+                  <button
+                    title='Edit'               
+                    onClick={() => setEditMode(prev => !prev)}
+                    className={`${editMode 
+                    ?   'text-gray-500 inset-shadow-sm inset-shadow-gray-400 bg-zuccini-300 dark:inset-shadow-gray-900 dark:text-gray-700 dark:bg-zuccini-500' 
+                    :'cursor-pointer text-gray-500 bg-gray-200 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 shadow-md dark:inset-shadow-sm dark:inset-shadow-gray-400 dark:bg-gray-950/50'
+                } p-3 px-4 text-xl transition-all duration-200 border border-neutral-300 rounded-xl dark:border-neutral-500 cursor-pointer`}
+              >                
+
+                <FontAwesomeIcon icon={faPen} className="z-10" />
+              </button>
+                  )}
+
+                {isAdmin && visible === "areas" && (
                   <button onMouseEnter={() => setShowWord(true)}
                     onMouseLeave={() => setShowWord(false)}
                     onClick={() => setShowCreateModal(true)}
@@ -647,7 +833,7 @@ import StatusModal from "../components/modals/StatusModal";
                   </button>)}
                 {showCreateModal && (
                   <CreateModal 
-                    onCreate={refreshAreas} 
+                    onCreate={() => refreshAreas(selectedProgram.programCode)} 
                     setShowCreateModal={setShowCreateModal} 
                     onClick={() => setShowCreateModal(false)}
                   />
@@ -662,7 +848,9 @@ import StatusModal from "../components/modals/StatusModal";
                     
                     {/* Program Cards Section */}
                     <div className={`${visible == "programs" ? 'block' : 'hidden'} flex flex-wrap gap-4`}>
-                { isAdmin && (<CreateCard form={form} handleChange={handleChange} setShowForm={setShowForm} title="Program" />)}
+
+                { isAdmin && editMode && (
+                  <CreateCard form={form} handleChange={handleChange} setShowForm={setShowForm} title="Program" />)}
                   {programLoading ? (
                     <>
                       <CardSkeleton />
@@ -675,71 +863,156 @@ import StatusModal from "../components/modals/StatusModal";
                             <ProgramCard 
                               program={program} 
                               key={program.programID} 
-                              onClick={()=> visibleArea(program)}                           
+                              onClick={()=> visibleArea(program)}
                             />
                           ))}
                     </>
                   )}
                   
                         </div>
+                      {isAdmin && selectedProgram && visible === "templates" && (
+                       <div className={`${visible == "templates" ? 'block' : 'hidden'} flex flex-row flex-wrap gap-5`}>
+                          {/* Create new template */}
+                           <button
+                            onClick={() => setVisible("canvas")}
+                            className={` group relative flex flex-col items-center justify-center cursor-pointer h-full max-h-screen overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-100 shadow-sm transition-all duration-300 hover:shadow-xl hover:scale-105 hover:border-blue-400 hover:bg-blue-50 dark:bg-gray-800 dark:border-gray-600 dark:hover:border-blue-500 dark:hover:bg-gray-700 w-full max-w-[475px]`}>
+                            {/* Icon Section */}
+                            <div className="flex items-center justify-center w-16 h-16 mb-3 transition-colors duration-300 bg-gray-200 rounded-full group-hover:bg-blue-100 dark:bg-gray-700 dark:group-hover:bg-blue-900">
+                              <div 
+                                className="w-8 h-8 text-gray-500 transition-colors duration-300 group-hover:text-blue-600 dark:text-gray-400 dark:group-hover:text-blue-400"                                 
+                              >
+                                <FontAwesomeIcon icon={faPlus} className="text-3xl text-gray-600"/>
+                              </div>
+                            </div>
 
-                        {/* Areas Section */}
-                        {selectedProgram && visible === "areas" && (
-                          <div className="flex flex-col w-full overflow-auto">
-                            <div className="w-full p-2 text-gray-700 rounded-xl">
-                              {areas.sort((a, b) => a.areaID - b.areaID).map((area) => {
-                                const allCriteria = Array.isArray(area.subareas)
-                                  ? area.subareas.flatMap(sub => [
-                                      ...(sub.criteria?.inputs || []),
-                                      ...(sub.criteria?.processes || []),
-                                      ...(sub.criteria?.outcomes || []),
-                                    ])
-                                  : [];
+                            {/* Text Content */}
+                            <div className="space-y-1 text-center">
+                              <h3 className="text-lg font-semibold text-gray-700 transition-colors duration-200 group-hover:text-blue-700 dark:text-gray-300 dark:group-hover:text-blue-300">
+                                Add New
+                              </h3>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Create a new template
+                              </p>
+                            </div>
 
-                                const doneCount = allCriteria.filter(c => done[c.criteriaID]).length;
-                                const doneTotal = allCriteria.length;        
-                                const progress = doneTotal > 0 ? ((doneCount / doneTotal) * 100).toFixed(0) : 0 ;              
+                            {/* Subtle animated background effect */}
+                            <div className="absolute inset-0 transition-opacity duration-300 opacity-0 pointer-events-none bg-gradient-to-br from-blue-500/5 to-purple-500/5 group-hover:opacity-100"></div>
+                            
+                            {/* Corner accent */}
+                            <div className="absolute w-2 h-2 transition-opacity duration-300 bg-blue-400 rounded-full opacity-0 top-3 right-3 group-hover:opacity-100"></div>
+                          </button>
 
-                          return (
-                                <div key={area.areaID} className='flex flex-col'>
-                                  <AreaCont 
-                                    title={area.areaName} 
-                                    onClick={() => handleDropDown(area)}
-                                    onIconClick={() => handleDropDown(area)}
-                                    isExpanded={expandedAreaIndex === area.areaID}
-                                    doneCount={doneCount}
-                                    doneTotal={doneTotal}         
-                                    progress={progress}
-                                  /> 
-                                  <div className={`list-upper-alpha list-inside overflow-hidden transition-all duration-500 ease-in-out ${expandedAreaIndex === area.areaID ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                                  {Array.isArray(area.subareas) && area.subareas.filter(sa => sa.subareaID != null).length > 0 ? (area.subareas.filter(sa => sa.subareaID != null).map((subarea) => (
-                                    <SubCont 
-                                      key={subarea.subareaID} 
-                                      title={subarea.subareaName} 
-                                      criteria={subarea.criteria}                                  
-                                      programCode={area.programCode}
-                                      areaName={area.areaName}  
-                                      subareaName={subarea.subareaName}
-                                      onClick={() => {handleSubareaSelect(subarea)}}
-                                      onCreate={() => {setShowCreateModal(true)}}
-                                      onRefresh={refreshAreas}
-                                      onFilePreview={handleFilePreview}
-                                      done={done}
-                                      setDone={setDone}
-                                      setAreas={setAreas}
-                                      toggleDone={toggleDone}
-                                    />))
-                                    ) : (
-                                    <div className='flex flex-col items-center justify-center p-5 mb-3 text-neutral-800 bg-neutral-300/50 dark:bg-gray-800/50 dark:text-white rounded-2xl'>
-                                      <h1 className='text-lg font-semibold'>No Sub-Areas found</h1>
-                                      <p className='mb-1 font-light text-md'>Want to Create one?</p>
-                                      <button onClick={() => {setShowCreateModal(true)}} className='px-10 py-2 transition-all duration-300 cursor-pointer bg-neutral-300 dark:bg-gray-600 hover:text-white hover:bg-zuccini-600/60 rounded-2xl'>Create</button>
-                                    </div>
-                                    )
-                                  }
+                          
+                          {/* Use Existing template*/}
+                           <button
+                           onClick={() => setShowApplyTempModal(true)}
+                            className={` group relative flex flex-col items-center justify-center cursor-pointer h-56 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-100 shadow-sm transition-all duration-300 hover:shadow-xl hover:scale-105 hover:border-blue-400 hover:bg-blue-50 dark:bg-gray-800 dark:border-gray-600 dark:hover:border-blue-500 dark:hover:bg-gray-700 w-full max-w-[475px]`}>
+                            {/* Icon Section */}
+                            <div className="flex items-center justify-center w-16 h-16 mb-3 transition-colors duration-300 bg-gray-200 rounded-full group-hover:bg-blue-100 dark:bg-gray-700 dark:group-hover:bg-blue-900">
+                              <div 
+                                className="w-8 h-8 text-gray-500 transition-colors duration-300 group-hover:text-blue-600 dark:text-gray-400 dark:group-hover:text-blue-400"                                 
+                              >
+                                <FontAwesomeIcon icon={faFolderOpen} className="text-3xl text-gray-600"/>
+                              </div>
+                            </div>
+
+                            {/* Text Content */}
+                            <div className="space-y-1 text-center">
+                              <h3 className="text-lg font-semibold text-gray-700 transition-colors duration-200 group-hover:text-blue-700 dark:text-gray-300 dark:group-hover:text-blue-300">
+                                Use Existing
+                              </h3>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Use and existing template
+                              </p>
+                            </div>
+
+                            {/* Subtle animated background effect */}
+                            <div className="absolute inset-0 transition-opacity duration-300 opacity-0 pointer-events-none bg-gradient-to-br from-blue-500/5 to-purple-500/5 group-hover:opacity-100"></div>
+                            
+                            {/* Corner accent */}
+                            <div className="absolute w-2 h-2 transition-opacity duration-300 bg-blue-400 rounded-full opacity-0 top-3 right-3 group-hover:opacity-100"></div>
+                          </button>
+
+                        </div>  
+                      )}
+
+                      
+                      {isAdmin && selectedProgram && visible === "canvas" && (
+                      
+                        <TemplateBuilder 
+                          onClose={handleClose}
+                          program={selectedProgram}                        
+                        />
+                      )}
+
+
+                      {/* Areas Section */}
+                      {selectedProgram && visible === "areas" && (
+                        <div className="flex flex-col w-full overflow-auto">
+                          <div className="w-full p-2 text-gray-700 rounded-xl">
+                            {areas.sort((a, b) => a.areaID - b.areaID).map((area) => {
+                              const allCriteria = Array.isArray(area.subareas)
+                                ? area.subareas.flatMap(sub => [
+                                    ...(sub.criteria?.inputs || []),
+                                    ...(sub.criteria?.processes || []),
+                                    ...(sub.criteria?.outcomes || []),
+                                  ])
+                                : [];
+
+                              const doneCount = allCriteria.filter(c => done[c.criteriaID]).length;
+                              const doneTotal = allCriteria.length;        
+                              const progress = doneTotal > 0 ? ((doneCount / doneTotal) * 100).toFixed(0) : 0 ;              
+
+                        return (
+                              <div key={area.areaID} className='flex flex-col'>
+                                <AreaCont 
+                                  title={area.areaName} 
+                                  areaID={area.areaID}                                  
+                                  onClick={() => handleDropDown(area)}
+                                  onIconClick={() => handleDropDown(area)}
+                                  isExpanded={expandedAreaIndex === area.areaID}
+                                  doneCount={doneCount}
+                                  doneTotal={doneTotal}         
+                                  progress={progress}
+                                  editMode={editMode}
+                                  onSaveEdit={handleEditArea}
+                                  onDelete={handleDeleteArea}
+                                /> 
+                                <div className={`list-upper-alpha list-inside overflow-hidden transition-all duration-500 ease-in-out ${expandedAreaIndex === area.areaID ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'}`}>
+                                {Array.isArray(area.subareas) && area.subareas.filter(sa => sa.subareaID != null).length > 0 ? (area.subareas.filter(sa => sa.subareaID != null).map((subarea) => (
+                                  <SubCont 
+                                    key={subarea.subareaID} 
+                                    subareaID={subarea.subareaID}
+                                    title={subarea.subareaName} 
+                                    criteria={subarea.criteria}                                  
+                                    programCode={area.programCode}
+                                    areaName={area.areaName}  
+                                    subareaName={subarea.subareaName}
+                                    onClick={() => {handleSubareaSelect(subarea)}}
+                                    onCreate={() => {setShowCreateModal(true)}}
+                                    onRefresh={() => refreshAreas(selectedProgram.programCode)}
+                                    onFilePreview={handleFilePreview}
+                                    done={done}
+                                    setDone={setDone}
+                                    setAreas={setAreas}
+                                    toggleDone={toggleDone}
+                                    editMode={editMode}
+                                    onSaveEditSub={handleEditSubarea}
+                                    onDeleteSub={handleDeleteSubarea}
+                                    onSaveEditCrit={handleEditCriteria}
+                                    onDeleteCrit={handleDeleteCriteria}
+                                  />))
+                                  ) : (
+                                  <div className='flex flex-col items-center justify-center p-5 mb-3 text-neutral-800 bg-neutral-300/50 dark:bg-gray-800/50 dark:text-white rounded-2xl'>
+                                    <h1 className='text-lg font-semibold'>No Sub-Areas found</h1>
+                                    <p className='mb-1 font-light text-md'>Want to Create one?</p>
+                                    <button onClick={() => {setShowCreateModal(true)}} className='px-10 py-2 transition-all duration-300 cursor-pointer bg-neutral-300 dark:bg-gray-600 hover:text-white hover:bg-zuccini-600/60 rounded-2xl'>Create</button>
                                   </div>
+                                  )
+                                }
                                 </div>
-                              )})}            
+                              </div>
+                            )})}            
                         </div>
                       </div>
                     )}
