@@ -66,6 +66,7 @@ import toast, { Toaster } from 'react-hot-toast'
 
   // Fetch programs
   const fetchPrograms = async () => {
+    
     setProgramLoading(true)
 
     try {
@@ -110,6 +111,7 @@ import toast, { Toaster } from 'react-hot-toast'
 
     // Fetch employees for program dean dropdown selection
     useEffect(() => {
+      
       const fetchEmployees = async () => {
         try {
          
@@ -467,8 +469,9 @@ import toast, { Toaster } from 'react-hot-toast'
     setVisible(editMode ? "templates" : "areas");
     setSelectedProgram(program);
     fetchAreasForProgram(program.programCode);      
-  }
 
+  }
+ 
   // Clear navigation route to programs
   const backToPrograms = () => {
     setVisible("programs");
@@ -830,7 +833,7 @@ import toast, { Toaster } from 'react-hot-toast'
                   </button>)}
                 {showCreateModal && (
                   <CreateModal 
-                    onCreate={refreshAreas} 
+                    onCreate={() => refreshAreas(selectedProgram.programCode)} 
                     setShowCreateModal={setShowCreateModal} 
                     onClick={() => setShowCreateModal(false)}
                   />
@@ -860,14 +863,13 @@ import toast, { Toaster } from 'react-hot-toast'
                             <ProgramCard 
                               program={program} 
                               key={program.programID} 
-                              onClick={()=> visibleArea(program)}                           
+                              onClick={()=> visibleArea(program)}
                             />
                           ))}
                     </>
                   )}
                   
                         </div>
-
                       {isAdmin && selectedProgram && visible === "templates" && (
                        <div className={`${visible == "templates" ? 'block' : 'hidden'} flex flex-row flex-wrap gap-5`}>
                           {/* Create new template */}

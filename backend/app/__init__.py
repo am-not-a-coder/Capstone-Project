@@ -47,16 +47,14 @@ def create_app():
 
     db.init_app(app)
     migrate.init_app(app, db)
-    socketio.init_app(app, cors_allowed_origins=["http://localhost:5173"], async_mode='threading', logger=True, engineio_logger=True)
     JWTManager(app)
     mail.init_app(app)
 
-
+    # Initialize CORS
     CORS(app, origins=['http://localhost:5173'], supports_credentials=True)
 
-
     # Initialize SocketIO with CORS settings
-    socketio.init_app(app, cors_allowed_origins="http://localhost:5173", 
+    socketio.init_app(app, cors_allowed_origins=["http://localhost:5173"], 
                       async_mode='threading', logger=True, engineio_logger=True)
 
     from app.routes import register_routes
