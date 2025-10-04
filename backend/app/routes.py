@@ -62,6 +62,14 @@ def register_routes(app):
                 return jsonify({'success': False, 'message': 'User account has invalid password format. Contact administrator.'}), 400
                 
             if is_valid_password: 
+                # audit successful login
+                new_log = AuditLog(
+                    employeeID = user.employeeID,
+                    action = f"{user.lName}, {user.fName} {user.suffix}. LOGGED IN. Admin={user.isAdmin}"
+                )
+                db.session.add(new_log)
+                db.session.commit()
+
                 bypass = redis_client.get(f'otp_bypass:{empID}')
                 if bypass:
                     return complete_user_login(user, empID)
@@ -245,6 +253,17 @@ def register_routes(app):
             }), 200
             
         except Exception as e:
+            # Audit failed token refresh instead of repeating new token
+            if current_user_id:
+                user = Employee.query.filter_by(employeeID=current_user_id).first()
+                if user:
+                    new_log = AuditLog(
+                        employeeID=current_user_id,
+                        action=f"{user.lName}, {user.fName} {user.suffix or ''}. TOKEN REFRESH FAILED. Admin={user.isAdmin}"
+                    )
+                    db.session.add(new_log)
+                    db.session.commit()
+
             current_app.logger.error(f"Token refresh error: {e}")
             return jsonify({'success': False, 'message': 'Token refresh failed'}), 500
     
@@ -254,12 +273,11 @@ def register_routes(app):
         session_id = request.json.get('sessionId') if request.is_json else None
         return session_id
 
-    #LOGOUT API
-    @app.route('/api/logout', methods=["POST"])
-    def logout():
+    #Audit session expired
+    @app.route('/api/session-expired', methods=["POST"])
+    def sessionExpired():
         try:
             data = request.get_json() or {}
-            
             empID = data.get('employeeID')
             session_id = data.get('session_id')
 
@@ -276,11 +294,60 @@ def register_routes(app):
             # Always return success for logout (even if empID missing)
             resp = jsonify({'success': True})
             unset_jwt_cookies(resp) 
+
+            # Audit session expired
+            user = Employee.query.filter_by(employeeID=empID).first()
+            new_log = AuditLog(
+                employeeID = empID,
+                action = f"{user.lName}, {user.fName} {user.suffix}. SESSION EXPIRED. Admin={user.isAdmin}"
+            )
+            db.session.add(new_log)
+            db.session.commit()
+
             return resp
             
         except Exception as e:
             print(f"Logout error: {e}")
             return jsonify({'success': False, 'error': str(e)}), 500
+        
+    # Audit Logout
+    @app.route('/api/logout', methods=["POST"])
+    @jwt_required()
+    def logout():
+        try:
+            data = request.get_json() or {}
+            empID = data.get('employeeID')
+            session_id = data.get('session_id')
+
+            # Clean up session from Redis
+            if session_id:
+                redis_key = f'session:{session_id}'
+                redis_client.delete(redis_key)
+                redis_client.hdel('user_status', empID)
+
+            # Clean up user from online users (if empID provided)
+            if empID:
+                redis_client.srem('online_users', empID)
+            
+            # Always return success for logout (even if empID missing)
+            resp = jsonify({'success': True})
+            unset_jwt_cookies(resp) 
+
+            # Audit successful logouts
+            user = Employee.query.filter_by(employeeID=get_jwt_identity()).first()
+            new_log = AuditLog(
+                employeeID = empID,
+                action = f"{user.lName}, {user.fName} {user.suffix}. LOGGED OUT. Admin={user.isAdmin}"
+            )
+            db.session.add(new_log)
+            db.session.commit()
+
+            return resp
+            
+        except Exception as e:
+            print(f"Logout error: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
 
 
     # ============================================ DASHBOARD ROUTES ============================================
@@ -305,6 +372,14 @@ def register_routes(app):
                 duration = duration
                 )
             db.session.add(new_announcement)
+
+            # Audit new announcement
+            currentUser = Employee.query.filter_by(employeeID=userID).first()
+            new_log = AuditLog(
+                employeeID = currentUser.employeeID,
+                action = f"{currentUser.lName}, {currentUser.fName} {currentUser.suffix} CREATED ANNOUNCEMENT {title}"
+            )
+            db.session.add(new_log)
             db.session.commit()
             return jsonify({'success': True, 'message': 'Announcement created successfully'}), 200 
         except Exception as e:
@@ -342,6 +417,35 @@ def register_routes(app):
         
         except Exception as e:
             return jsonify({'success': False, 'message': f'Failed to fetch announcements, {e}'}), 500
+
+    @app.route('/api/announcement/delete/<int:announcement_id>', methods=['DELETE'])
+    @jwt_required()
+    def delete_announcement(announcement_id):
+        try:
+            current_user_id = get_jwt_identity()
+            admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+            if not admin_user or not admin_user.isAdmin:
+                return jsonify({'success': False, 'message': 'Admins only'}), 403
+
+            announcement = Announcement.query.filter_by(announceID=announcement_id).first()
+            if not announcement:
+                return jsonify({'success': False, 'message': 'Announcement not found'}), 404
+
+            db.session.delete(announcement)
+
+            # Audit deleted announcement
+            new_log = AuditLog(
+                employeeID = admin_user.employeeID,
+                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} DELETED ANNOUNCEMENT {announcement.announceTitle}"
+            )
+            db.session.add(new_log)
+            db.session.commit()
+
+            return jsonify({'success': True, 'message': 'Announcement deleted successfully'}), 200
+
+        except Exception as e:
+            current_app.logger.error(f"Delete announcement error: {e}")
+            return jsonify({'success': False, 'message': 'Failed to delete announcement'}), 500
 
         
 
@@ -448,6 +552,13 @@ def register_routes(app):
             created_at=created_at
         )
         db.session.add(new_user)
+
+        # Audit created user
+        new_log = AuditLog(
+            employeeID = admin_user.employeeID,
+            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW USER {last_name}, {first_name} {suffix}. Admin={isAdmin}"
+        )
+        db.session.add(new_log)
         db.session.commit()
 
         return jsonify({
@@ -504,6 +615,13 @@ def register_routes(app):
             return jsonify({"success": False, "message": "Employee does not exists"}), 404
         
         db.session.delete(user)
+
+        # Audit deleted user
+        new_log = AuditLog(
+            employeeID = admin_user.employeeID,
+            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} DELETED THE USER {user.lName}, {user.fName} {user.suffix}"
+        )
+        db.session.add(new_log)
         db.session.commit()
 
         return jsonify({"success": True, "message":"Employee has been deleted successfully!"}), 200
@@ -901,6 +1019,12 @@ def register_routes(app):
                     employee_id = data.get('employeeID')
                     institute.employeeID = employee_id.strip() if employee_id and employee_id.strip() else None
             
+            # audit edit of institute
+            new_log = AuditLog(
+                employeeID = admin_user.employeeID,
+                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} EDITED THE INSTITUTE {institute.instName}"
+            )
+            db.session.add(new_log)
             # Save changes
             db.session.commit()
             
@@ -973,8 +1097,15 @@ def register_routes(app):
                 instPic=instPicPath,
                 employeeID=employee_id.strip() if employee_id and employee_id.strip() else None
             )
-
             db.session.add(new_institute)
+
+            # Audit new institute
+            admin_user = Employee.query.filter_by(employeeID=get_jwt_identity()).first()
+            new_log = AuditLog(
+                employeeID = admin_user.employeeID,
+                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED INSTITUTE {instName}"
+            )
+            db.session.add(new_log)
             db.session.commit()
 
             dean = new_institute.dean
@@ -1036,6 +1167,13 @@ def register_routes(app):
 
             # Safe to delete
             db.session.delete(institute)
+
+            # Audit deleted institute
+            new_log = AuditLog(
+                employeeID = admin_user.employeeID,
+                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} DELETED INSTITUTE {institute.instName}"
+            )
+            db.session.add(new_log)
             db.session.commit()
 
             return jsonify({'success': True, 'message': 'Institute deleted successfully', 'deletedID': instID}), 200
@@ -1134,6 +1272,12 @@ def register_routes(app):
             program.employeeID = data.get('employeeID', program.employeeID)         # Handle employeeID - accept string format like "23-45-678"
             program.instID = data.get('instID', program.instID)
 
+            # Audit edited program
+            new_log = AuditLog(
+                employeeID = admin_user.employeeID,
+                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} EDITED THE PROGRAM {program.programName}"
+            )
+            db.session.add(new_log)
             db.session.commit() # Save changes to database
 
             return jsonify({        
@@ -1190,6 +1334,13 @@ def register_routes(app):
             )
             
             db.session.add(new_program)  # Add to database
+
+            # Audit new program
+            new_log = AuditLog(
+                employeeID = admin_user.employeeID,
+                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW PROGRAM {data.get('programName')}"
+            )
+            db.session.add(new_log)
             db.session.commit()  # Save changes
             
             # Get the dean info for response (same as edit route)
@@ -1263,6 +1414,13 @@ def register_routes(app):
             
             # Safe to delete - no dependencies found
             db.session.delete(programs)
+
+            # Audit deleted program
+            new_log = AuditLog(
+                employeeID = admin_user.employeeID,
+                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} DELETED PROGRAM {programs.programName}"
+            )
+            db.session.add(new_log)
             db.session.commit()
             
             return jsonify({
@@ -1658,11 +1816,85 @@ def register_routes(app):
             areaName = areaName,
             areaNum = areaNum
         )
-
         db.session.add(new_area)
+
+        # Audit new area
+        new_log = AuditLog(
+            EmployeeID = admin_user.employeeID,
+            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW AREA {areaName}"
+        )
+        db.session.add(new_log)
         db.session.commit()
 
         return jsonify({'message' : 'Area created successfully!'}), 200
+
+
+    @app.route('/api/accreditation/create_subarea', methods=["POST"])
+    @jwt_required()
+    def create_sub_area():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
+        data = request.form
+        areaID = data.get("selectedAreaID")
+        subareaName = data.get("subAreaName")
+
+        area = Area.query.get(areaID)
+        # Check if the area exists
+        if not area:
+            return jsonify({'error': 'Area not found'}), 404
+
+
+        new_subArea = Subarea(subareaName = subareaName)
+        area.subareas.append(new_subArea)
+        db.session.add(new_subArea)
+
+        # Audit new subarea
+        new_log = AuditLog(
+            employeeID = admin_user.employeeID,
+            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW SUBAREA {subareaName}"
+        )
+        db.session.add(new_log)
+        db.session.commit()
+
+        return jsonify({'message': 'Sub-Area created successfully!'}), 200
+
+        
+    @app.route('/api/accreditation/create_criteria', methods=["POST"])
+    @jwt_required()
+    def create_criteria():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
+        data = request.form
+        subareaID = data.get("selectedSubAreaID")
+        criteriaContent = data.get("criteria")
+        criteriaType = data.get("criteriaType")
+
+        subarea = Subarea.query.get(subareaID)
+
+        if not subarea:
+            return jsonify({'error': 'Subarea not found'}), 404
+        
+        new_criteria = Criteria(
+            subareaID = subareaID,
+            criteriaContent = criteriaContent,
+            criteriaType = criteriaType
+        )
+        subarea.criteria.append(new_criteria)
+        db.session.add(new_criteria)
+
+        # Audit new criteria
+        new_log = AuditLog(
+            employeeID = admin_user.employeeID,
+            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW CRITERIA {criteriaType} IN {subarea.subareaName}"
+        )
+        db.session.add(new_log)
+        db.session.commit()
+
+        return jsonify({'message': 'Criteria created successfully!'}), 200
     
     # ===== Load Models for Document Processing =====
 
@@ -1798,7 +2030,15 @@ def register_routes(app):
                 doc.docName = file_name
                 doc.content = extracted_text
                 doc.tags = list(tags)
-                doc.embedding = embedding            
+                doc.embedding = embedding
+
+                # Audit updated doc
+                new_log = AuditLog(
+                    employeeID = uploader.employeeID,
+                    action = f"{uploader.lName}, {uploader.fName} {uploader.suffix} UPDATED DOCUMENT {filename}"
+                )
+                db.session.add(new_log)
+
             else:
                 # Create new doc
                 doc = Document(
@@ -1812,6 +2052,13 @@ def register_routes(app):
                 )
                 db.session.add(doc)
                 db.session.flush()  # Assign docID before linking
+
+                # Audit new doc
+                new_log = AuditLog(
+                    employeeID = uploader.employeeID,
+                    action = f"{uploader.lName}, {uploader.fName} {uploader.suffix} UPLOADED NEW DOCUMENT {filename}"
+                )
+                db.session.add(new_log)
 
             # ==== Link document to criteria ====
             criteria = Criteria.query.get(criteria_id)
@@ -1938,7 +2185,18 @@ def register_routes(app):
         return preview_file_nextcloud(file_path)
     
     @app.route('/api/documents/download/<path:file_path>', methods=["GET"])
+    @jwt_required()
     def download_file_documents(file_path):
+        # Audit downloaded file
+        user = Employee.query.filter_by(employeeID=get_jwt_identity()).first()
+        file_name = file_path.split("/")[-1]
+        new_log = AuditLog(
+            employeeID = user.employeeID,
+            action = f"{user.lName}, {user.fName} {user.suffix} DOWNLOADED {file_name}"
+        )
+        db.session.add(new_log)
+        db.session.commit()
+
         return download_file_nextcloud(file_path)
     
     
@@ -1976,6 +2234,13 @@ def register_routes(app):
 
             # Delete metadata from DB only if Nextcloud deletion succeeded
             db.session.delete(doc)
+
+            # Audit deleted doc
+            new_log = AuditLog(
+                employeeID = admin_user.employeeID,
+                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} DELETED THE FILE {doc.docName}"
+            )
+            db.session.add(new_log)
             db.session.commit()
 
             return jsonify({
@@ -1993,6 +2258,7 @@ def register_routes(app):
 
 
     @app.route('/api/documents/rename', methods=["PUT"])
+    @jwt_required()
     def rename_file():        
         data = request.get_json()
         old_path = data.get("oldPath")
@@ -2014,6 +2280,13 @@ def register_routes(app):
                 doc = Document.query.filter_by(docPath=old_path).first()
                 if doc:
                     doc.docPath = display_name
+                    user = Employee.query.filter_by(employeeID=get_jwt_identity()).first()
+                    # Audit rename path
+                    new_log = AuditLog(
+                        employeeID = user.employeeID,
+                        action = f"{user.lName}, {user.fName} {user.suffix} RENAMED FILE {doc.docName}"
+                    )
+                    db.session.add(new_log)
                     db.session.commit()
                 else:                 
                     return jsonify({'success': True, 'message': 'File renamed successfully.'}), 200
@@ -2059,6 +2332,15 @@ def register_routes(app):
 
         # Upload to Nextcloud
         response = upload_to_nextcloud(file, directory)
+
+        # Audit successful upload
+        new_log = AuditLog(
+            employeeID = uploader.employeeID,
+            action = f"{uploader.lName}, {uploader.fName} {uploader.suffix} UPLOADED {filename}"
+        )
+        db.session.add(new_log)
+        db.session.commit()
+
         if response.status_code not in (200, 201, 204):
             return jsonify({
                 "success": False,
@@ -2257,8 +2539,13 @@ def register_routes(app):
             if not criteria:
                 return jsonify({'success': False, 'message': f'Criteria ID {criteriaID} not found'}), 404
             criteria.rating = rating
-
             db.session.add(criteria)
+
+            # Audit rated criteria
+            new_log = AuditLog(
+                employeeID = admin_user.employeeID,
+                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} RATED THE CRITERIA {criteria.criteriaType}"
+            )
             db.session.commit()
 
         return jsonify({'success': True, 'message': 'Criteria Rated Successfully!' }), 200
@@ -2379,8 +2666,14 @@ def register_routes(app):
             return jsonify({'success': False, 'message': 'Area not found'}), 404
 
         area.rating = rating
-
         db.session.add(area)
+
+        # Audit rated area
+        new_log = AuditLog(
+            employeeID = admin_user.employeeID,
+            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} RATED THE AREA {area.areaName}"
+        )
+        db.session.add(new_log)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Area rating saved!' }), 200
 
@@ -3091,7 +3384,7 @@ def register_routes(app):
         except Exception as e:
             db.session.rollback()
             return jsonify({"success": False, "message": f"Failed to update: {str(e)}"}), 500
-
+          
     # ================ Delete Routes ================
 
     # Delete Area
@@ -3135,5 +3428,42 @@ def register_routes(app):
         db.session.commit()
 
         return jsonify({"success": True, "message": "Criteria Deleted"})
+
+      
+    # ==================================== Audit Log Routes ====================================      
+      
+    # Get all audit logs
+    @app.route('/api/auditLogs', methods=['GET'])
+    def get_audit_logs():
+        try:
+            logs = AuditLog.query.order_by(AuditLog.createdAt.desc()).all()
+            logs_list = [{
+                'logID': log.logID,
+                'employeeID': log.employeeID,
+                'action': log.action,
+                'createdAt': log.createdAt
+            } for log in logs]
+
+            return jsonify({'success': True, 'logs': logs_list}), 200
+        except Exception as e:
+            current_app.logger.error(f"Error getting logs: {e}")
+            return jsonify({'success': False, 'message': 'Failed to get audit logs'}), 500
+
+
+
+    #Get all pending documents
+    @app.route('/api/pendingDocs', methods=['GET'])
+    def get_pending_docs():
+        try:
+            pendingDocs = Document.query.filter(Document.isApproved == None).all()
+            pendingDocs_list = [{
+                'pendingDocID': pendingDoc.docID,
+                'pendingDocName': pendingDoc.docName
+            } for pendingDoc in pendingDocs]
+        
+            return jsonify({'success': True, 'pendingDocs': pendingDocs_list}), 200
+        except Exception as e:
+            current_app.logger.error(f"Error getting pending documents: {e}")
+            return jsonify({'success': False, 'message': 'Failed to get pending documents'}), 500
 
     
