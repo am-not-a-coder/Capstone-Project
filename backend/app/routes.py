@@ -479,7 +479,7 @@ def register_routes(app):
         created_at = datetime.now()
 
         # email regex for validation
-        validEmail = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        validEmail = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         
         # Validate required fields
         if not password:
@@ -3268,63 +3268,7 @@ def register_routes(app):
     # ================== CRUD for Areas/Subares/Criteria per Program ==================
 
     # ================ Create Routes ================
-
-    @app.route('/api/accreditation/create_subarea', methods=["POST"])
-    @jwt_required()
-    def create_sub_area():
-        current_user_id = get_jwt_identity()
-        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
-        if not admin_user or not admin_user.isAdmin:
-            return jsonify({'success': False, 'message': 'Admins only'}), 403
-        data = request.form
-        areaID = data.get("selectedAreaID")
-        subareaName = data.get("subAreaName")
-
-        area = Area.query.get(areaID)
-        # Check if the area exists
-        if not area:
-            return jsonify({'error': 'Area not found'}), 404
-
-
-        new_subArea = Subarea(subareaName = subareaName)
-        area.subareas.append(new_subArea)
-
-        db.session.add(new_subArea)
-        db.session.commit()
-
-        return jsonify({'message': 'Sub-Area created successfully!'}), 200
-
         
-    @app.route('/api/accreditation/create_criteria', methods=["POST"])
-    @jwt_required()
-    def create_criteria():
-        current_user_id = get_jwt_identity()
-        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
-        if not admin_user or not admin_user.isAdmin:
-            return jsonify({'success': False, 'message': 'Admins only'}), 403
-        data = request.form
-        subareaID = data.get("selectedSubAreaID")
-        criteriaContent = data.get("criteria")
-        criteriaType = data.get("criteriaType")
-
-        subarea = Subarea.query.get(subareaID)
-
-        if not subarea:
-            return jsonify({'error': 'Subarea not found'}), 404
-        
-        new_criteria = Criteria(
-            subareaID = subareaID,
-            criteriaContent = criteriaContent,
-            criteriaType = criteriaType
-        )
-
-        subarea.criteria.append(new_criteria)
-
-        db.session.add(new_criteria)
-        db.session.commit()
-
-        return jsonify({'message': 'Criteria created successfully!'}), 200
-
     # ================ Update Routes ================
 
     # Update area
@@ -3458,7 +3402,8 @@ def register_routes(app):
             pendingDocs = Document.query.filter(Document.isApproved == None).all()
             pendingDocs_list = [{
                 'pendingDocID': pendingDoc.docID,
-                'pendingDocName': pendingDoc.docName
+                'pendingDocName': pendingDoc.docName,
+                'pendingDocPath': pendingDoc.docPath
             } for pendingDoc in pendingDocs]
         
             return jsonify({'success': True, 'pendingDocs': pendingDocs_list}), 200

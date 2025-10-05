@@ -8,7 +8,7 @@ import{
     faHourglassHalf,
     faCalendarDays 
 } from '@fortawesome/free-solid-svg-icons';
-import {useNavigate} from 'react-router-dom';
+import {Link, Navigate, Route, useNavigate} from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useState } from 'react';
 import { apiGet, apiPost, apiDelete } from '../utils/api_utils';
@@ -174,6 +174,42 @@ const Dashboard = () => {
         } 
         fetchPendingDocs()
     }, [])
+
+    function parseDocumentPath(pendingDoc) {
+        const pathParts = pendingDoc.pendingDocPath.split('/')
+        const programIndex = pathParts.findIndex(part => part === 'Programs')
+        const programCode = pathParts[programIndex + 1]
+        const areaName = pathParts[programIndex + 2]
+        const subareaName = pathParts[programIndex + 3]
+        const criteria = pathParts[programIndex + 4]
+        const criteriaNum = pathParts[programIndex + 5]
+        const documentName = pathParts[programIndex + 6]
+        return {
+            programCode,
+            areaName,
+            subareaName,
+            criteria,
+            criteriaNum,
+            documentName
+        };
+    }
+
+    // Navigate to accreditation with parsed path information
+    const navigate = useNavigate()
+    function handlePendingDocClick(pathInfo) {
+        navigate('/Accreditation', {
+            state: {
+                programCode: pathInfo.programCode,
+                areaName: pathInfo.areaName,
+                subareaName: pathInfo.subareaName,
+                criteria: pathInfo.criteria,
+                criteriaNum: pathInfo.criteriaNum,
+                documentName: pathInfo.documentName,
+                openDocument: true
+            }
+        });
+    }
+    
     
     return (
         <>
@@ -256,10 +292,12 @@ const Dashboard = () => {
                         <FontAwesomeIcon icon={faHourglassHalf}  className="p-2 transition-all duration-500 dark:text-white" />
                         <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Pending Documents</h2>
                     </div>
-                    <div className="flex flex-col p-1 gap-1 transition-all duration-500 rounded-lg h-60 bg-neutral-300 dark:bg-gray-950/50">
-                        {pendingDocs.map((pendingDoc)=> (
-                            <p key={pendingDoc.pendingDocID} className=" text-gray-700 hover:bg-gray-400 transition-all duration-500 dark:text-white">{pendingDoc.pendingDocName}</p>
-                        ))}
+                    <div className="overflow-auto gap-1 relative whitespace-nowrap flex flex-col p-2 rounded-lg h-60 bg-neutral-300 dark:border-gray-900 dark:bg-gray-950/50" >
+                        {pendingDocs.map((pendingDoc)=> {
+                        const pathInfo = parseDocumentPath(pendingDoc)
+                        return (
+                            <p onClick={()=> handlePendingDocClick(pathInfo)} key={pendingDoc.pendingDocID} className=" text-gray-800 w-fit border-b border-gray-400 cursor-pointer hover:bg-gray-400 dark:text-white"><span className='font-semibold'>{pendingDoc.pendingDocName}</span><br/>{pathInfo.programCode}/{pathInfo.areaName}/{pathInfo.subareaName}/{pathInfo.criteria}/{pathInfo.criteriaNum}</p>
+                        )})}
                     </div>
                 </div>
                 {/* Audit Logs */}
@@ -271,18 +309,11 @@ const Dashboard = () => {
                     </div>
 
                     {/* Display logs */}
-                    <table className="overflow-auto gap-1 relative whitespace-nowrap flex flex-col p-2 rounded-lg h-60 bg-neutral-300 dark:border-gray-900 dark:bg-gray-950/50">
-                        <tr className=' flex justify-around w-[150%] lg:w-[110%]'>
-                            <th>Action</th>
-                            <th className='ml-30'>Date & Time</th>
-                        </tr>
+                    <div className="overflow-auto gap-1 relative whitespace-nowrap flex flex-col p-2 rounded-lg h-60 bg-neutral-300 dark:border-gray-900 dark:bg-gray-950/50" >
                         {logs.map((log)=> (
-                            <tr key={log.logID} className='flex w-[150%] lg:w-[110%] justify-between hover:bg-gray-400'>
-                                <td  className=" text-gray-700 transition-all duration-500 dark:text-white" >{log.action}</td>
-                                <td className=" flex text-gray-700 transition-all duration-500 dark:text-white"  >{log.createdAt}</td>
-                            </tr>
+                            <p key={log.logID} className='min-w-fit hover:bg-gray-400 text-gray-800 border-b border-gray-400'>{log.action}. {log.createdAt}</p>
                         ))}
-                    </table>
+                    </div>
                     
                      
                 </div>
