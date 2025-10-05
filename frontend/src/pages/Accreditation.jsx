@@ -6,7 +6,7 @@
   faStar
   } from '@fortawesome/free-solid-svg-icons';
   import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-  import {useCallback, useEffect, useState} from 'react'
+  import {use, useCallback, useEffect, useState} from 'react'
   import AreaContForm from '../components/AreaContForm';
   import SubContForm from '../components/SubContForm';
   
@@ -17,7 +17,7 @@
   import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer";
   import "@cyntler/react-doc-viewer/dist/index.css";
   import "../../index.css";
-  import { Navigate } from 'react-router-dom';
+  import { Navigate, useLocation } from 'react-router-dom';
 
   
   const Accreditation = () => {
@@ -35,6 +35,8 @@
     const [selfRateMode, setSelfRateMode] = useState(false);   
     
     const [visible, setVisible] = useState("programs");
+
+    
     const [selectedProgram, setSelectedProgram] = useState(null);
     const [selectedArea, setSelectedArea] = useState(null);
     const [selectedSubarea, setSelectedSubarea] = useState(null);
@@ -262,7 +264,27 @@
       }
     }, [selectedProgram, area, isAdmin]);
     
+    // useEffect(() => {
+    //   const location = useLocation()
+    //   if(location){
+    //     const { programCode, areaID, subareaID } = location.state
+    //     setSelectedProgram(programs.find(p => p.programCode === programCode) || null)
+    //     fetchAreasForProgram(programCode)
+    //     setVisible("areas")
 
+    //     if(areaID){
+    //       const areaToSelect = area.find(a => a.areaID === areaID) || null
+    //       setSelectedArea(areaToSelect)
+    //       setExpandedAreaIndex(areaID)
+
+    //       if(subareaID && areaToSelect){
+    //         const subareaToSelect = areaToSelect.subareas.find(sa => sa.subareaID === subareaID) || null
+    //         setSelectedSubarea(subareaToSelect)
+    //       }
+    //     }
+    //   } else {console.log('No location state found')}
+    // }, [])
+    
     return(
     <>
         <div className="relative flex flex-row justify-around border border-neutral-300 rounded-[20px] min-w-[950px] min-h-[90%] shadow-md inset-shadow-sm inset-shadow-gray-400 p-3 bg-neutral-200 dark:bg-gray-900 dark:inset-shadow-zuccini-800">
