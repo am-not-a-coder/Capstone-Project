@@ -1216,19 +1216,61 @@ def register_routes(app):
         institute = Institute.query.filter_by(instCode=instCode).first()
         if not institute or not institute.instPic:
             return jsonify({"success": False, "message": "Institute logo not found"}), 404
+            
+        # Validate Nextcloud configuration
+        NEXTCLOUD_URL = os.getenv("NEXTCLOUD_URL")
+        NEXTCLOUD_USER = os.getenv("NEXTCLOUD_USER")
+        NEXTCLOUD_PASSWORD = os.getenv("NEXTCLOUD_PASSWORD")
+        if not all([NEXTCLOUD_URL, NEXTCLOUD_USER, NEXTCLOUD_PASSWORD]):
+            return jsonify({
+                'success': False,
+                'message': 'Nextcloud configuration missing on server'
+            }), 500
 
-        response = preview_from_nextcloud(institute.instPic)
+        raw = (institute.instPic or '').strip()
+        # Build candidate paths to match your structure UDMS_Repository/Institutes/Logos
+        candidates = []
+        if raw:
+            filename = os.path.basename(raw)
+            name, ext = os.path.splitext(filename)
+            if raw.startswith('UDMS_Repository/'):
+                # Try exact DB path first
+                candidates.append(raw)
+                # If it fails, try swapping common image extensions
+                if name and ext:
+                    dir_prefix = raw[: -len(filename)]
+                    for e in ['.png', '.jpg', '.jpeg', '.webp']:
+                        if ext.lower() != e:
+                            candidates.append(f"{dir_prefix}{name}{e}")
+            else:
+                if name:
+                    exts = [ext] if ext else []
+                    for e in ['.png', '.jpg', '.jpeg', '.webp']:
+                        if e not in exts:
+                            exts.append(e)
+                    for e in exts:
+                        fname = f"{name}{e}" if e else filename
+                        candidates.append(f"UDMS_Repository/Institutes/Logos/{fname}")
+                        candidates.append(f"UDMS_Repository/Institutes/logos/{fname}")  
+                candidates.append(f"UDMS_Repository/{raw}")
 
-        if response.status_code == 200:
+        response = None
+        for p in candidates:
+            r = preview_from_nextcloud(p)
+            if getattr(r, 'status_code', 500) == 200:
+                response = r
+                break
+
+        if response and response.status_code == 200:
             content_type = response.headers.get("Content-Type", "application/octet-stream")
             return Response(response.content, content_type=content_type)
         else:
             return jsonify({
                 "success": False,
                 "message": f"Failed to fetch logo for {instCode}",
-                "status": response.status_code,
+                "status": getattr(response, 'status_code', 500),
                 "detail": getattr(response, "text", "No response text")
-            }), response.status_code            
+            }), getattr(response, 'status_code', 500)            
 
     # Fetch programs for the institute
     @app.route('/api/institute/programs', methods=["GET"])

@@ -4,7 +4,7 @@ import ProgramCard from "../components/ProgramCard";
 import CreateCard from "../components/CreateCard";
 import CreateForm from "../components/CreateForm";
 import CollegeInfoModal from "../components/modals/CollegeInfoModal";
-import { apiGet, apiPut, apiDelete, apiPostForm, apiGetBlob, apiPutForm } from "../utils/api_utils";
+import { apiGet, apiPut, apiDelete, apiPostForm, apiGetBlob, apiPutForm, API_URL } from "../utils/api_utils";
 import StatusModal from "../components/modals/StatusModal";
 import { CardSkeleton } from "../components/Skeletons";
 import { adminHelper } from "../utils/auth_utils";
@@ -42,7 +42,7 @@ const Institutes = () => {
               if (Array.isArray(instituteData)) {
                   const mappedInstitutes = instituteData.map((inst) => {
                   const logoUrl = inst.instPic
-                    ? `/api/institute/logos/${inst.instCode}`
+                    ? `${API_URL}/api/institute/logos/${inst.instCode}`
                     : "../assets/UDM-logo.png";
 
                   return {

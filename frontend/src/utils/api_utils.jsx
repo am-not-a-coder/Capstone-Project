@@ -1,5 +1,5 @@
 // Base API URL from environment variables for flexibility
-const API_URL = import.meta.env.VITE_APP_API_URL || 'http://localhost:5000'
+export const API_URL = import.meta.env.VITE_APP_API_URL || 'http://localhost:5000'
 
 const getCookie = (name) => {
     const m = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]+)'))

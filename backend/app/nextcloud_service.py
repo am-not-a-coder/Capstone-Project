@@ -114,7 +114,7 @@ def preview_from_nextcloud(doc_path):
         print(f"Nextcloud request failed: {e}")
 
         class MockResponse:
-            status_code = 500,
+            status_code = 500
             text = str(e)
             headers = {}
         return MockResponse()
@@ -199,7 +199,7 @@ def delete_from_nextcloud(doc_path):
         print(f"Nextcloud request failed: {e}")
 
         class MockResponse:
-            status_code = 500,
+            status_code = 500
             text = str(e)
             headers = {}
         return MockResponse()
