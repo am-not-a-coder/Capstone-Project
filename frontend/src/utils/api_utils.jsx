@@ -5,6 +5,7 @@ const getCookie = (name) => {
     const m = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]+)'))
     return m ? decodeURIComponent(m[2]) : null
   }
+const getCsrfRefresh = () => getCookie('csrf_refresh_token')
 const toJson = async (res) => {
     let data = null
     try { data = await res.json() } catch {}
@@ -40,7 +41,10 @@ export const MakeApiCalls = async (endpoint, options = {}) => {
             try {
                 const refreshResponse = await fetch(`${API_URL}/api/refresh-token`, {
                     method: 'POST',
-                    credentials: 'include'
+                    credentials: 'include',
+                    headers: {
+                        'X-CSRF-TOKEN': getCsrfRefresh() || ''
+                    }
                 })
                 if (refreshResponse.ok) {
                     return await fetch(fullUrl, finalOptions)
@@ -144,9 +148,9 @@ const refreshAccessToken = async () => {
     try {
         const response = await fetch(`${API_URL}/api/refresh-token`, {
             method: 'POST',
+            credentials: 'include',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${refreshToken}`
+                'X-CSRF-TOKEN': getCsrfRefresh() || ''
             }
         })
 

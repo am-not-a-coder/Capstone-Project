@@ -244,13 +244,21 @@ def register_routes(app):
                 'role': 'admin' if user.isAdmin else 'user'
             }
             
-            return jsonify({
+            resp = jsonify({
                 'success': True,
                 'message': 'Token refreshed successfully',
                 'access_token': new_access_token,
-                'refresh_token': new_refresh_token,  # Send new refresh token
-                'user': user_data  # Send updated user info
-            }), 200
+                'refresh_token': new_refresh_token,
+                'user': user_data
+            })
+            # Also set cookies so subsequent requests with credentials include them
+            try:
+                from flask_jwt_extended import set_access_cookies, set_refresh_cookies
+                set_access_cookies(resp, new_access_token)
+                set_refresh_cookies(resp, new_refresh_token)
+            except Exception as _:
+                pass
+            return resp, 200
             
         except Exception as e:
             # Audit failed token refresh instead of repeating new token
@@ -1143,29 +1151,18 @@ def register_routes(app):
             if not institute:
                 return jsonify({'error': 'Institute not found'}), 404
 
-            # Check dependencies
-            dependencies = []
-            programs = Program.query.filter_by(instID=instID).count()
-            if programs > 0:
-                dependencies.append(f"{programs} program(s)")
-
-            areas = Area.query.filter_by(instID=instID).count()
-            if areas > 0:
-                dependencies.append(f"{areas} area(s)")
-
-            deadlines = Deadline.query.filter_by(instID=instID).count()
-            if deadlines > 0:
-                dependencies.append(f"{deadlines} deadline(s)")
-
-            if dependencies:
-                return jsonify({
-                    'error': 'Cannot delete institute',
-                    'reason': f'This institute is referenced by: {", ".join(dependencies)}',
-                    'canDelete': False,
-                    'dependencies': dependencies
-                }), 400
-
-            # Safe to delete
+            updated_counts = {}
+            programs_updated = Program.query.filter_by(instID=instID).update({'instID': None})
+            updated_counts['programs'] = programs_updated
+            
+            areas_updated = Area.query.filter_by(instID=instID).update({'instID': None})
+            updated_counts['areas'] = areas_updated
+            
+            deadlines_updated = 0
+            if hasattr(Deadline, 'instID'):
+                deadlines_updated = Deadline.query.filter_by(instID=instID).update({'instID': None})
+            updated_counts['deadlines'] = deadlines_updated
+            
             db.session.delete(institute)
 
             # Audit deleted institute
@@ -1176,7 +1173,13 @@ def register_routes(app):
             db.session.add(new_log)
             db.session.commit()
 
-            return jsonify({'success': True, 'message': 'Institute deleted successfully', 'deletedID': instID}), 200
+            return jsonify({
+                'success': True, 
+                'message': f'Institute deleted successfully. Related records preserved but unlinked.',
+                'deletedID': instID,
+                'updated_counts': updated_counts
+            }), 200
+            
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Delete institute error: {str(e)}")
@@ -1373,46 +1376,23 @@ def register_routes(app):
             admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
             if not admin_user or not admin_user.isAdmin:
                 return jsonify({'success': False, 'message': 'Admins only'}), 403
+
             programs = Program.query.filter_by(programID=programID).first()
             
             if not programs:
                 return jsonify({'error': 'Program not found'}), 404
             
-            # Check dependencies before deletion
-            dependencies = []
+            updated_counts = {}
             
-            # Check employees
-            employees = Employee.query.filter_by(programID=programID).count()
-            if employees > 0:
-                dependencies.append(f"{employees} employee(s)")
+            employees_updated = Employee.query.filter_by(programID=programID).update({'programID': None})
+            updated_counts['employees'] = employees_updated
             
-            # Check areas
-            areas = Area.query.filter_by(programID=programID).count()
-            if areas > 0:
-                dependencies.append(f"{areas} area(s)")
+            areas_updated = Area.query.filter_by(programID=programID).update({'programID': None})
+            updated_counts['areas'] = areas_updated
             
-            # Check institutes  
-            institutes = Institute.query.filter_by(programID=programID).count()
-            if institutes > 0:
-                dependencies.append(f"{institutes} institute(s)")
-                
-            # Check deadlines
-            deadlines = Deadline.query.filter_by(programID=programID).count()  
-            if deadlines > 0:
-                dependencies.append(f"{deadlines} deadline(s)")
-            
-            # If dependencies exist, prevent deletion
-            if dependencies:
-                dependency_text = ", ".join(dependencies)
-                return jsonify({
-                    'error': 'Cannot delete program',
-                    'reason': f'This program is referenced by: {dependency_text}',
-                    'suggestion': 'Please reassign or remove dependent records first',
-                    'canDelete': False,
-                    'dependencies': dependencies
-                }), 400
-            
-            # Safe to delete - no dependencies found
+            deadlines_updated = Deadline.query.filter_by(programID=programID).update({'programID': None})
+            updated_counts['deadlines'] = deadlines_updated
+        
             db.session.delete(programs)
 
             # Audit deleted program
@@ -1425,15 +1405,16 @@ def register_routes(app):
             
             return jsonify({
                 'success': True,
-                'message': 'Program deleted successfully',
-                'deletedID': programID
-            })
-                
+                'message': f'Program deleted successfully. {employees_updated} employees, {areas_updated} areas, and {deadlines_updated} deadlines are now unlinked.',
+                'deletedID': programID,
+                'updated_counts': updated_counts
+            }), 200
+            
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Delete program error: {str(e)}")
             return jsonify({'error': 'Database error occurred'}), 500
-        
+
     @app.route('/api/program', methods=['GET'])
     @jwt_required()
     def get_user_program():
