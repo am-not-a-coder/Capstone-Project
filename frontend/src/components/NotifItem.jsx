@@ -17,8 +17,14 @@ const NotificationItem = ({
       onMarkRead(); // Mark as read when clicked
     }
     if (link) {
-      // Navigate to the link
-      window.location.href = link;
+      // Use client-side navigation for internal links
+      const isAbsolute = /^(?:[a-z]+:)?\/\//i.test(link);
+      if (isAbsolute) {
+        window.location.href = link;
+      } else {
+        const nav = navigate || useNavigate();
+        nav(link);
+      }
     }
     if (onClose) {
       onClose(); // Close dropdown if in header

@@ -121,7 +121,7 @@ def preview_from_nextcloud(doc_path):
     
 
 def rename_file_nextcloud(old_path, new_path):
-    UDMS_URL = f"{NEXTCLOUD_URL.rstrip('/')}/UDMS_Repository/"
+    UDMS_URL = f"{NEXTCLOUD_URL}/UDMS_Repository/"
    
     old_url = UDMS_URL + '/'.join(quote(part) for part in old_path.split('/'))
     new_url = UDMS_URL + '/'.join(quote(part) for part in new_path.split('/'))
@@ -207,7 +207,7 @@ def delete_from_nextcloud(doc_path):
 
     # Fetch all files & folders from Nextcloud and return as a nested dict (tree).
 def list_files_from_nextcloud():
-    UDMS_URL = f"{NEXTCLOUD_URL}UDMS_Repository/"
+    UDMS_URL = f"{NEXTCLOUD_URL.rstrip('/')}/UDMS_Repository/"
 
     response = requests.request(
         "PROPFIND",
@@ -220,15 +220,19 @@ def list_files_from_nextcloud():
         raise Exception(f"NextCloud Error: {response.status_code} - {response.text}")
 
     from xml.etree import ElementTree as ET
-    from urllib.parse import unquote
+    from urllib.parse import unquote, urlparse
     import os
 
     tree = ET.fromstring(response.content)
     ns = {"d": "DAV:"}
 
     paths = []
-    responses = []  # keep full <response> nodes for metadata lookup
-    base_path = f"/remote.php/dav/files/{NEXTCLOUD_USER}/UDMS_Repository/"
+    responses = [] 
+
+    parsed = urlparse(UDMS_URL)
+    base_path = parsed.path if parsed.path else "/"
+    if not base_path.endswith('/'):
+        base_path += '/'
 
     for resp in tree.findall("d:response", ns):
         href = resp.find("d:href", ns).text.rstrip("/")

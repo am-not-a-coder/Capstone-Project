@@ -11,7 +11,7 @@ import{
 import {useNavigate} from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useState } from 'react';
-import { apiGet, apiPost, apiDelete } from '../utils/api_utils';
+import { apiGet, apiPost, apiDelete, API_URL } from '../utils/api_utils';
 import toast from 'react-hot-toast';
 import { Toaster } from 'react-hot-toast'
 import { getCurrentUser, adminHelper } from '../utils/auth_utils';
@@ -42,7 +42,7 @@ const Dashboard = () => {
         try {
             setAnnouncementsLoading(true);
             console.log('📢 Fetching announcements...');
-            const response = await fetch('http://localhost:5000/api/announcements', {
+            const response = await fetch(`${API_URL}/api/announcements`, {
                 method: 'GET',
                 credentials: 'include',
                 headers: {
@@ -157,8 +157,12 @@ const Dashboard = () => {
         const fetchLogs = async ()=> {
             try {
                 const response = await apiGet('/api/auditLogs')
-                setLogs(response.data.logs)
-            } catch(err) {console.error('Error getting logs ', err)}
+                const logsData = response?.data?.logs || response?.data?.data?.logs || []
+                setLogs(Array.isArray(logsData) ? logsData : [])
+            } catch(err) {
+                console.error('Error getting logs ', err)
+                setLogs([])
+            }
         } 
         fetchLogs()
     }, [])
@@ -169,8 +173,12 @@ const Dashboard = () => {
         const fetchPendingDocs = async ()=> {
             try {
                 const response = await apiGet('/api/pendingDocs')
-                setPendingDocs(response.data.pendingDocs)
-            } catch(err) {console.error('Error getting pending documents ', err)}
+                const pd = response?.data?.pendingDocs || response?.data?.data?.pendingDocs || []
+                setPendingDocs(Array.isArray(pd) ? pd : [])
+            } catch(err) {
+                console.error('Error getting pending documents ', err)
+                setPendingDocs([])
+            }
         } 
         fetchPendingDocs()
     }, [])
@@ -271,18 +279,24 @@ const Dashboard = () => {
                     </div>
 
                     {/* Display logs */}
-                    <table className="overflow-auto gap-1 relative whitespace-nowrap flex flex-col p-2 rounded-lg h-60 bg-neutral-300 dark:border-gray-900 dark:bg-gray-950/50">
-                        <tr className=' flex justify-around w-[150%] lg:w-[110%]'>
-                            <th>Action</th>
-                            <th className='ml-30'>Date & Time</th>
-                        </tr>
-                        {logs.map((log)=> (
-                            <tr key={log.logID} className='flex w-[150%] lg:w-[110%] justify-between hover:bg-gray-400'>
-                                <td  className=" text-gray-700 transition-all duration-500 dark:text-white" >{log.action}</td>
-                                <td className=" flex text-gray-700 transition-all duration-500 dark:text-white"  >{log.createdAt}</td>
-                            </tr>
-                        ))}
-                    </table>
+                    <div className="overflow-auto rounded-lg h-60 bg-neutral-300 dark:border-gray-900 dark:bg-gray-950/50">
+                        <table className="min-w-full text-left">
+                            <thead>
+                                <tr>
+                                    <th className="px-3 py-2">Action</th>
+                                    <th className="px-3 py-2">Date & Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {(Array.isArray(logs) ? logs : []).map((log) => (
+                                    <tr key={log.logID} className='hover:bg-gray-400'>
+                                        <td className="px-3 py-2 text-gray-700 transition-all duration-500 dark:text-white">{log.action}</td>
+                                        <td className="px-3 py-2 text-gray-700 transition-all duration-500 dark:text-white">{log.createdAt}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                     
                      
                 </div>

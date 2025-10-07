@@ -23,7 +23,7 @@ import redis
 from app.otp_utils import generate_random
 from flask_mail import Message as MailMessage
 from app.login_handlers import complete_user_login
-from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message, MessageDeletion, Template, AreaBlueprint, SubareaBlueprint, CriteriaBlueprint, AppliedTemplate
+from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message, MessageDeletion, Template, AreaBlueprint, SubareaBlueprint, CriteriaBlueprint, AppliedTemplate, Notification
 from sqlalchemy import cast, String, func, text
 
 
@@ -1537,6 +1537,211 @@ def register_routes(app):
 
         return jsonify({'success': True, 'message': 'Area progress saved!'}), 200
 
+
+    # ============================================ Notifications ============================================
+    @app.route('/api/notifications', methods=['GET', 'OPTIONS'])
+    def notifications_options_handler():
+        if request.method == 'OPTIONS':
+            return ('', 204)
+        return get_notifications()
+
+    @jwt_required()
+    def get_notifications():
+        try:
+            current_user_id = get_jwt_identity()
+            page = request.args.get('page', 1, type=int)
+            per_page = request.args.get('per_page', 20, type=int)
+
+            notifications = Notification.query.filter_by(recipientID=current_user_id)\
+            .order_by(Notification.createdAt.desc())\
+            .paginate(page=page, per_page=per_page, error_out=False)
+
+            notification_list = []
+            for notif in notifications.items:
+                sender_info = None
+                if notif.senderID:
+                    sender = Employee.query.get(notif.senderID)
+                    if sender:
+                        sender_info = {
+                            'employeeID': sender.employeeID,
+                            'name': f'{sender.fName} {sender.lName}',
+                            'profilePic': sender.profilePic if sender.profilePic else None
+                        }
+                notification_list.append({
+                    'notificationID': notif.notificationID,
+                    'type': notif.type,
+                    'title': notif.title,
+                    'content': notif.content,
+                    'createdAt': notif.createdAt.isoformat() if notif.createdAt else None,
+                    'isRead': notif.isRead,
+                    'link': notif.link,
+                    'sender': sender_info
+                })
+            return jsonify({
+                'success': True,
+                'notifications': notification_list,
+                'total': notifications.total,
+                'pages': notifications.pages,
+                'current_page': page
+            }), 200
+        except Exception as e:
+            return jsonify({'success': False, 'message': f'Failed to fetch notifications: {e}'}), 500
+    
+    
+    @app.route('/api/notifications/<int:notification_id>/read', methods=['PUT', 'OPTIONS'])
+    def mark_notification_read_options(notification_id):
+        if request.method == 'OPTIONS':
+            return ('', 204)
+        return mark_notification_read_impl(notification_id)
+
+    @jwt_required()
+    def mark_notification_read_impl(notification_id):
+        try:
+            current_user_id = get_jwt_identity()
+            notification = Notification.query.filter_by(
+                notificationID=notification_id,
+                recipientID=current_user_id
+            ).first()
+            
+            if not notification:
+                return jsonify({'success': False, 'message': 'Notification not found'}), 404
+            
+            notification.isRead = True
+            db.session.commit()
+            
+            return jsonify({'success': True, 'message': 'Notification marked as read'}), 200
+            
+        except Exception as e:
+            current_app.logger.error(f"Mark notification read error: {e}")
+            return jsonify({'success': False, 'message': 'Failed to update notification'}), 500
+
+    @app.route('/api/notifications/<int:notification_id>', methods=['DELETE', 'OPTIONS'])
+    def delete_notification_options(notification_id):
+        if request.method == 'OPTIONS':
+            return ('', 204)
+        return delete_notification_impl(notification_id)
+
+    @jwt_required()
+    def delete_notification_impl(notification_id):
+        try:
+            current_user_id = get_jwt_identity()
+            notification = Notification.query.filter_by(
+                notificationID=notification_id,
+                recipientID=current_user_id
+            ).first()
+            
+            if not notification:
+                return jsonify({'success': False, 'message': 'Notification not found'}), 404
+            
+            db.session.delete(notification)
+            db.session.commit()
+            
+            return jsonify({'success': True, 'message': 'Notification deleted'}), 200
+            
+        except Exception as e:
+            current_app.logger.error(f"Delete notification error: {e}")
+            return jsonify({'success': False, 'message': 'Failed to delete notification'}), 500
+
+    @app.route('/api/notifications', methods=['DELETE', 'OPTIONS'])
+    def delete_all_notifications_options():
+        if request.method == 'OPTIONS':
+            return ('', 204)
+        return delete_all_notifications_impl()
+
+    @jwt_required()
+    def delete_all_notifications_impl():
+        try:
+            current_user_id = get_jwt_identity()
+            Notification.query.filter_by(recipientID=current_user_id).delete()
+            db.session.commit()
+            
+            return jsonify({'success': True, 'message': 'All notifications deleted'}), 200
+            
+        except Exception as e:
+            current_app.logger.error(f"Delete all notifications error: {e}")
+            return jsonify({'success': False, 'message': 'Failed to delete notifications'}), 500
+
+    @app.route('/api/notifications/mark-all-read', methods=['PUT', 'OPTIONS'])
+    def mark_all_notifications_read_options():
+        if request.method == 'OPTIONS':
+            return ('', 204)
+        return mark_all_notifications_read_impl()
+
+    @jwt_required()
+    def mark_all_notifications_read_impl():
+        try:
+            current_user_id = get_jwt_identity()
+            Notification.query.filter_by(
+                recipientID=current_user_id,
+                isRead=False
+            ).update({'isRead': True})
+            db.session.commit()
+            
+            return jsonify({'success': True, 'message': 'All notifications marked as read'}), 200
+            
+        except Exception as e:
+            current_app.logger.error(f"Mark all notifications read error: {e}")
+            return jsonify({'success': False, 'message': 'Failed to mark notifications as read'}), 500
+
+    @app.route('/api/notifications/unread-count', methods=['GET', 'OPTIONS'])
+    def get_unread_count_options():
+        if request.method == 'OPTIONS':
+            return ('', 204)
+        return get_unread_count_impl()
+
+    @jwt_required()
+    def get_unread_count_impl():
+        try:
+            current_user_id = get_jwt_identity()
+            count = Notification.query.filter_by(
+                recipientID=current_user_id,
+                isRead=False
+            ).count()
+            
+            return jsonify({'success': True, 'count': count}), 200
+            
+        except Exception as e:
+            current_app.logger.error(f"Get unread count error: {e}")
+            return jsonify({'success': False, 'message': 'Failed to get unread count'}), 500
+
+    # ============================================ Dashboard: Audit Logs & Pending Docs ============================================
+    @app.route('/api/auditLogs', methods=['GET', 'OPTIONS'])
+    @jwt_required()
+    def get_audit_logs():
+        if request.method == 'OPTIONS':
+            return ('', 204)
+        try:
+            logs = (AuditLog.query.order_by(AuditLog.createdAt.desc()).limit(100).all())
+            results = [{
+                'logID': l.logID,
+                'employeeID': l.employeeID,
+                'action': l.action,
+                'createdAt': l.createdAt.isoformat() if l.createdAt else None,
+            } for l in logs]
+            return jsonify({ 'success': True, 'data': { 'logs': results } }), 200
+        except Exception as e:
+            current_app.logger.error(f"Get audit logs error: {e}")
+            return jsonify({ 'success': False, 'error': 'Failed to fetch logs' }), 500
+
+    @app.route('/api/pendingDocs', methods=['GET', 'OPTIONS'])
+    @jwt_required()
+    def get_pending_docs():
+        if request.method == 'OPTIONS':
+            return ('', 204)
+        try:
+            # Consider pending as documents that are not approved yet (isApproved is NULL)
+            pending = Document.query.filter((Document.isApproved.is_(None))).order_by(Document.docID.desc()).limit(100).all()
+            def serialize_doc(d: Document):
+                # best-effort fields to match frontend expectations
+                name = getattr(d, 'docName', None) or getattr(d, 'fileName', None) or 'Document'
+                return {
+                    'pendingDocID': getattr(d, 'docID', None),
+                    'pendingDocName': name,
+                }
+            return jsonify({ 'success': True, 'data': { 'pendingDocs': [serialize_doc(d) for d in pending] } }), 200
+        except Exception as e:
+            current_app.logger.error(f"Get pending docs error: {e}")
+            return jsonify({ 'success': False, 'error': 'Failed to fetch pending documents' }), 500
 
     @app.route('/api/program/approve', methods=["PUT"])
     @jwt_required()

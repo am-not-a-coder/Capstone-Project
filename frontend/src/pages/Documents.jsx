@@ -23,7 +23,7 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useRef, useEffect } from "react";
 import { useLocation } from 'react-router-dom';
-import { apiDelete, apiGet, apiPut } from '../utils/api_utils';
+import { apiDelete, apiGet, apiPut, API_URL } from '../utils/api_utils';
 import { DocumentSkeleton } from '../components/Skeletons';
 import  StatusModal  from '../components/modals/StatusModal';
 import  DocUpload  from '../components/modals/DocUpload';
@@ -248,12 +248,12 @@ const Documents = () => {
 
   const handlePreview = (file) => {
     const path = buildPath(currentPath, file.name);    
-    window.open(`http://localhost:5000/api/documents/preview/${path}`, "_blank");
+    window.open(`${API_URL}/api/documents/preview/${path}`, "_blank");
   }
 
   const handleDownload = (file) => {
     const path = buildPath(currentPath, file.name); 
-    window.location.href = `http://localhost:5000/api/documents/download/${path}`;
+    window.location.href = `${API_URL}/api/documents/download/${path}`;
   }
 
   const handleDelete = async (docID) => {
