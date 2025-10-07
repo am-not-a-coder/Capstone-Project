@@ -1052,15 +1052,15 @@ def register_routes(app):
 
 
     @app.route('/api/institutes', methods=['POST'])
-    @jwt_required()
     def create_institute():
         try:
             data = request.form
             instCode = data.get('instCode')
             instName = data.get("instName")
-            instPic = request.files.get('instPic')
+            instPic = request.files.get('instPic') 
             employee_id = data.get('employeeID')
 
+            
             if not instCode or not instName:
                 return jsonify({'success': False, 'message': 'Institute code and name are required'}), 400
 
@@ -1070,50 +1070,62 @@ def register_routes(app):
             if instPic.filename == '':
                 return jsonify({'success': False, 'message': 'No file selected'}), 400
 
+            # Validate file extension
             allowed_extensions = {'jpg', 'jpeg', 'png', 'webp'}
             if '.' not in instPic.filename:
                 return jsonify({'success': False, 'message': 'Invalid file format'}), 400
 
             file_extension = instPic.filename.rsplit('.', 1)[1].lower()
             if file_extension not in allowed_extensions:
-                return jsonify({'success': False, 'message': 'Invalid file format. Only jpg, jpeg, png, webp allowed.'}), 400
+                return jsonify({'success': False, 'message': 'Invalid file format. Only jpg and png allowed.'}), 400
 
-            # Create uploads folder if missing
-            upload_folder = os.path.join(current_app.root_path, "uploads")
-            os.makedirs(upload_folder, exist_ok=True)
+            # Build Nextcloud path
+            path = "UDMS_Repository/Institutes/Logos"
+            encoded_path = safe_path(path)
+            ensure_directories(encoded_path)
 
             filename = f"{instCode}.{file_extension}"
             filename = secure_filename(filename)
 
-            save_path = os.path.join(upload_folder, filename)
-            instPic.save(save_path)
+            if not filename:
+                return jsonify({'success': False, 'message': 'Invalid filename'}), 400
 
-            # Save just the filename in DB (not full path)
-            instPicPath = filename
+            # Set the filename property for upload
+            instPic.filename = filename
+        
+            # Upload file to Nextcloud
+            response = upload_to_nextcloud(instPic, encoded_path)
+            if response.status_code not in (200, 201, 204):
+                return jsonify({
+                    'success': False,
+                    'message': 'Nextcloud upload failed.',
+                    'status': response.status_code,
+                    'details': response.text
+                }), 400
 
+            instPicPath = f"{path}/{filename}"  
+
+            # Handle employeeID
+            final_employee_id = employee_id.strip() if employee_id and employee_id.strip() else None
+
+            # Create new institute object
             new_institute = Institute(
                 instCode=instCode,
                 instName=instName,
                 instPic=instPicPath,
-                employeeID=employee_id.strip() if employee_id and employee_id.strip() else None
+                employeeID=final_employee_id
             )
-            db.session.add(new_institute)
 
-            # Audit new institute
-            admin_user = Employee.query.filter_by(employeeID=get_jwt_identity()).first()
-            new_log = AuditLog(
-                employeeID = admin_user.employeeID,
-                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED INSTITUTE {instName}"
-            )
-            db.session.add(new_log)
+            db.session.add(new_institute)
             db.session.commit()
 
+            # Get dean info
             dean = new_institute.dean
             dean_name = f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A"
 
             return jsonify({
                 'success': True,
-                'message': 'Institute Created Successfully',
+                'message': 'Institutes Created Successfully',
                 'instID': new_institute.instID,
                 'instCode': new_institute.instCode,
                 'instName': new_institute.instName,
@@ -1737,7 +1749,7 @@ def register_routes(app):
         .outerjoin(Program, Area.programID == Program.programID)
         .outerjoin(Subarea, (Area.areaID == Subarea.areaID) & (Subarea.archived == False))
         .outerjoin(Criteria, (Subarea.subareaID == Criteria.subareaID) & (Criteria.archived == False))
-        .outerjoin(Document, Criteria.docID == Document.docID)       
+        .outerjoin(Document, Criteria.docID == Document.docID)
         .filter(Program.programCode == program_code, Area.archived == False)
         .order_by(Area.areaID.asc(), Subarea.subareaID.asc(), Criteria.criteriaID.asc())
         .all()
@@ -1797,104 +1809,7 @@ def register_routes(app):
 
         return jsonify(list(result.values())) 
     
-    @app.route('/api/accreditation/create_area', methods=["POST"])
-    @jwt_required()
-    def create_area():
-        current_user_id = get_jwt_identity()
-        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
-        if not admin_user or not admin_user.isAdmin:
-            return jsonify({'success': False, 'message': 'Admins only'}), 403
-        data = request.form
-        programID = data.get("programID")
-        areaNum = data.get("areaNum")
-        areaName = data.get("areaName")
-
-    # create new area
-
-        new_area = Area(
-            programID = programID,
-            areaName = areaName,
-            areaNum = areaNum
-        )
-        db.session.add(new_area)
-
-        # Audit new area
-        new_log = AuditLog(
-            EmployeeID = admin_user.employeeID,
-            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW AREA {areaName}"
-        )
-        db.session.add(new_log)
-        db.session.commit()
-
-        return jsonify({'message' : 'Area created successfully!'}), 200
-
-
-    @app.route('/api/accreditation/create_subarea', methods=["POST"])
-    @jwt_required()
-    def create_sub_area():
-        current_user_id = get_jwt_identity()
-        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
-        if not admin_user or not admin_user.isAdmin:
-            return jsonify({'success': False, 'message': 'Admins only'}), 403
-        data = request.form
-        areaID = data.get("selectedAreaID")
-        subareaName = data.get("subAreaName")
-
-        area = Area.query.get(areaID)
-        # Check if the area exists
-        if not area:
-            return jsonify({'error': 'Area not found'}), 404
-
-
-        new_subArea = Subarea(subareaName = subareaName)
-        area.subareas.append(new_subArea)
-        db.session.add(new_subArea)
-
-        # Audit new subarea
-        new_log = AuditLog(
-            employeeID = admin_user.employeeID,
-            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW SUBAREA {subareaName}"
-        )
-        db.session.add(new_log)
-        db.session.commit()
-
-        return jsonify({'message': 'Sub-Area created successfully!'}), 200
-
-        
-    @app.route('/api/accreditation/create_criteria', methods=["POST"])
-    @jwt_required()
-    def create_criteria():
-        current_user_id = get_jwt_identity()
-        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
-        if not admin_user or not admin_user.isAdmin:
-            return jsonify({'success': False, 'message': 'Admins only'}), 403
-        data = request.form
-        subareaID = data.get("selectedSubAreaID")
-        criteriaContent = data.get("criteria")
-        criteriaType = data.get("criteriaType")
-
-        subarea = Subarea.query.get(subareaID)
-
-        if not subarea:
-            return jsonify({'error': 'Subarea not found'}), 404
-        
-        new_criteria = Criteria(
-            subareaID = subareaID,
-            criteriaContent = criteriaContent,
-            criteriaType = criteriaType
-        )
-        subarea.criteria.append(new_criteria)
-        db.session.add(new_criteria)
-
-        # Audit new criteria
-        new_log = AuditLog(
-            employeeID = admin_user.employeeID,
-            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW CRITERIA {criteriaType} IN {subarea.subareaName}"
-        )
-        db.session.add(new_log)
-        db.session.commit()
-
-        return jsonify({'message': 'Criteria created successfully!'}), 200
+    
     
     # ===== Load Models for Document Processing =====
 
@@ -1956,11 +1871,13 @@ def register_routes(app):
         except Exception as e:
             return jsonify({'success': False, 'message': 'Authentication error'}), 400
         
+        
+        
         # ==== Save File ====
 
         # Gets the file url
         path = f"UDMS_Repository/Accreditation/Programs/{program_code}/{area_name}/{subarea_name}/{criteria_type}/{criteria_id}"
-        normalized_path = normalize_path(path)    
+        normalized_path = normalize_path(path)
 
         # Generates a secure filename
         filename = secure_filename(file.filename)
@@ -2168,6 +2085,78 @@ def register_routes(app):
 
        
     # ============================================ Documents Routes ============================================
+
+    @app.route('/debug-nextcloud', methods=['GET'])
+    def debug_nextcloud():
+        import requests
+        from requests.auth import HTTPBasicAuth
+        from xml.etree import ElementTree as ET
+        from urllib.parse import unquote
+
+        NEXTCLOUD_URL = "http://47.84.200.237/nextcloud/remote.php/dav/files/UDMSAdmin/"
+        NEXTCLOUD_USER = "UDMSAdmin"
+        NEXTCLOUD_PASSWORD = "UDMSAdmin1@123"  # Replace with actual password
+
+        result = {
+            "status": "",
+            "root_contents": [],
+            "udms_check": {}
+        }
+
+        # List everything in root directory
+        response = requests.request(
+            "PROPFIND",
+            NEXTCLOUD_URL,
+            auth=HTTPBasicAuth(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD),
+            headers={"Depth": "1"}
+        )
+
+        result["status"] = f"Root status code: {response.status_code}"
+
+        if response.status_code == 207:
+            tree = ET.fromstring(response.content)
+            ns = {"d": "DAV:"}
+            
+            for resp in tree.findall("d:response", ns):
+                href = resp.find("d:href", ns).text
+                decoded_href = unquote(href)
+                
+                # Check if it's a collection (folder)
+                resourcetype = resp.find(".//d:resourcetype", ns)
+                is_folder = resourcetype.find("d:collection", ns) is not None
+                
+                # Get the name (last part of path)
+                name = decoded_href.rstrip('/').split('/')[-1]
+                
+                if name and name != "UDMSAdmin":
+                    result["root_contents"].append({
+                        "name": name,
+                        "type": "folder" if is_folder else "file",
+                        "full_path": decoded_href
+                    })
+            
+            # Try to access UDMS_Repository specifically
+            udms_url = f"{NEXTCLOUD_URL}UDMS_Repository/"
+            
+            response2 = requests.request(
+                "PROPFIND",
+                udms_url,
+                auth=HTTPBasicAuth(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD),
+                headers={"Depth": "0"}
+            )
+            
+            result["udms_check"] = {
+                "url_tested": udms_url,
+                "status_code": response2.status_code,
+                "accessible": response2.status_code == 207,
+                "message": "✓ UDMS_Repository is accessible!" if response2.status_code == 207 
+                        else "✗ UDMS_Repository not found - check folder name case sensitivity"
+            }
+            
+            return jsonify(result), 200
+        else:
+            result["error"] = response.text
+            return jsonify(result), response.status_code
 
     # display all the documents inside nextcloud repo
     @app.route('/api/documents', methods=["GET"])
@@ -3269,6 +3258,38 @@ def register_routes(app):
 
     # ================ Create Routes ================
 
+    @app.route('/api/accreditation/create_area', methods=["POST"])
+    @jwt_required()
+    def create_area():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
+        data = request.form
+        programID = data.get("programID")
+        areaNum = data.get("areaNum")
+        areaName = data.get("areaName")
+
+    # create new area
+
+        new_area = Area(
+            programID = programID,
+            areaName = areaName,
+            areaNum = areaNum
+        )
+        db.session.add(new_area)
+
+        # Audit new area
+        new_log = AuditLog(
+            employeeID = admin_user.employeeID,
+            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW AREA {areaName}"
+        )
+        db.session.add(new_log)
+        db.session.commit()
+
+        return jsonify({'message' : 'Area created successfully!'}), 200
+
+
     @app.route('/api/accreditation/create_subarea', methods=["POST"])
     @jwt_required()
     def create_sub_area():
@@ -3288,8 +3309,14 @@ def register_routes(app):
 
         new_subArea = Subarea(subareaName = subareaName)
         area.subareas.append(new_subArea)
-
         db.session.add(new_subArea)
+
+        # Audit new subarea
+        new_log = AuditLog(
+            employeeID = admin_user.employeeID,
+            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW SUBAREA {subareaName}"
+        )
+        db.session.add(new_log)
         db.session.commit()
 
         return jsonify({'message': 'Sub-Area created successfully!'}), 200
@@ -3317,10 +3344,15 @@ def register_routes(app):
             criteriaContent = criteriaContent,
             criteriaType = criteriaType
         )
-
         subarea.criteria.append(new_criteria)
-
         db.session.add(new_criteria)
+
+        # Audit new criteria
+        new_log = AuditLog(
+            employeeID = admin_user.employeeID,
+            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW CRITERIA {criteriaType} IN {subarea.subareaName}"
+        )
+        db.session.add(new_log)
         db.session.commit()
 
         return jsonify({'message': 'Criteria created successfully!'}), 200

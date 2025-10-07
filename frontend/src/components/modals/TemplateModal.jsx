@@ -94,7 +94,7 @@ export const ApplyTempModal = ({programCode, onClick, onApply, loading, createTe
                                     Cancel
                                 </button>
                                 <button 
-                                    onClick={handleApplyTemplate(selectedTemplate.templateID)}
+                                    onClick={() => handleApplyTemplate(selectedTemplate.templateID)}
                                     disabled={loading}
                                     className={`p-2 px-4 font-medium text-white transition-colors duration-300 rounded-full cursor-pointer ${loading ? 'bg-gray-400' : 'bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500'}`}
                                 >

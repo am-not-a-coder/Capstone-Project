@@ -449,7 +449,7 @@ const Messages = () => {
           )}
 
           {/* Messages List */}
-          <div className='space-y-2 overflow-y-auto max-h-[calc(100vh-280px)]'>
+          <div className='space-y-2 overflow-y-auto px-4 max-h-[calc(100vh-280px)]'>
             {view === 'all' ? (
               <>
                 {/* Pinned New Message Button */}
@@ -679,7 +679,7 @@ const Messages = () => {
             <input
               type='text'
               placeholder='Search users...'
-              className='px-4 py-3 mb-4 transition-all bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white'
+              className='px-4 py-3 mb-4 text-gray-800 transition-all bg-gray-100 border border-gray-300 rounded-lg dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white'
               value={userSearch}
               onChange={e => setUserSearch(e.target.value)}
             />

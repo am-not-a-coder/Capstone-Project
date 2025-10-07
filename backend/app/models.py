@@ -65,7 +65,7 @@ class Template(db.Model):
 
     templateID = db.Column(db.Integer, primary_key=True, nullable=False, autoincrement=True)
     templateName = db.Column(db.String(100), nullable=False)
-    description = db.Column(db.Text, nullable=False)    
+    description = db.Column(db.Text, nullable=False)
     createdBy = db.Column(db.String(10), db.ForeignKey('employee.employeeID'), nullable=False)
     createdAt = db.Column(db.DateTime, default=datetime.utcnow)
     isArchived = db.Column(db.Boolean, default=False)

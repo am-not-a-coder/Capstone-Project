@@ -40,8 +40,7 @@ const Dashboard = () => {
     // Fetch announcements
     const fetchAnnouncements = async () => {
         try {
-            setAnnouncementsLoading(true);
-            console.log('📢 Fetching announcements...');
+            setAnnouncementsLoading(true);           
             const response = await fetch('http://localhost:5000/api/announcements', {
                 method: 'GET',
                 credentials: 'include',
@@ -49,17 +48,14 @@ const Dashboard = () => {
                     'Content-Type': 'application/json',
                 }
             });
-            console.log('📢 Response status:', response.status);
-            console.log('📢 Response ok:', response.ok);
+           
             const data = await response.json();
-            console.log('📢 Announcements response:', data);
-            console.log('📢 Is array?', Array.isArray(data));
-            console.log('📢 Data length:', data ? data.length : 'no data');
+            
             if (data && Array.isArray(data)) {
                 setAnnouncements(data);
-                console.log('📢 Announcements set:', data);
+                
             } else {
-                console.log('📢 No announcements or invalid response');
+                
                 setAnnouncements([]);
             }
         } catch (error) {
@@ -69,6 +65,8 @@ const Dashboard = () => {
             setAnnouncementsLoading(false);
         }
     };
+
+   
 
     useEffect(()=> {
         const fetchCounts = async () => {
@@ -99,9 +97,7 @@ const Dashboard = () => {
           }  
     }, [])
 
-      const handleCreateAnnouncement = async (announcement) => {
-      console.log("New announcement:", announcement);
-      // Here you can push it to state, API call, etc.
+      const handleCreateAnnouncement = async (announcement) => {      
         
         try {
         const response = await apiPost('/api/announcement/post', {
@@ -134,9 +130,9 @@ const Dashboard = () => {
 
         if (window.confirm('Are you sure you want to delete this announcement?')) {
             try {
-                console.log('🗑️ Deleting announcement:', announcementId);
+                
                 const response = await apiDelete(`/api/announcement/delete/${announcementId}`);
-                console.log('🗑️ Delete response:', response);
+                
                 
                 if (response.success) {
                     toast.success('Announcement deleted successfully');
@@ -160,8 +156,9 @@ const Dashboard = () => {
                 setLogs(response.data.logs)
             } catch(err) {console.error('Error getting logs ', err)}
         } 
-        fetchLogs()
-    }, [])
+        fetchLogs();
+    }, [logs])
+    
 
     // Fetch pending documents
     const [pendingDocs, setPendingDocs] = useState([])
@@ -209,14 +206,14 @@ const Dashboard = () => {
                 </div>)}
                 
                 <div className="p-4 transition-all duration-500 rounded-lg bg-neutral-300 dark:bg-gray-950/50">
-                    {console.log('📊 Dashboard render - announcements:', announcements, 'loading:', announcementsLoading)}
+                    
                     {announcementsLoading ? (
                         <p className="p-5 font-light text-center text-gray-700 transition-all duration-500 dark:text-white">Loading announcements...</p>
                     ) : announcements && announcements.length > 0 ? (
                         <div className="space-y-3 max-h-[400px] overflow-y-auto">
                             {announcements.map((announcement, index) => (
-                                <div key={index} className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                                    <div className="flex justify-between items-start mb-2">
+                                <div key={index} className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm dark:bg-gray-800 dark:border-gray-700">
+                                    <div className="flex items-start justify-between mb-2">
                                         <h3 className="font-semibold text-gray-800 dark:text-white">{announcement.announceTitle}</h3>
                                         <div className="flex items-center gap-2">
                                             <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -225,14 +222,14 @@ const Dashboard = () => {
                                             {isAdmin && (
                                                 <button
                                                     onClick={() => handleDeleteAnnouncement(announcement.announceID)}
-                                                    className="px-2 py-1 text-xs text-red-600 hover:bg-red-100 dark:hover:bg-red-900 rounded transition-colors"
+                                                    className="px-2 py-1 text-xs text-red-600 transition-colors rounded hover:bg-red-100 dark:hover:bg-red-900"
                                                 >
                                                     Delete
                                                 </button>
                                             )}
                                         </div>
                                     </div>
-                                    <p className="text-gray-600 dark:text-gray-300 text-sm mb-2">{announcement.announceText}</p>
+                                    <p className="mb-2 text-sm text-gray-600 dark:text-gray-300">{announcement.announceText}</p>
                                     <p className="text-xs text-gray-500 dark:text-gray-400">By: {announcement.author}</p>
                                 </div>
                             ))}
@@ -256,36 +253,81 @@ const Dashboard = () => {
                         <FontAwesomeIcon icon={faHourglassHalf}  className="p-2 transition-all duration-500 dark:text-white" />
                         <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Pending Documents</h2>
                     </div>
-                    <div className="flex flex-col p-1 gap-1 transition-all duration-500 rounded-lg h-60 bg-neutral-300 dark:bg-gray-950/50">
+                    <div className="flex flex-col gap-1 p-1 transition-all duration-500 rounded-lg h-60 bg-neutral-300 dark:bg-gray-950/50">
                         {pendingDocs.map((pendingDoc)=> (
-                            <p key={pendingDoc.pendingDocID} className=" text-gray-700 hover:bg-gray-400 transition-all duration-500 dark:text-white">{pendingDoc.pendingDocName}</p>
+                            <p key={pendingDoc.pendingDocID} className="text-gray-700 transition-all duration-500 hover:bg-gray-400 dark:text-white">{pendingDoc.pendingDocName}</p>
                         ))}
                     </div>
                 </div>
-                {/* Audit Logs */}
-                
-                <div className="p-5 mb-10 transition-all duration-500 shadow-xl text-neutral-800 border-1 dark:border-gray-900 border-neutral-300 rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-900">
-                    <div className='flex flex-row'>
-                        <FontAwesomeIcon icon={faGears}  className="p-2 transition-all duration-500 dark:text-white" />
-                        <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Audit Logs</h2>
-                    </div>
+                {/* Audit Logs */}                
+                    <div className="p-5 mb-10 transition-all duration-500 shadow-xl text-neutral-800 border-1 dark:border-gray-900 border-neutral-300 rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-900">
+                        <div className='flex flex-row'>
+                            <FontAwesomeIcon icon={faGears} className="p-2 transition-all duration-500 dark:text-white" />
+                            <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Audit Logs</h2>
+                        </div>
 
-                    {/* Display logs */}
-                    <table className="overflow-auto gap-1 relative whitespace-nowrap flex flex-col p-2 rounded-lg h-60 bg-neutral-300 dark:border-gray-900 dark:bg-gray-950/50">
-                        <tr className=' flex justify-around w-[150%] lg:w-[110%]'>
-                            <th>Action</th>
-                            <th className='ml-30'>Date & Time</th>
-                        </tr>
-                        {logs.map((log)=> (
-                            <tr key={log.logID} className='flex w-[150%] lg:w-[110%] justify-between hover:bg-gray-400'>
-                                <td  className=" text-gray-700 transition-all duration-500 dark:text-white" >{log.action}</td>
-                                <td className=" flex text-gray-700 transition-all duration-500 dark:text-white"  >{log.createdAt}</td>
-                            </tr>
-                        ))}
-                    </table>
-                    
-                     
-                </div>
+                        {/* Redesigned logs table */}
+                        <div className="overflow-auto rounded-lg h-60 bg-neutral-300 dark:bg-gray-950/50">
+                            <table className="w-full">
+                                <thead className="sticky top-0 border-b border-gray-400 bg-neutral-400 dark:bg-gray-900 dark:border-gray-800">
+                                    <tr>
+                                        <th className="px-4 py-2 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase dark:text-gray-300">
+                                            Action
+                                        </th>
+                                        <th className="px-4 py-2 text-xs font-semibold tracking-wider text-right text-gray-700 uppercase dark:text-gray-300">
+                                            Date & Time
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-400 dark:divide-gray-800">
+                                    {logs.map((log) => {
+                                        const isLogin = log.action.includes('LOGGED IN');
+                                        const isDelete = log.action.includes('DELETED');
+                                        const isRate = log.action.includes('RATED');
+                                        const isCreate = log.action.includes('CREATED');
+                                        
+                                        return (
+                                            <tr 
+                                                key={log.logID} 
+                                                className="transition-colors duration-150 hover:bg-gray-400 dark:hover:bg-gray-800/70"
+                                            >
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center gap-2">
+                                                        {isLogin && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-blue-200 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
+                                                                Login
+                                                            </span>
+                                                        )}
+                                                        {isDelete && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-red-200 text-red-800 dark:bg-red-900/40 dark:text-red-300">
+                                                                Delete
+                                                            </span>
+                                                        )}
+                                                        {isRate && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-orange-200 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300">
+                                                                Rate
+                                                            </span>
+                                                        )}
+                                                        {isCreate && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-200 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                                                Create
+                                                            </span>
+                                                        )}
+                                                        <span className="text-sm text-gray-700 transition-all duration-500 dark:text-white">
+                                                            {log.action}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-right text-gray-700 transition-all duration-500 dark:text-white">
+                                                    {log.createdAt}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </section>
             )}
 

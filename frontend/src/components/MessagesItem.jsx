@@ -14,7 +14,7 @@ const MessagesItem = ({picture, userName, message, time, alert, onDelete, onOpen
     return (
         <div 
         onClick={handleMessageClick}
-        className={`relative flex items-center w-full min-h-[50px] p-3 border mt-2 rounded-xl shadow-md transition-transform duration-200 cursor-pointer hover:shadow-lg hover:scale-101 dark:hover:shadow-md dark:hover:shadow-zuccini-800 dark:border-none dark:inset-shadow-sm dark:inset-shadow-zuccini-700 ${isSelected 
+        className={`relative flex items-center w-full min-h-[50px] p-3 border border-gray-400 mt-2 rounded-xl shadow-md transition-transform duration-200 cursor-pointer hover:shadow-lg hover:scale-101 dark:hover:shadow-md dark:hover:shadow-zuccini-800 dark:border-none dark:inset-shadow-sm dark:inset-shadow-zuccini-700 ${isSelected 
         ? 
         'bg-blue-100 border-blue-300 dark:bg-blue-900/30 dark:border-blue-500' //selected appearance
         : 'bg-neutral-200 dark:bg-gray-950' //normal appearance
@@ -39,7 +39,7 @@ const MessagesItem = ({picture, userName, message, time, alert, onDelete, onOpen
 
             {/* Message content */}
             <div className="flex flex-col w-[50%]">
-             <h1 className='flex items-center font-bold truncate text-md'>
+             <h1 className='flex items-center font-bold text-gray-800 truncate text-md dark:text-gray-100'>
                 {userName}
                 {isOnline && status === 'away' && (
                   <span className='ml-2 px-2 py-0.5 text-[10px] leading-none rounded-full bg-orange-500 text-white'>Away</span>
