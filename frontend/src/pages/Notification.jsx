@@ -192,6 +192,7 @@ const Notification = () => {
               date={new Date(notification.createdAt).toLocaleDateString()}
               alert={!notification.isRead}
               link={notification.link}
+              type={notification.type}
               onDelete={() => handleDelete(notification.notificationID)}
               onMarkRead={() => markAsRead(notification.notificationID)}
             />

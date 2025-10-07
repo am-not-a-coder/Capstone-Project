@@ -389,6 +389,26 @@ def register_routes(app):
             )
             db.session.add(new_log)
             db.session.commit()
+            
+            # Real-time notifications: notify all active users about the announcement
+            try:
+                from app.socket_handlers import create_notification
+                # Notify every employee except the author
+                employees = Employee.query.with_entities(Employee.employeeID).all()
+                for (emp_id,) in employees:
+                    if str(emp_id) == str(userID):
+                        continue
+                    create_notification(
+                        recipient_id=str(emp_id),
+                        notification_type='announcement',
+                        title=title or 'New Announcement',
+                        content=message or '',
+                        sender_id=str(userID),
+                        link='/Dashboard'
+                    )
+            except Exception as notify_err:
+                current_app.logger.error(f"Announcement notification emit failed: {notify_err}")
+
             return jsonify({'success': True, 'message': 'Announcement created successfully'}), 200 
         except Exception as e:
             return jsonify({'success': False, 'message': f'Failed to create announcement, {e}'}), 500

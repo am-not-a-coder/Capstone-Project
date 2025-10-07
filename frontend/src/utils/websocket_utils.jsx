@@ -6,7 +6,7 @@ let presenceInitialized = false
 export const getSocket = () => {
   if (!socket) {
     console.log('🔌 Creating new socket connection...')
-    socket = io('http://localhost:5000', {
+    socket = io(API_URL, {
       withCredentials: true,
       transports: ['websocket', 'polling'],
       autoConnect: true,
