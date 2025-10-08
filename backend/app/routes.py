@@ -23,7 +23,7 @@ import redis
 from app.otp_utils import generate_random
 from flask_mail import Message as MailMessage
 from app.login_handlers import complete_user_login
-from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message, MessageDeletion, Template, AreaBlueprint, SubareaBlueprint, CriteriaBlueprint, AppliedTemplate
+from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message, MessageDeletion, Template, AreaBlueprint, SubareaBlueprint, CriteriaBlueprint, AppliedTemplate, Notification
 from sqlalchemy import cast, String, func, text
 
 
@@ -244,13 +244,21 @@ def register_routes(app):
                 'role': 'admin' if user.isAdmin else 'user'
             }
             
-            return jsonify({
+            resp = jsonify({
                 'success': True,
                 'message': 'Token refreshed successfully',
                 'access_token': new_access_token,
-                'refresh_token': new_refresh_token,  # Send new refresh token
-                'user': user_data  # Send updated user info
-            }), 200
+                'refresh_token': new_refresh_token,
+                'user': user_data
+            })
+            # Also set cookies so subsequent requests with credentials include them
+            try:
+                from flask_jwt_extended import set_access_cookies, set_refresh_cookies
+                set_access_cookies(resp, new_access_token)
+                set_refresh_cookies(resp, new_refresh_token)
+            except Exception as _:
+                pass
+            return resp, 200
             
         except Exception as e:
             # Audit failed token refresh instead of repeating new token
@@ -381,6 +389,26 @@ def register_routes(app):
             )
             db.session.add(new_log)
             db.session.commit()
+            
+            # Real-time notifications: notify all active users about the announcement
+            try:
+                from app.socket_handlers import create_notification
+                # Notify every employee except the author
+                employees = Employee.query.with_entities(Employee.employeeID).all()
+                for (emp_id,) in employees:
+                    if str(emp_id) == str(userID):
+                        continue
+                    create_notification(
+                        recipient_id=str(emp_id),
+                        notification_type='announcement',
+                        title=title or 'New Announcement',
+                        content=message or '',
+                        sender_id=str(userID),
+                        link='/Dashboard'
+                    )
+            except Exception as notify_err:
+                current_app.logger.error(f"Announcement notification emit failed: {notify_err}")
+
             return jsonify({'success': True, 'message': 'Announcement created successfully'}), 200 
         except Exception as e:
             return jsonify({'success': False, 'message': f'Failed to create announcement, {e}'}), 500
@@ -1143,29 +1171,18 @@ def register_routes(app):
             if not institute:
                 return jsonify({'error': 'Institute not found'}), 404
 
-            # Check dependencies
-            dependencies = []
-            programs = Program.query.filter_by(instID=instID).count()
-            if programs > 0:
-                dependencies.append(f"{programs} program(s)")
-
-            areas = Area.query.filter_by(instID=instID).count()
-            if areas > 0:
-                dependencies.append(f"{areas} area(s)")
-
-            deadlines = Deadline.query.filter_by(instID=instID).count()
-            if deadlines > 0:
-                dependencies.append(f"{deadlines} deadline(s)")
-
-            if dependencies:
-                return jsonify({
-                    'error': 'Cannot delete institute',
-                    'reason': f'This institute is referenced by: {", ".join(dependencies)}',
-                    'canDelete': False,
-                    'dependencies': dependencies
-                }), 400
-
-            # Safe to delete
+            updated_counts = {}
+            programs_updated = Program.query.filter_by(instID=instID).update({'instID': None})
+            updated_counts['programs'] = programs_updated
+            
+            areas_updated = Area.query.filter_by(instID=instID).update({'instID': None})
+            updated_counts['areas'] = areas_updated
+            
+            deadlines_updated = 0
+            if hasattr(Deadline, 'instID'):
+                deadlines_updated = Deadline.query.filter_by(instID=instID).update({'instID': None})
+            updated_counts['deadlines'] = deadlines_updated
+            
             db.session.delete(institute)
 
             # Audit deleted institute
@@ -1176,7 +1193,13 @@ def register_routes(app):
             db.session.add(new_log)
             db.session.commit()
 
-            return jsonify({'success': True, 'message': 'Institute deleted successfully', 'deletedID': instID}), 200
+            return jsonify({
+                'success': True, 
+                'message': f'Institute deleted successfully. Related records preserved but unlinked.',
+                'deletedID': instID,
+                'updated_counts': updated_counts
+            }), 200
+            
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Delete institute error: {str(e)}")
@@ -1213,19 +1236,61 @@ def register_routes(app):
         institute = Institute.query.filter_by(instCode=instCode).first()
         if not institute or not institute.instPic:
             return jsonify({"success": False, "message": "Institute logo not found"}), 404
+            
+        # Validate Nextcloud configuration
+        NEXTCLOUD_URL = os.getenv("NEXTCLOUD_URL")
+        NEXTCLOUD_USER = os.getenv("NEXTCLOUD_USER")
+        NEXTCLOUD_PASSWORD = os.getenv("NEXTCLOUD_PASSWORD")
+        if not all([NEXTCLOUD_URL, NEXTCLOUD_USER, NEXTCLOUD_PASSWORD]):
+            return jsonify({
+                'success': False,
+                'message': 'Nextcloud configuration missing on server'
+            }), 500
 
-        response = preview_from_nextcloud(institute.instPic)
+        raw = (institute.instPic or '').strip()
+        # Build candidate paths to match your structure UDMS_Repository/Institutes/Logos
+        candidates = []
+        if raw:
+            filename = os.path.basename(raw)
+            name, ext = os.path.splitext(filename)
+            if raw.startswith('UDMS_Repository/'):
+                # Try exact DB path first
+                candidates.append(raw)
+                # If it fails, try swapping common image extensions
+                if name and ext:
+                    dir_prefix = raw[: -len(filename)]
+                    for e in ['.png', '.jpg', '.jpeg', '.webp']:
+                        if ext.lower() != e:
+                            candidates.append(f"{dir_prefix}{name}{e}")
+            else:
+                if name:
+                    exts = [ext] if ext else []
+                    for e in ['.png', '.jpg', '.jpeg', '.webp']:
+                        if e not in exts:
+                            exts.append(e)
+                    for e in exts:
+                        fname = f"{name}{e}" if e else filename
+                        candidates.append(f"UDMS_Repository/Institutes/Logos/{fname}")
+                        candidates.append(f"UDMS_Repository/Institutes/logos/{fname}")  
+                candidates.append(f"UDMS_Repository/{raw}")
 
-        if response.status_code == 200:
+        response = None
+        for p in candidates:
+            r = preview_from_nextcloud(p)
+            if getattr(r, 'status_code', 500) == 200:
+                response = r
+                break
+
+        if response and response.status_code == 200:
             content_type = response.headers.get("Content-Type", "application/octet-stream")
             return Response(response.content, content_type=content_type)
         else:
             return jsonify({
                 "success": False,
                 "message": f"Failed to fetch logo for {instCode}",
-                "status": response.status_code,
+                "status": getattr(response, 'status_code', 500),
                 "detail": getattr(response, "text", "No response text")
-            }), response.status_code            
+            }), getattr(response, 'status_code', 500)            
 
     # Fetch programs for the institute
     @app.route('/api/institute/programs', methods=["GET"])
@@ -1373,46 +1438,23 @@ def register_routes(app):
             admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
             if not admin_user or not admin_user.isAdmin:
                 return jsonify({'success': False, 'message': 'Admins only'}), 403
+
             programs = Program.query.filter_by(programID=programID).first()
             
             if not programs:
                 return jsonify({'error': 'Program not found'}), 404
             
-            # Check dependencies before deletion
-            dependencies = []
+            updated_counts = {}
             
-            # Check employees
-            employees = Employee.query.filter_by(programID=programID).count()
-            if employees > 0:
-                dependencies.append(f"{employees} employee(s)")
+            employees_updated = Employee.query.filter_by(programID=programID).update({'programID': None})
+            updated_counts['employees'] = employees_updated
             
-            # Check areas
-            areas = Area.query.filter_by(programID=programID).count()
-            if areas > 0:
-                dependencies.append(f"{areas} area(s)")
+            areas_updated = Area.query.filter_by(programID=programID).update({'programID': None})
+            updated_counts['areas'] = areas_updated
             
-            # Check institutes  
-            institutes = Institute.query.filter_by(programID=programID).count()
-            if institutes > 0:
-                dependencies.append(f"{institutes} institute(s)")
-                
-            # Check deadlines
-            deadlines = Deadline.query.filter_by(programID=programID).count()  
-            if deadlines > 0:
-                dependencies.append(f"{deadlines} deadline(s)")
-            
-            # If dependencies exist, prevent deletion
-            if dependencies:
-                dependency_text = ", ".join(dependencies)
-                return jsonify({
-                    'error': 'Cannot delete program',
-                    'reason': f'This program is referenced by: {dependency_text}',
-                    'suggestion': 'Please reassign or remove dependent records first',
-                    'canDelete': False,
-                    'dependencies': dependencies
-                }), 400
-            
-            # Safe to delete - no dependencies found
+            deadlines_updated = Deadline.query.filter_by(programID=programID).update({'programID': None})
+            updated_counts['deadlines'] = deadlines_updated
+        
             db.session.delete(programs)
 
             # Audit deleted program
@@ -1425,15 +1467,16 @@ def register_routes(app):
             
             return jsonify({
                 'success': True,
-                'message': 'Program deleted successfully',
-                'deletedID': programID
-            })
-                
+                'message': f'Program deleted successfully. {employees_updated} employees, {areas_updated} areas, and {deadlines_updated} deadlines are now unlinked.',
+                'deletedID': programID,
+                'updated_counts': updated_counts
+            }), 200
+            
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Delete program error: {str(e)}")
             return jsonify({'error': 'Database error occurred'}), 500
-        
+
     @app.route('/api/program', methods=['GET'])
     @jwt_required()
     def get_user_program():
@@ -1514,6 +1557,211 @@ def register_routes(app):
 
         return jsonify({'success': True, 'message': 'Area progress saved!'}), 200
 
+
+    # ============================================ Notifications ============================================
+    @app.route('/api/notifications', methods=['GET', 'OPTIONS'])
+    def notifications_options_handler():
+        if request.method == 'OPTIONS':
+            return ('', 204)
+        return get_notifications()
+
+    @jwt_required()
+    def get_notifications():
+        try:
+            current_user_id = get_jwt_identity()
+            page = request.args.get('page', 1, type=int)
+            per_page = request.args.get('per_page', 20, type=int)
+
+            notifications = Notification.query.filter_by(recipientID=current_user_id)\
+            .order_by(Notification.createdAt.desc())\
+            .paginate(page=page, per_page=per_page, error_out=False)
+
+            notification_list = []
+            for notif in notifications.items:
+                sender_info = None
+                if notif.senderID:
+                    sender = Employee.query.get(notif.senderID)
+                    if sender:
+                        sender_info = {
+                            'employeeID': sender.employeeID,
+                            'name': f'{sender.fName} {sender.lName}',
+                            'profilePic': sender.profilePic if sender.profilePic else None
+                        }
+                notification_list.append({
+                    'notificationID': notif.notificationID,
+                    'type': notif.type,
+                    'title': notif.title,
+                    'content': notif.content,
+                    'createdAt': notif.createdAt.isoformat() if notif.createdAt else None,
+                    'isRead': notif.isRead,
+                    'link': notif.link,
+                    'sender': sender_info
+                })
+            return jsonify({
+                'success': True,
+                'notifications': notification_list,
+                'total': notifications.total,
+                'pages': notifications.pages,
+                'current_page': page
+            }), 200
+        except Exception as e:
+            return jsonify({'success': False, 'message': f'Failed to fetch notifications: {e}'}), 500
+    
+    
+    @app.route('/api/notifications/<int:notification_id>/read', methods=['PUT', 'OPTIONS'])
+    def mark_notification_read_options(notification_id):
+        if request.method == 'OPTIONS':
+            return ('', 204)
+        return mark_notification_read_impl(notification_id)
+
+    @jwt_required()
+    def mark_notification_read_impl(notification_id):
+        try:
+            current_user_id = get_jwt_identity()
+            notification = Notification.query.filter_by(
+                notificationID=notification_id,
+                recipientID=current_user_id
+            ).first()
+            
+            if not notification:
+                return jsonify({'success': False, 'message': 'Notification not found'}), 404
+            
+            notification.isRead = True
+            db.session.commit()
+            
+            return jsonify({'success': True, 'message': 'Notification marked as read'}), 200
+            
+        except Exception as e:
+            current_app.logger.error(f"Mark notification read error: {e}")
+            return jsonify({'success': False, 'message': 'Failed to update notification'}), 500
+
+    @app.route('/api/notifications/<int:notification_id>', methods=['DELETE', 'OPTIONS'])
+    def delete_notification_options(notification_id):
+        if request.method == 'OPTIONS':
+            return ('', 204)
+        return delete_notification_impl(notification_id)
+
+    @jwt_required()
+    def delete_notification_impl(notification_id):
+        try:
+            current_user_id = get_jwt_identity()
+            notification = Notification.query.filter_by(
+                notificationID=notification_id,
+                recipientID=current_user_id
+            ).first()
+            
+            if not notification:
+                return jsonify({'success': False, 'message': 'Notification not found'}), 404
+            
+            db.session.delete(notification)
+            db.session.commit()
+            
+            return jsonify({'success': True, 'message': 'Notification deleted'}), 200
+            
+        except Exception as e:
+            current_app.logger.error(f"Delete notification error: {e}")
+            return jsonify({'success': False, 'message': 'Failed to delete notification'}), 500
+
+    @app.route('/api/notifications', methods=['DELETE', 'OPTIONS'])
+    def delete_all_notifications_options():
+        if request.method == 'OPTIONS':
+            return ('', 204)
+        return delete_all_notifications_impl()
+
+    @jwt_required()
+    def delete_all_notifications_impl():
+        try:
+            current_user_id = get_jwt_identity()
+            Notification.query.filter_by(recipientID=current_user_id).delete()
+            db.session.commit()
+            
+            return jsonify({'success': True, 'message': 'All notifications deleted'}), 200
+            
+        except Exception as e:
+            current_app.logger.error(f"Delete all notifications error: {e}")
+            return jsonify({'success': False, 'message': 'Failed to delete notifications'}), 500
+
+    @app.route('/api/notifications/mark-all-read', methods=['PUT', 'OPTIONS'])
+    def mark_all_notifications_read_options():
+        if request.method == 'OPTIONS':
+            return ('', 204)
+        return mark_all_notifications_read_impl()
+
+    @jwt_required()
+    def mark_all_notifications_read_impl():
+        try:
+            current_user_id = get_jwt_identity()
+            Notification.query.filter_by(
+                recipientID=current_user_id,
+                isRead=False
+            ).update({'isRead': True})
+            db.session.commit()
+            
+            return jsonify({'success': True, 'message': 'All notifications marked as read'}), 200
+            
+        except Exception as e:
+            current_app.logger.error(f"Mark all notifications read error: {e}")
+            return jsonify({'success': False, 'message': 'Failed to mark notifications as read'}), 500
+
+    @app.route('/api/notifications/unread-count', methods=['GET', 'OPTIONS'])
+    def get_unread_count_options():
+        if request.method == 'OPTIONS':
+            return ('', 204)
+        return get_unread_count_impl()
+
+    @jwt_required()
+    def get_unread_count_impl():
+        try:
+            current_user_id = get_jwt_identity()
+            count = Notification.query.filter_by(
+                recipientID=current_user_id,
+                isRead=False
+            ).count()
+            
+            return jsonify({'success': True, 'count': count}), 200
+            
+        except Exception as e:
+            current_app.logger.error(f"Get unread count error: {e}")
+            return jsonify({'success': False, 'message': 'Failed to get unread count'}), 500
+
+    # ============================================ Dashboard: Audit Logs & Pending Docs ============================================
+    @app.route('/api/auditLogs', methods=['GET', 'OPTIONS'])
+    @jwt_required()
+    def get_audit_logs():
+        if request.method == 'OPTIONS':
+            return ('', 204)
+        try:
+            logs = (AuditLog.query.order_by(AuditLog.createdAt.desc()).limit(100).all())
+            results = [{
+                'logID': l.logID,
+                'employeeID': l.employeeID,
+                'action': l.action,
+                'createdAt': l.createdAt.isoformat() if l.createdAt else None,
+            } for l in logs]
+            return jsonify({ 'success': True, 'data': { 'logs': results } }), 200
+        except Exception as e:
+            current_app.logger.error(f"Get audit logs error: {e}")
+            return jsonify({ 'success': False, 'error': 'Failed to fetch logs' }), 500
+
+    @app.route('/api/pendingDocs', methods=['GET', 'OPTIONS'])
+    @jwt_required()
+    def get_pending_docs():
+        if request.method == 'OPTIONS':
+            return ('', 204)
+        try:
+            # Consider pending as documents that are not approved yet (isApproved is NULL)
+            pending = Document.query.filter((Document.isApproved.is_(None))).order_by(Document.docID.desc()).limit(100).all()
+            def serialize_doc(d: Document):
+                # best-effort fields to match frontend expectations
+                name = getattr(d, 'docName', None) or getattr(d, 'fileName', None) or 'Document'
+                return {
+                    'pendingDocID': getattr(d, 'docID', None),
+                    'pendingDocName': name,
+                }
+            return jsonify({ 'success': True, 'data': { 'pendingDocs': [serialize_doc(d) for d in pending] } }), 200
+        except Exception as e:
+            current_app.logger.error(f"Get pending docs error: {e}")
+            return jsonify({ 'success': False, 'error': 'Failed to fetch pending documents' }), 500
 
     @app.route('/api/program/approve', methods=["PUT"])
     @jwt_required()
@@ -3265,150 +3513,3 @@ def register_routes(app):
             return jsonify({'success': False, 'message': f"Failed to apply template {str(e)}"}), 500
 
 
-    # ================== CRUD for Areas/Subares/Criteria per Program ==================
-
-    # ================ Create Routes ================
-        
-    # ================ Update Routes ================
-
-    # Update area
-    @app.route('/api/areas/<int:areaID>/edit', methods=["PUT"])
-    @jwt_required()
-    def update_area(areaID):
-        data = request.get_json()
-        try:
-            area = Area.query.get(areaID)
-            if not area:
-                return jsonify({'success': False, 'message': 'Area not found.'}), 404
-
-            area.areaName = data.get("areaName")
-            area.areaNum = data.get("areaNum")
-
-            db.session.commit()
-            return jsonify({"success": True, "message": "Area updated"})
-
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({"success": False, "message": f"Failed to update: {str(e)}"}), 500
-        
-    # Update subarea   
-    @app.route('/api/subareas/<int:subareaID>/edit', methods=["PUT"])
-    @jwt_required()
-    def update_subarea(subareaID):
-        data = request.get_json()
-        try:
-            subarea = Subarea.query.get(subareaID)
-            if not subarea:
-                return jsonify({'success': False, 'message': 'Subarea not found.'}), 404
-
-            subarea.subareaName = data.get("subareaName")            
-
-            db.session.commit()
-            return jsonify({"success": True, "message": "Subarea updated"})
-
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({"success": False, "message": f"Failed to update: {str(e)}"}), 500
-
-   # Update criteria 
-    @app.route('/api/criterias/<int:criteriaID>/edit', methods=["PUT"])
-    @jwt_required()
-    def update_criteria(criteriaID):
-        data = request.get_json()
-        try:
-            criteria = Criteria.query.get(criteriaID)
-            if not criteria:
-                return jsonify({'success': False, 'message': 'Criteria not found.'}), 404
-
-            criteria.criteriaContent = data.get("criteriaContent")            
-
-            db.session.commit()
-            return jsonify({"success": True, "message": "Criteria updated"})
-
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({"success": False, "message": f"Failed to update: {str(e)}"}), 500
-          
-    # ================ Delete Routes ================
-
-    # Delete Area
-    @app.route('/api/areas/<int:areaID>/delete', methods=["DELETE"])
-    @jwt_required()
-    def delete_area(areaID):        
-
-        area = Area.query.get(areaID)
-        if not area:
-            return jsonify({"success": False, "message": "Area not found"}), 404    
-    
-        db.session.delete(area)
-        db.session.commit()
-
-        return jsonify({"success": True, "message": "Area Deleted"})
-    
-    # Delete Subarea
-    @app.route('/api/subareas/<int:subareaID>/delete', methods=["DELETE"])
-    @jwt_required()
-    def delete_subarea(subareaID):
-
-        subarea = Subarea.query.get(subareaID)
-        if not subarea:
-            return jsonify({"success": False, "message": "Subarea not found"}), 404    
-    
-        db.session.delete(subarea)
-        db.session.commit()
-
-        return jsonify({"success": True, "message": "Subarea Deleted"})
-    
-    # Delete Criteria
-    @app.route('/api/criterias/<int:criteriaID>/delete', methods=["DELETE"])
-    @jwt_required()
-    def delete_criteria(criteriaID):        
-
-        criteria = Criteria.query.get(criteriaID)
-        if not criteria:
-            return jsonify({"success": False, "message": "Criteri not found"}), 404    
-    
-        db.session.delete(criteria)
-        db.session.commit()
-
-        return jsonify({"success": True, "message": "Criteria Deleted"})
-
-      
-    # ==================================== Audit Log Routes ====================================      
-      
-    # Get all audit logs
-    @app.route('/api/auditLogs', methods=['GET'])
-    def get_audit_logs():
-        try:
-            logs = AuditLog.query.order_by(AuditLog.createdAt.desc()).all()
-            logs_list = [{
-                'logID': log.logID,
-                'employeeID': log.employeeID,
-                'action': log.action,
-                'createdAt': log.createdAt
-            } for log in logs]
-
-            return jsonify({'success': True, 'logs': logs_list}), 200
-        except Exception as e:
-            current_app.logger.error(f"Error getting logs: {e}")
-            return jsonify({'success': False, 'message': 'Failed to get audit logs'}), 500
-
-
-
-    #Get all pending documents
-    @app.route('/api/pendingDocs', methods=['GET'])
-    def get_pending_docs():
-        try:
-            pendingDocs = Document.query.filter(Document.isApproved == None).all()
-            pendingDocs_list = [{
-                'pendingDocID': pendingDoc.docID,
-                'pendingDocName': pendingDoc.docName,
-                'pendingDocPath': pendingDoc.docPath
-            } for pendingDoc in pendingDocs]
-        
-            return jsonify({'success': True, 'pendingDocs': pendingDocs_list}), 200
-        except Exception as e:
-            current_app.logger.error(f"Error getting pending documents: {e}")
-            return jsonify({'success': False, 'message': 'Failed to get pending documents'}), 500
-
-    

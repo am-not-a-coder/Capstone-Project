@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import NotificationItem from '../components/NotifItem';
-import { apiGet, apiPost, apiDelete } from '../utils/api_utils';
+import { apiGet, apiPost, apiDelete, apiPut } from '../utils/api_utils';
 import { getCurrentUser } from '../utils/auth_utils';
 import { getSocket } from '../utils/websocket_utils';
 
@@ -36,8 +36,8 @@ const Notification = () => {
     try {
       const response = await apiGet('/api/notifications/unread-count');
       if (response && response.success) {
-        // You can use this count for a badge in your header
-        console.log('Unread notifications:', response.count);
+        const count = (response?.data?.count ?? response?.count ?? 0);
+        console.log('Unread notifications:', count);
       } else {
         console.log('Unread notifications: 0 (API error)');
       }
@@ -50,7 +50,7 @@ const Notification = () => {
   // Mark notification as read
   const markAsRead = async (notificationId) => {
     try {
-      const response = await apiPost(`/api/notifications/${notificationId}/read`, {});
+      const response = await apiPut(`/api/notifications/${notificationId}/read`, {});
       if (response.success) {
         setNotifications(prev => 
           prev.map(notif => 
@@ -192,6 +192,7 @@ const Notification = () => {
               date={new Date(notification.createdAt).toLocaleDateString()}
               alert={!notification.isRead}
               link={notification.link}
+              type={notification.type}
               onDelete={() => handleDelete(notification.notificationID)}
               onMarkRead={() => markAsRead(notification.notificationID)}
             />

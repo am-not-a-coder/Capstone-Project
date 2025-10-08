@@ -1,48 +1,59 @@
 # ==========================
-# Base image
+# Multi-stage build for smaller image
 # ==========================
+
+# Base image with minimal dependencies
 FROM python:3.11-slim AS base
 
 WORKDIR /app
 
-# Install system dependencies
+# Install only essential system dependencies
 RUN apt-get update && apt-get install -y \
     poppler-utils \
     tesseract-ocr \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# ==========================
+# Build stage for ML dependencies
+# ==========================
+FROM base AS builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
     libopenblas-dev \
-    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
-    
-RUN pip install jupyterlab ipykernel
 
-
-# ==========================
-# Install base dependencies
-# ==========================
-FROM base AS deps-base
-COPY requirements-base.txt .
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements-base.txt     
-
+# Install Python dependencies
+COPY requirements-base.txt requirements-ml.txt ./
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir --user -r requirements-base.txt && \
+    pip install --no-cache-dir --user -r requirements-ml.txt
 
 # ==========================
-# Install ML dependencies
+# Final lightweight image
 # ==========================
-FROM deps-base AS deps-ml
-COPY requirements-ml.txt .
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir -r requirements-ml.txt
+FROM base AS final
 
-# ==========================
-# Final image
-# ==========================
-FROM deps-ml AS final
+# Copy Python packages from builder
+COPY --from=builder /root/.local /root/.local
 
+# Make sure scripts in .local are usable
+ENV PATH=/root/.local/bin:$PATH
+
+# Copy application code
 WORKDIR /app
 COPY . .
+
+# Remove unnecessary files to reduce size
+RUN find . -type f -name "*.pyc" -delete && \
+    find . -type d -name "__pycache__" -delete && \
+    rm -rf .git* && \
+    rm -rf tests/ && \
+    rm -rf *.md
 
 EXPOSE 5000
 CMD ["python", "run.py"]

@@ -10,7 +10,7 @@ import os
 import redis
 from flask_mail import Mail
 
-redis_client = redis.Redis(host='localhost', port=6379, db=0)
+redis_client = redis.Redis(host='redis', port=6379, db=0)
 
 db = SQLAlchemy()
 migrate = Migrate()
@@ -51,10 +51,10 @@ def create_app():
     mail.init_app(app)
 
     # Initialize CORS
-    CORS(app, origins=['http://localhost:5173'], supports_credentials=True)
+    CORS(app, origins=['http://localhost:5173', 'http://localhost:3000', 'http://localhost:8080'], supports_credentials=True)
 
     # Initialize SocketIO with CORS settings
-    socketio.init_app(app, cors_allowed_origins=["http://localhost:5173"], 
+    socketio.init_app(app, cors_allowed_origins=["http://localhost:5173", "http://localhost:3000", "http://localhost:8080"], 
                       async_mode='threading', logger=True, engineio_logger=True)
 
     from app.routes import register_routes
