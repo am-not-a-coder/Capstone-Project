@@ -24,8 +24,6 @@ class Employee(db.Model):
     __tablename__ = 'employee'
 
     employeeID = db.Column(db.String(10), primary_key=True, nullable=False)
-    programID = db.Column(db.Integer, db.ForeignKey('program.programID'), nullable=False)
-    areaID = db.Column(db.Integer, nullable=False)
     fName = db.Column(db.String(50), nullable=False)
     lName = db.Column(db.String(50))
     suffix = db.Column(db.String(10))
@@ -34,6 +32,11 @@ class Employee(db.Model):
     password = db.Column(db.String(128), nullable=False)
     profilePic = db.Column(db.Text)
     isAdmin = db.Column(db.Boolean, default=False)
+    isRating = db.Column(db.Boolean, default=False)
+    isEdit = db.Column(db.Boolean, default=False)
+    crudFormsEnable = db.Column(db.Boolean, default=False)
+    crudProgramEnable = db.Column(db.Boolean, default=False)
+    crudInstituteEnable = db.Column(db.Boolean, default=False)
     isOnline = db.Column(db.Boolean, default=False)
     experiences = db.Column(db.Text)
 
@@ -43,8 +46,33 @@ class Employee(db.Model):
     otpcode = db.Column(db.String(6))
     otpexpiry = db.Column(db.DateTime(timezone=True))
     otpverified = db.Column(db.Boolean, default=False)
-    # Relationships
-    program = db.relationship("Program", foreign_keys=[programID], backref="employees")
+    
+    # Relationships to junction tables
+    employee_programs = db.relationship("EmployeeProgram", backref="employee")
+    employee_areas = db.relationship("EmployeeArea", backref="employee")
+    employee_folders = db.relationship("EmployeeFolder", backref="employee")
+
+
+class EmployeeProgram(db.Model):
+    __tablename__ = 'employee_program'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    employeeID = db.Column(db.String(10), db.ForeignKey('employee.employeeID'), nullable=False)
+    programID = db.Column(db.Integer, db.ForeignKey('program.programID'), nullable=False)
+
+class EmployeeArea(db.Model):
+    __tablename__ = 'employee_area'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    employeeID = db.Column(db.String(10), db.ForeignKey('employee.employeeID'), nullable=False)
+    areaID = db.Column(db.Integer, db.ForeignKey('area.areaID'), nullable=False)
+
+class EmployeeFolder(db.Model):
+    __tablename__ = 'employee_folder'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    employeeID = db.Column(db.String(10), db.ForeignKey('employee.employeeID', ondelete='CASCADE'), nullable=False)
+    folderPath = db.Column(db.String(500), nullable=False)
 
     # ============================ 
 

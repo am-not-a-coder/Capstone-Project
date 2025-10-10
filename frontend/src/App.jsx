@@ -308,13 +308,13 @@ useEffect(() => {
 
 // If the user is not logged in it will redirect to login page
 const ProtectedRoute = ({children}) => {
-  console.log('🔒 ProtectedRoute - authReady:', authReady, 'isLoggedIn:', isLoggedIn())
+  
   if (!authReady) {
-    console.log('⏳ Auth not ready, showing loading...')
+    
     return <div style={{padding: '20px', fontSize: '18px', color: 'blue'}}>Loading... Please wait</div>
   } else {
     const loggedIn = isLoggedIn()
-    console.log('🔐 Auth ready, logged in:', loggedIn)
+    
     return loggedIn ? children : <Navigate to="/login" />
   }
 }

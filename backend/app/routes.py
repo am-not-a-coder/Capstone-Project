@@ -23,7 +23,7 @@ import redis
 from app.otp_utils import generate_random
 from flask_mail import Message as MailMessage
 from app.login_handlers import complete_user_login
-from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message, MessageDeletion, Template, AreaBlueprint, SubareaBlueprint, CriteriaBlueprint, AppliedTemplate, Notification
+from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message, MessageDeletion, Template, AreaBlueprint, SubareaBlueprint, CriteriaBlueprint, AppliedTemplate, Notification, EmployeeProgram, EmployeeArea, EmployeeFolder
 from sqlalchemy import cast, String, func, text
 
 
@@ -150,20 +150,47 @@ def register_routes(app):
         user = Employee.query.filter_by(employeeID=emp_id).first()
         if not user:
             return jsonify({'success': False, 'message': 'User not found'})
-        program_name = user.program.programCode if user.program else None
+        
+        # Get user's programs and areas from junction tables
+        user_programs = []
+        user_areas = []
+        
+        for ep in user.employee_programs:
+            program = Program.query.get(ep.programID)
+            if program:
+                user_programs.append({
+                    'programID': program.programID,
+                    'programCode': program.programCode,
+                    'programName': program.programName
+                })
+        
+        for ea in user.employee_areas:
+            area = Area.query.get(ea.areaID)
+            if area:
+                user_areas.append({
+                    'areaID': area.areaID,
+                    'areaName': area.areaName,
+                    'areaNum': area.areaNum
+                })
+        
         return jsonify({
             'success': True,
             'user': {
                 'employeeID': user.employeeID,
                 'firstName': user.fName,
                 'lastName': user.lName,
-                'programID': user.programID,
-                'programCode': program_name,
+                'programs': user_programs,
+                'areas': user_areas,
                 'suffix' : user.suffix,
                 'email': user.email,
                 'contactNum': user.contactNum,
                 'profilePic': user.profilePic,
                 'isAdmin': user.isAdmin,
+                'isRating': user.isRating,
+                'isEdit': user.isEdit,
+                'crudFormsEnable': user.crudFormsEnable,
+                'crudProgramEnable': user.crudProgramEnable,
+                'crudInstituteEnable': user.crudInstituteEnable,
                 'role': 'admin' if user.isAdmin else 'user'
             }
         }), 200
@@ -378,7 +405,7 @@ def register_routes(app):
                 announceTitle = title, 
                 announceText = message, 
                 duration = duration
-                )
+            )
             db.session.add(new_announcement)
 
             # Audit new announcement
@@ -389,7 +416,7 @@ def register_routes(app):
             )
             db.session.add(new_log)
             db.session.commit()
-            
+
             # Real-time notifications: notify all active users about the announcement
             try:
                 from app.socket_handlers import create_notification
@@ -398,9 +425,9 @@ def register_routes(app):
                 for (emp_id,) in employees:
                     if str(emp_id) == str(userID):
                         continue
-                    create_notification(
+                create_notification(
                         recipient_id=str(emp_id),
-                        notification_type='announcement',
+                    notification_type='announcement',
                         title=title or 'New Announcement',
                         content=message or '',
                         sender_id=str(userID),
@@ -501,9 +528,26 @@ def register_routes(app):
         suffix = data.get("suffix", "").strip()
         email = data.get("email", "").strip()
         contactNum = data.get("contactNum", "").strip()
-        programID = data.get("programID")
-        areaID = data.get("areaID")
+        
+        # Parse JSON arrays for programs and areas
+        try:
+            programs = json.loads(data.get("programs", "[]"))
+            areas = json.loads(data.get("areas", "[]"))
+        except json.JSONDecodeError:
+            return jsonify({'success': False, 'message': 'Invalid programs or areas format'}), 400
+        
+        # Parse selected folders for folder permissions
+        try:
+            selected_folders = json.loads(data.get("selectedFolder", "[]"))
+        except json.JSONDecodeError:
+            selected_folders = []
+        
         isAdmin = str(data.get("isAdmin", "false")).lower() in ["true", "1", "yes", "y"]
+        isRating = str(data.get("isRating", "false")).lower() in ["true", "1", "yes", "y"]
+        isEdit = str(data.get("isEdit", "false")).lower() in ["true", "1", "yes", "y"]
+        crudFormsEnable = str(data.get("crudFormsEnable", "false")).lower() in ["true", "1", "yes", "y"]
+        crudProgramEnable = str(data.get("crudProgramEnable", "false")).lower() in ["true", "1", "yes", "y"]
+        crudInstituteEnable = str(data.get("crudInstituteEnable", "false")).lower() in ["true", "1", "yes", "y"]
         created_at = datetime.now()
 
         # email regex for validation
@@ -520,8 +564,9 @@ def register_routes(app):
             return jsonify({'success': False, 'message': 'Last name is required'}), 400
         if not email or not re.match(validEmail, email):
             return jsonify({'success': False, 'message': 'Please enter a valid email'}), 400
-        if not contactNum or not re.match(r'^\d{11}$', contactNum):
-            return jsonify({'success': False, 'message': 'Contact number must be 11 digits'}), 400
+        # Accept both formats: +63 XXX XXX XXXX or 09XXXXXXXXX
+        if not contactNum or not (re.match(r'^\+63 \d{3} \d{3} \d{4}$', contactNum) or re.match(r'^\d{11}$', contactNum)):
+            return jsonify({'success': False, 'message': 'Contact number must be in format +63 XXX XXX XXXX'}), 400
         
         # === Handle the Profile Picture (optional) ===
         profilePicPath = None
@@ -564,7 +609,13 @@ def register_routes(app):
         if Employee.query.filter_by(employeeID=empID).first():
             return jsonify({'success': False, "message": "Employee already exists"}), 400
 
-        # Create user
+        # Validate that programs and areas are provided
+        if not programs or len(programs) == 0:
+            return jsonify({'success': False, 'message': 'At least one program is required'}), 400
+        if not areas or len(areas) == 0:
+            return jsonify({'success': False, 'message': 'At least one area is required'}), 400
+
+        # Create user (programID and areaID are now nullable, set to primary or None)
         new_user = Employee(
             employeeID=empID,
             password=generate_password_hash(password, method="pbkdf2:sha256"),
@@ -574,12 +625,40 @@ def register_routes(app):
             email=email,
             contactNum=contactNum,
             profilePic=profilePicPath, 
-            programID=programID,
-            areaID=areaID,
             isAdmin=isAdmin,
+            isRating=isRating,
+            isEdit=isEdit,
+            crudFormsEnable=crudFormsEnable,
+            crudProgramEnable=crudProgramEnable,
+            crudInstituteEnable=crudInstituteEnable,
             created_at=created_at
         )
         db.session.add(new_user)
+        db.session.flush()  # Flush to get the employeeID for junction tables
+
+        # Create EmployeeProgram entries
+        for program_id in programs:
+            emp_program = EmployeeProgram(
+                employeeID=empID,
+                programID=int(program_id)
+            )
+            db.session.add(emp_program)
+
+        # Create EmployeeArea entries
+        for area_id in areas:
+            emp_area = EmployeeArea(
+                employeeID=empID,
+                areaID=int(area_id)
+            )
+            db.session.add(emp_area)
+            
+        # Create EmployeeFolder entries
+        for folder_path in selected_folders:
+            emp_folder = EmployeeFolder(
+                employeeID=empID,
+                folderPath=folder_path
+            )
+            db.session.add(emp_folder)
 
         # Audit created user
         new_log = AuditLog(
@@ -758,31 +837,36 @@ def register_routes(app):
     @jwt_required()
     def get_user_profile(employeeID):
         try:
-            # Query user with additional related data
-            user = (Employee.query
-                   .outerjoin(Program, Employee.programID == Program.programID)
-                   .outerjoin(Area, Employee.areaID == Area.areaID)
-                   .filter(Employee.employeeID == employeeID)
-                   .add_columns(
-                       Employee.employeeID,
-                       Employee.fName, 
-                       Employee.lName,
-                       Employee.suffix,
-                       Employee.email,
-                       Employee.contactNum,
-                       Employee.profilePic,
-                       Employee.isAdmin,
-                       Program.programName,
-                       Program.programCode,
-                       Area.areaName,
-                       Area.areaNum
-                   ).first())
+            # Query user
+            user = Employee.query.filter_by(employeeID=employeeID).first()
             
             if not user:
                 return jsonify({
                     'success': False, 
                     'message': 'Employee not found'
                 }), 404
+            
+            # Get user's programs and areas from junction tables
+            user_programs = []
+            user_areas = []
+            
+            for ep in user.employee_programs:
+                program = Program.query.get(ep.programID)
+                if program:
+                    user_programs.append({
+                        'programID': program.programID,
+                        'programName': program.programName,
+                        'programCode': program.programCode
+                    })
+            
+            for ea in user.employee_areas:
+                area = Area.query.get(ea.areaID)
+                if area:
+                    user_areas.append({
+                        'areaID': area.areaID,
+                        'areaName': area.areaName,
+                        'areaNum': area.areaNum
+                    })
             
             # Prepare detailed profile data
             profile_data = {
@@ -795,11 +879,14 @@ def register_routes(app):
                 'profilePic': user.profilePic,
                 'isAdmin': user.isAdmin,
                 'role': 'admin' if user.isAdmin else 'user',
-                # Additional program/area info for profile display
-                'programName': user.programName or 'Not Assigned',
-                'programCode': user.programCode or 'N/A', 
-                'areaName': user.areaName or 'Not Assigned',
-                'areaNum': user.areaNum or 'N/A'
+            
+                'programs': user_programs,
+                'areas': user_areas,
+  
+                'programName': user_programs[0]['programName'] if user_programs else 'Not Assigned',
+                'programCode': user_programs[0]['programCode'] if user_programs else 'N/A', 
+                'areaName': user_areas[0]['areaName'] if user_areas else 'Not Assigned',
+                'areaNum': user_areas[0]['areaNum'] if user_areas else 'N/A'
             }
             
             return jsonify({
@@ -926,32 +1013,31 @@ def register_routes(app):
     @app.route('/api/users', methods=["GET"])
     @jwt_required()
     def get_users():
-        users  = (Employee.query
-                  .join(Program, Employee.programID == Program.programID)
-                  .join(Area, Employee.areaID == Area.areaID)
-                  .add_columns(
-                      Employee.employeeID,
-                      Program.programName,
-                      Area.areaName,
-                      Area.areaNum,
-                      Employee.fName,
-                      Employee.lName,
-                      Employee.suffix,
-                      Employee.email,
-                      Employee.contactNum,
-                      Employee.profilePic,
-                      Employee.isAdmin,
-                      Employee.isOnline,
-                  ).all()                
-                )        
+        users = Employee.query.all()
         
         user_list = []
         for user in users:
+            # Get user's programs and areas from junction tables
+            user_programs = []
+            user_areas = []
+            
+            for ep in user.employee_programs:
+                program = Program.query.get(ep.programID)
+                if program:
+                    user_programs.append(program.programName)
+            
+            for ea in user.employee_areas:
+                area = Area.query.get(ea.areaID)
+                if area:
+                    user_areas.append(f"{area.areaNum}: {area.areaName}")
+            
             user_data = {
                 'employeeID': user.employeeID,
-                'programName': user.programName,
-                'areaName': user.areaName,
-                'areaNum': user.areaNum,
+                'programs': user_programs,
+                'areas': user_areas,
+                'programName': ', '.join(user_programs) if user_programs else 'Not Assigned',
+                'areaName': ', '.join(user_areas) if user_areas else 'Not Assigned',
+                'areaNum': user_areas[0].split(':')[0] if user_areas else 'N/A',
                 'name': f"{user.fName} {user.lName} {user.suffix or ''}",
                 'email': user.email,
                 'contactNum': user.contactNum,
@@ -1236,7 +1322,7 @@ def register_routes(app):
         institute = Institute.query.filter_by(instCode=instCode).first()
         if not institute or not institute.instPic:
             return jsonify({"success": False, "message": "Institute logo not found"}), 404
-            
+
         # Validate Nextcloud configuration
         NEXTCLOUD_URL = os.getenv("NEXTCLOUD_URL")
         NEXTCLOUD_USER = os.getenv("NEXTCLOUD_USER")
@@ -1446,7 +1532,8 @@ def register_routes(app):
             
             updated_counts = {}
             
-            employees_updated = Employee.query.filter_by(programID=programID).update({'programID': None})
+            # Delete employee-program relationships instead of updating Employee table
+            employees_updated = EmployeeProgram.query.filter_by(programID=programID).delete()
             updated_counts['employees'] = employees_updated
             
             areas_updated = Area.query.filter_by(programID=programID).update({'programID': None})
@@ -1471,12 +1558,12 @@ def register_routes(app):
                 'deletedID': programID,
                 'updated_counts': updated_counts
             }), 200
-            
+                
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Delete program error: {str(e)}")
             return jsonify({'error': 'Database error occurred'}), 500
-
+        
     @app.route('/api/program', methods=['GET'])
     @jwt_required()
     def get_user_program():
@@ -1488,11 +1575,12 @@ def register_routes(app):
                 return jsonify({'success': False, 'message': 'User not found'}), 404
             
             # If user is admin, return all programs
-            if current_user.isAdmin:
+            if current_user.isAdmin or current_user.crudProgramEnable:
                 programs = Program.query.all()
             else:
-                # If regular user, return only their assigned program
-                programs = Program.query.filter_by(programID=current_user.programID).all()
+                # If regular user, return only their assigned programs
+                user_program_ids = [ep.programID for ep in current_user.employee_programs]
+                programs = Program.query.filter(Program.programID.in_(user_program_ids)).all()
                     
             program_list = []
             for program in programs:
@@ -1831,6 +1919,7 @@ def register_routes(app):
                     Area.areaName,
                     Area.areaNum,
                     Area.progress,
+                    Area.archived,
                     Subarea.subareaName
                 )
             ).all()
@@ -1848,6 +1937,7 @@ def register_routes(app):
                 'areaName': f"{area.areaNum}: {area.areaName}",
                 'progress': area.progress,
                 'subareaName': area.subareaName,                
+                'archived': area.archived,                
             }
             area_list.append(area_data)
         
@@ -1963,33 +2053,33 @@ def register_routes(app):
         program_code = request.args.get('programCode')
 
         data = (
-        db.session.query(
-            Area.areaID,
-            Program.programCode,
-            Area.areaName,
-            Area.areaNum,
-            Area.progress,
-            Subarea.subareaID,
-            Subarea.subareaName,
-            Criteria.criteriaID,
-            Criteria.criteriaContent,
-            Criteria.criteriaType,
-            Criteria.rating,
-            Document.docID,
-            Document.docName,
-            Document.docType,
-            Document.docPath,
-            Document.isApproved,
-            Document.predicted_rating
-        )
-        .outerjoin(Program, Area.programID == Program.programID)
+            db.session.query(
+                Area.areaID,
+                Program.programCode,
+                Area.areaName,
+                Area.areaNum,
+                Area.progress,
+                Subarea.subareaID,
+                Subarea.subareaName,
+                Criteria.criteriaID,
+                Criteria.criteriaContent,
+                Criteria.criteriaType,
+                Criteria.rating,
+                Document.docID,
+                Document.docName,
+                Document.docType,
+                Document.docPath,
+                Document.isApproved,
+                Document.predicted_rating
+            )
+            .outerjoin(Program, Area.programID == Program.programID)
         .outerjoin(Subarea, (Area.areaID == Subarea.areaID) & (Subarea.archived == False))
         .outerjoin(Criteria, (Subarea.subareaID == Criteria.subareaID) & (Criteria.archived == False))
-        .outerjoin(Document, Criteria.docID == Document.docID)       
+            .outerjoin(Document, Criteria.docID == Document.docID)       
         .filter(Program.programCode == program_code, Area.archived == False)
-        .order_by(Area.areaID.asc(), Subarea.subareaID.asc(), Criteria.criteriaID.asc())
-        .all()
-    )
+            .order_by(Area.areaID.asc(), Subarea.subareaID.asc(), Criteria.criteriaID.asc())
+            .all() 
+        )
 
 
         result = {}
@@ -2278,7 +2368,7 @@ def register_routes(app):
                 doc.docName = file_name
                 doc.content = extracted_text
                 doc.tags = list(tags)
-                doc.embedding = embedding
+                doc.embedding = embedding            
 
                 # Audit updated doc
                 new_log = AuditLog(
@@ -2686,8 +2776,8 @@ def register_routes(app):
         for tag_list, in tags:
             if tag_list:
                 unique_tags.update(tag_list)
-                sorted_tags = sorted(unique_tags)
         
+        sorted_tags = sorted(unique_tags)
         return jsonify(sorted_tags), 200
 
     @app.route('/api/documents/filter', methods=["GET"])
@@ -3419,7 +3509,7 @@ def register_routes(app):
                 })
             
             db.session.commit()
-
+            
             return jsonify({
                 "success": True,
                 "message": "Template saved successfully!",
@@ -3433,7 +3523,7 @@ def register_routes(app):
                 }
             }), 201
         
-
+            
         except Exception as e:
             db.session.rollback()
             print("Save template error:", str(e))
@@ -3507,7 +3597,7 @@ def register_routes(app):
 
             db.session.commit()
             return jsonify({'success': True, 'message': 'Template applied successfully!'}), 201
-
+            
         except Exception as e:
             db.session.rollback()
             return jsonify({'success': False, 'message': f"Failed to apply template {str(e)}"}), 500
