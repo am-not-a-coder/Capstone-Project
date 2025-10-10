@@ -82,3 +82,13 @@ export const adminHelper = () => {
     
     return !!user?.isAdmin
 }
+
+export const PermissionGate = ({ requires, children }) => {
+    const user = getCurrentUser() 
+    if (!user) return null 
+    if (user[requires]) {   
+        return children  
+    }
+
+    return null  
+}

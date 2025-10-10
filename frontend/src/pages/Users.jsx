@@ -23,6 +23,8 @@ import { apiDelete, apiGet, apiPostForm, apiGetBlob } from '../utils/api_utils';
 import { Navigate } from 'react-router-dom';
 import Switch from '../components/Switch'
 import { UserSkeleton } from '../components/Skeletons';
+import Select from 'react-select'
+import makeAnimated from 'react-select/animated'
 
 const Users = () => {
   //check admin
@@ -42,7 +44,6 @@ const Users = () => {
   const [profilePic, setProfilePic] = useState(null); 
   const [adminAccess, setAdminAccess] = useState(false);
   
-
   const [allAreas, setAllAreas] = useState([]);
   const [filteredAreaOptions, setFilteredAreaOptions] = useState([]);
   const [programOption, setProgramOption] = useState([]);    
@@ -65,6 +66,23 @@ const Users = () => {
   const [usersLoading, setUsersLoading] = useState(false);
   const [loading, setLoading] = useState(false); 
 
+  const [selectedPrograms, setSelectedPrograms] = useState([])
+  const [selectedAreas, setSelectedAreas] = useState([])
+  const [employeeIDError, setEmployeeIDError] = useState("");
+  const [contactNumError, setContactNumError] = useState("");
+  
+  // Admin permission states
+  const [ratingEnable, setRatingEnable] = useState(false);
+  const [canEditUser, setCanEditUser] = useState(false);
+  const [crudForms, setCrudForms] = useState(false);
+  const [crudPrograms, setCrudPrograms] = useState(false);
+  const [crudInstitute, setCrudInstitute] = useState(false);
+  const [selectedFolder, setSelectedFolder] = useState([])
+  const [folderOptions, setFolderOptions] = useState([])
+
+  //select animation
+  const animatedComponents = makeAnimated()
+
   if (removeUser) {
       setSubmittedUsers(submittedUsers.filter(user => user !== selectedUser)); 
       setSelectedUser(null);
@@ -81,6 +99,32 @@ const Users = () => {
   const handleCreateUser = async (e) => {
       e.preventDefault(); 
 
+      // Validate that at least one program and area is selected
+      if (selectedPrograms.length === 0) {
+          setStatusMessage("Please select at least one program");
+          setShowStatusModal(true);
+          setStatusType("error");
+          return;
+      }
+      
+      if (selectedAreas.length === 0) {
+          setStatusMessage("Please select at least one area");
+          setShowStatusModal(true);
+          setStatusType("error");
+          return;
+      }
+
+
+      if ( adminAccess ){
+        if (!ratingEnable  && !canEditUser && !crudForms && !crudPrograms && !crudInstitute) {
+            setStatusMessage("Please select at least one admin permission");
+            setShowStatusModal(true);
+            setStatusType("error");
+            return;
+        }
+      }
+      
+
       const formData = new FormData();
           formData.append("employeeID", employeeID);
           formData.append("password", password);
@@ -90,9 +134,15 @@ const Users = () => {
           formData.append("email", email);
           formData.append("contactNum", contactNum);
            if(profilePic?.file) formData.append("profilePic", profilePic.file); 
-          formData.append("programID", programID);
-          formData.append("areaID", areaID);
+          formData.append("programs", JSON.stringify(selectedPrograms.map(p => p.value)));
+          formData.append("areas", JSON.stringify(selectedAreas.map(a => a.value)));
           formData.append("isAdmin", adminAccess);
+          formData.append("isRating", ratingEnable);
+          formData.append("isEdit", canEditUser);
+          formData.append("crudFormsEnable", crudForms);
+          formData.append("crudProgramEnable", crudPrograms);
+          formData.append("crudInstituteEnable", crudInstitute);
+          formData.append('selectedFolder', JSON.stringify(selectedFolder.map(f => f.value)))
 
 
         console.log("Form data being sent:");
@@ -145,6 +195,16 @@ const Users = () => {
           setAreaID("")
           setProfilePic(null)
           setAdminAccess(false)
+          setSelectedPrograms([])
+          setSelectedAreas([])
+          setSelectedFolder([])
+          setPrimaryProgram(null)
+          setPrimaryArea(null)
+          setRatingEnable(false)
+          setCanEditUser(false)
+          setCrudForms(false)
+          setCrudPrograms(false)
+          setCrudInstitute(false)
 
           makeVisible("list")
       
@@ -303,20 +363,89 @@ useEffect(() => {
   );
 
   // Filter area options depending on the program
-  useEffect(()=> {
-          if(programID){
-              const filteredAreas = allAreas.filter(
-              (area) => String(area.programID) === String(programID)
-              );
-              setFilteredAreaOptions(filteredAreas);
-              setAreaID("");
-          } else {
-              setFilteredAreaOptions([]);
-          }
-      }, [programID, allAreas]);
+  useEffect(() => {
+    if (selectedPrograms && selectedPrograms.length > 0) {
+        const selectedProgramIDS = selectedPrograms.map(p => String(p.value))
 
+        const filteredAreas = allAreas.filter(
+            (area) => selectedProgramIDS.includes(String(area.programID)) && !area.archived
+        )
+        setFilteredAreaOptions(filteredAreas)
+    } else {
+        setFilteredAreaOptions([])
+        setSelectedAreas([])
+    }
+  }, [selectedPrograms, allAreas])
+
+
+  useEffect(() => {
+    const fetchFolders = async () => {
+        try {
+            const res = await apiGet('/api/documents')
+            // Navigate to Accreditation -> Programs -> get folder names
+            const programsFolders = res.data?.folders?.Accreditation?.folders?.Programs?.folders;
+            
+            if (programsFolders) {
+                const options = Object.keys(programsFolders).map(programName => ({
+                    value: `UDMS_Repository/Accreditation/Programs/${programName}`,
+                    label: programName
+                }));
+                setFolderOptions(options)
+            } else {
+                setFolderOptions([])
+            }
+        } catch (err) {
+            console.error('Error fetching folders', err)
+        }
+    }
+    
+    if (adminAccess) {
+        fetchFolders()
+    }
+  }, [adminAccess])
+
+    
       
+    const validateEmployeeID = (value) => {
+        // Regex pattern for xx-xx-xxx format (digits only)
+        const pattern = /^\d{2}-\d{2}-\d{3}$/;
+        
+        if (!value) {
+            setEmployeeIDError("Employee ID is required");
+            return false;
+        }
+        
+        if (!pattern.test(value)) {
+            setEmployeeIDError("Format must be XX-XX-XXX (e.g., 22-16-075)");
+            return false;
+        }
+        
+        setEmployeeIDError("");
+        return true;
+    };
 
+    const validateContactNum = (value) => {
+        // Remove all non-digits for validation
+        let digitsOnly = value.replace(/\D/g, '');
+        
+        if (!value) {
+            setContactNumError("Contact number is required");
+            return false;
+        }
+        
+        // Remove the country code (63) if it's at the start
+        if (digitsOnly.startsWith('63')) {
+            digitsOnly = digitsOnly.slice(2);
+        }
+        
+        // Check if it has exactly 10 digits (without country code)
+        if (digitsOnly.length !== 10) {
+            setContactNumError("Must be 10 digits (e.g., +63 912 345 6789)");
+            return false;
+        }
+        setContactNumError("");
+        return true;
+    };
 
 
   return (
@@ -433,7 +562,37 @@ useEffect(() => {
             type="text" 
             value={employeeID} 
             required 
-            onChange={(e) => setEmployeeID(e.target.value)} 
+            maxLength={10}
+            onChange={(e) => {
+                let value = e.target.value;
+                
+                // Remove all non-digit characters (including dashes for processing)
+                const digitsOnly = value.replace(/\D/g, '');
+                
+                // Limit to 7 digits max (XX-XX-XXX = 7 digits)
+                if (digitsOnly.length > 7) {
+                    return;
+                }
+                
+                // Auto-format: add dashes at correct positions
+                let formatted = digitsOnly;
+                if (digitsOnly.length >= 3) {
+                    formatted = digitsOnly.slice(0, 2) + '-' + digitsOnly.slice(2);
+                }
+                if (digitsOnly.length >= 5) {
+                    formatted = digitsOnly.slice(0, 2) + '-' + digitsOnly.slice(2, 4) + '-' + digitsOnly.slice(4);
+                }
+                
+                setEmployeeID(formatted);
+                
+                // Validate when complete
+                if (formatted.length === 10) {
+                    validateEmployeeID(formatted);
+                } else if (formatted.length < 10) {
+                    setEmployeeIDError("");
+                }
+            }}
+            onBlur={(e) => validateEmployeeID(e.target.value)}
             name="employeeID" 
             id="employeeID"
             className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white peer-valid:top-0 peer-valid:text-xs peer-valid:text-blue-500"
@@ -445,6 +604,11 @@ useEffect(() => {
           >
             Employee ID
           </label>
+            {employeeIDError && (
+                <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                    {employeeIDError}
+                </p>
+            )}
         </div>
 
         {/* First Name */}
@@ -561,7 +725,47 @@ useEffect(() => {
             name="contactNum" 
             id="contactNum"
             value={contactNum} 
-            onChange={(e) => setContactNum(e.target.value)}  
+            maxLength={16}
+            onChange={(e) => {
+                let value = e.target.value;
+                
+                // Remove all non-digits
+                let digitsOnly = value.replace(/\D/g, '');
+                
+                // Remove the country code (63) if it's at the start
+                if (digitsOnly.startsWith('63')) {
+                    digitsOnly = digitsOnly.slice(2);
+                }
+                
+                // Limit to 10 digits (Philippine mobile number without country code)
+                if (digitsOnly.length > 10) {
+                    return;
+                }
+                
+                
+                // Auto-format: +63 XXX XXX XXXX
+                let formatted = '';
+                if (digitsOnly.length === 0) {
+                    formatted = '';
+                } else if (digitsOnly.length <= 3) {
+                    formatted = '+63 ' + digitsOnly;
+                } else if (digitsOnly.length <= 6) {
+                    formatted = '+63 ' + digitsOnly.slice(0, 3) + ' ' + digitsOnly.slice(3);
+                } else {
+                    formatted = '+63 ' + digitsOnly.slice(0, 3) + ' ' + digitsOnly.slice(3, 6) + ' ' + digitsOnly.slice(6);
+                }
+                
+                setContactNum(formatted);
+                
+                // Clear error while typing
+                setContactNumError("");
+            }}
+            onBlur={(e) => {
+                const value = e.target.value;
+                if (value && value.length > 0) {
+                    validateContactNum(value);
+                }
+            }}
             className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
             placeholder=" "
           />
@@ -571,46 +775,55 @@ useEffect(() => {
           >
             Contact Number
           </label>
+          {contactNumError && (
+              <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                  {contactNumError}
+              </p>
+          )}
         </div>
 
         {/* Program Select */}
         <div className="relative">
-          <select 
-            name="programID" 
-            id="programID"
-            value={programID}  
-            required 
-            onChange={(e) => setProgramID(e.target.value)} 
-            className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
-          >
-                                <option value="">Select Program</option>
-            {programOption.map((program) => (
-              <option key={program.programID} value={program.programID}>
-                {program.programName}
-              </option>
-            ))}
-                            </select>
-                        </div>
+            <Select 
+                closeMenuOnScroll={false}
+                closeMenuOnSelect={false}
+                components={animatedComponents}
+                required
+                isMulti
+                value={selectedPrograms}
+                onChange={setSelectedPrograms}
+                options=
+                {programOption.map((program) => ({
+                    value: program.programID,
+                    label: program.programName
+                }))}
+                placeholder='Select Programs...'
+                className='w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800'
+            />
+        </div>
 
         {/* Area Select */}
         <div className="relative">
-          <select 
-            name="areaID" 
-            id="areaID"
-            value={areaID} 
-            required 
-            onChange={(e) => setAreaID(e.target.value)} 
-            className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
-          >
-                                <option value="">Select Area</option>
-            {filteredAreaOptions.filter((area, index, self) => 
-              index === self.findIndex(a => a.areaID === area.areaID))
-              .map((area) => (
-                  <option key={area.areaID} value={area.areaID}>
-                  {area.areaName}
-                  </option>
-              ))}
-            </select>
+          <Select 
+            closeMenuOnScroll={false}
+            closeMenuOnSelect={false}
+            components={animatedComponents}
+            required
+            isMulti
+            value={selectedAreas} 
+            onChange={setSelectedAreas}
+            options={filteredAreaOptions
+                .filter((area, index, self) =>
+                    index === self.findIndex(a => a.areaID === area.areaID)
+                )
+                .map((area) => ({
+                    value: area.areaID,
+                    label: area.areaName
+                }))
+            }
+            placeholder='Select Areas...'
+            className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"/>
+
         </div>
 
         <div className="relative">
@@ -624,6 +837,79 @@ useEffect(() => {
               <Switch isChecked={adminAccess} onChange={() => {setAdminAccess((current) => !current)}}/>            
           </div>
         </div>
+
+        {/* Conditional Admin Permissions */}
+        {adminAccess && (
+          <>
+            {/* Rating Enable */}
+            <div className="relative">
+              <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
+                <label className="text-base font-medium text-gray-700 dark:text-gray-300">
+                  Rating Enable
+                </label>
+                <Switch isChecked={ratingEnable} onChange={() => setRatingEnable((current) => !current)}/>
+              </div>
+            </div>
+
+            {/* Can Edit User */}
+            <div className="relative">
+              <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
+                <label className="text-base font-medium text-gray-700 dark:text-gray-300">
+                  Can Edit User
+                </label>
+                <Switch isChecked={canEditUser} onChange={() => setCanEditUser((current) => !current)}/>
+              </div>
+            </div>
+
+            {/* CRUD Forms */}
+            <div className="relative">
+              <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
+                <label className="text-base font-medium text-gray-700 dark:text-gray-300">
+                  CRUD Forms
+                </label>
+                <Switch isChecked={crudForms} onChange={() => setCrudForms((current) => !current)}/>
+              </div>
+            </div>
+
+            {/* CRUD Programs */}
+            <div className="relative">
+              <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
+                <label className="text-base font-medium text-gray-700 dark:text-gray-300">
+                  CRUD Programs
+                </label>
+                <Switch isChecked={crudPrograms} onChange={() => setCrudPrograms((current) => !current)}/>
+              </div>
+            </div>
+
+            {/* CRUD Institute */}
+            <div className="relative">
+              <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
+                <label className="text-base font-medium text-gray-700 dark:text-gray-300">
+                  CRUD Institute
+                </label>
+                <Switch isChecked={crudInstitute} onChange={() => setCrudInstitute((current) => !current)}/>
+              </div>
+            </div>
+            {/* DOCUMENT PERMISSION */}
+            <div className="relative">
+              <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
+                <Select 
+                isMulti
+                closeMenuOnScroll={false}
+                closeMenuOnSelect={false}
+                components={animatedComponents}
+                value={selectedFolder}
+                onChange={setSelectedFolder}
+                options={folderOptions}
+                placeholder='Select Folder to give permission...'
+                className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"/>
+              </div>
+              <label className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                Additional folder access (optional)
+              </label>
+            </div>
+          </>
+        )}
 
         {/* Submit */}
         <div className="flex justify-center mt-6 md:col-span-2">
@@ -1055,7 +1341,6 @@ useEffect(() => {
                   </div>
                   )}
               </div>
-
       </div>
   );
 };
