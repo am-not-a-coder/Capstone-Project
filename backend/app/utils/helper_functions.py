@@ -2,53 +2,70 @@
 from app.models import Area, Subarea, Criteria, AreaBlueprint, SubareaBlueprint, CriteriaBlueprint
 from app import db
 
-def reapply_template(templateID, applied_template):
-    """    
-    This function archives current applied Areas/Subareas/Criteria for that appliedTemplate
-    then copies all current AreaBlueprint/SubareaBlueprint/CriteriaBlueprint for templateID
-    into the Area/Subarea/Criteria tables for the given applied_template.
-    """
-    # Archive old applied areas/subs/crits
-    old_areas = Area.query.filter_by(appliedTemplateID=applied_template.appliedTemplateID, archived=False).all()
-    for a in old_areas:
-        a.archived = True
-        for s in a.subareas:
-            s.archived = True
-            for c in s.criteria:
-                c.archived = True
 
-    # Copy blueprints -> applied tables
-    area_blueprints = AreaBlueprint.query.filter_by(templateID=templateID).order_by(AreaBlueprint.areaBlueprintID.asc()).all()
+def reapply_template(templateID, applied_template):
+    """
+    Archives old applied Areas/Subareas/Criteria for the given AppliedTemplate,
+    then copies all blueprints from the Template into the Program’s live tables.
+    """
+
+    # ===== 1️⃣ Archive old areas in bulk =====
+    old_areas = Area.query.filter_by(appliedTemplateID=applied_template.appliedTemplateID, archived=False).all()
+    old_area_ids = [a.areaID for a in old_areas]
+
+    if old_area_ids:
+        # Bulk archive all levels
+        db.session.query(Criteria).filter(Criteria.subareaID.in_(
+            db.session.query(Subarea.subareaID).filter(Subarea.areaID.in_(old_area_ids))
+        )).update({"archived": True}, synchronize_session=False)
+
+        db.session.query(Subarea).filter(Subarea.areaID.in_(old_area_ids)).update({"archived": True}, synchronize_session=False)
+        db.session.query(Area).filter(Area.areaID.in_(old_area_ids)).update({"archived": True}, synchronize_session=False)
+
+    # ===== 2️⃣ Copy all blueprints -> applied data =====
+    area_blueprints = AreaBlueprint.query.filter_by(templateID=templateID).all()
+
     for ab in area_blueprints:
         new_area = Area(
             appliedTemplateID=applied_template.appliedTemplateID,
             programID=applied_template.programID,
-            areaBlueprintID=ab.areaBlueprintID,   # keep provenance
+            areaBlueprintID=ab.areaBlueprintID,
             areaName=ab.areaName,
             areaNum=ab.areaNum,
             archived=False
         )
         db.session.add(new_area)
-        db.session.flush()  # get new_area.areaID
+        db.session.flush()
 
-        subarea_blueprints = SubareaBlueprint.query.filter_by(areaBlueprintID=ab.areaBlueprintID).order_by(SubareaBlueprint.subareaBlueprintID.asc()).all()
+        subarea_blueprints = SubareaBlueprint.query.filter_by(areaBlueprintID=ab.areaBlueprintID).all()
+        new_subareas = []
         for sb in subarea_blueprints:
-            new_sub = Subarea(
+            sub = Subarea(
                 areaID=new_area.areaID,
-                subareaBlueprintID=sb.subareaBlueprintID,  # provenance
+                subareaBlueprintID=sb.subareaBlueprintID,
                 subareaName=sb.subareaName,
                 archived=False
             )
-            db.session.add(new_sub)
-            db.session.flush()
+            new_subareas.append(sub)
+        db.session.add_all(new_subareas)
+        db.session.flush()
 
-            crit_blueprints = CriteriaBlueprint.query.filter_by(subareaBlueprintID=sb.subareaBlueprintID).order_by(CriteriaBlueprint.criteriaBlueprintID.asc()).all()
-            for cb in crit_blueprints:
-                new_crit = Criteria(
-                    subareaID=new_sub.subareaID,
-                    criteriaBlueprintID=cb.criteriaBlueprintID,  # provenance
-                    criteriaContent=cb.criteriaContent,
-                    criteriaType=cb.criteriaType,
-                    archived=False
-                )
-                db.session.add(new_crit)
+        # Preload criteria blueprints once (performance boost)
+        all_criteria_bps = CriteriaBlueprint.query.filter(
+            CriteriaBlueprint.subareaBlueprintID.in_([sb.subareaBlueprintID for sb in subarea_blueprints])
+        ).all()
+        criteria_map = {}
+        for cb in all_criteria_bps:
+            criteria_map.setdefault(cb.subareaBlueprintID, []).append(cb)
+
+        for sub in new_subareas:
+            if sub.subareaBlueprintID in criteria_map:
+                db.session.add_all([
+                    Criteria(
+                        subareaID=sub.subareaID,
+                        criteriaBlueprintID=cb.criteriaBlueprintID,
+                        criteriaContent=cb.criteriaContent,
+                        criteriaType=cb.criteriaType,
+                        archived=False
+                    ) for cb in criteria_map[sub.subareaBlueprintID]
+                ])

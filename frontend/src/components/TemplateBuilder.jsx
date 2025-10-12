@@ -344,12 +344,9 @@ export default function TemplateBuilder({onClose, template = null}) {
       const res = isEditMode ? await apiPut(endpoint, data) : await apiPost(endpoint, data);
                 
         setShowStatusModal(true);
-        setStatusMessage(
-          isEditMode ? "Template updated successfully!" : res.data.message
-        );
+        setStatusMessage(isEditMode ? "Template updated successfully!" : res.data.message);
         setStatusType("success");
-        setHasUnsavedChanges(false);
-        onClose();  
+        setHasUnsavedChanges(false);        
      
     } catch (err) {
       console.error("Failed to create template", err);

@@ -3665,98 +3665,6 @@ def register_routes(app):
             return jsonify({"success": False, "message": f"Failed to save template: {str(e)}"}), 500
 
 
-    @app.route('/api/programs/apply-template/<int:templateID>', methods=["POST"])
-    @jwt_required()
-    def apply_template(templateID): 
-        try:
-            data = request.get_json()
-            programIDs = data.get("programIDs", [])
-            
-            if not programIDs:
-                return jsonify({"success": False, "message": "No programs selected"}), 400
-
-            # Get the template
-            template = Template.query.filter_by(templateID=templateID).first()
-            if not template:
-                return jsonify({"success": False, "message": "Template not found"}), 404
-
-            for programID in programIDs:
-                # === Archive existing areas ===
-                active_areas = Area.query.filter_by(programID=programID, archived=False).all()
-                for area in active_areas:
-                    area.archived = True
-                    for sub in area.subareas:
-                        sub.archived = True
-                        for crit in sub.criteria:
-                            crit.archived = True
-
-                # === Create Applied Template for this program ===
-                applied_template = AppliedTemplate(
-                    programID=programID,
-                    templateID=template.templateID,
-                    templateName=template.templateName,
-                    description=template.description,
-                    appliedBy=get_jwt_identity()
-                )
-                db.session.add(applied_template)
-                db.session.flush()
-
-                # === Copy Areas, Subareas, Criteria ===
-                area_blueprints = AreaBlueprint.query.filter_by(templateID=templateID).all()
-                for ab in area_blueprints:
-                    area = Area(
-                        appliedTemplateID=applied_template.appliedTemplateID,
-                        programID=programID,
-                        # Remove this if your model doesn’t have this column
-                        areaBlueprintID=ab.areaBlueprintID,
-                        areaName=ab.areaName,
-                        areaNum=ab.areaNum,
-                        archived=False
-                    )
-                    db.session.add(area)
-                    db.session.flush()
-
-                    subarea_blueprints = SubareaBlueprint.query.filter_by(areaBlueprintID=ab.areaBlueprintID).all()
-                    for sb in subarea_blueprints:
-                        subarea = Subarea(
-                            areaID=area.areaID,
-                            # Remove this if your model doesn’t have this column
-                            subareaBlueprintID=sb.subareaBlueprintID,
-                            subareaName=sb.subareaName,
-                            archived=False
-                        )
-                        db.session.add(subarea)
-                        db.session.flush()
-
-                        criteria_blueprints = CriteriaBlueprint.query.filter_by(subareaBlueprintID=sb.subareaBlueprintID).all()
-                        for cb in criteria_blueprints:
-                            criteria = Criteria(
-                                subareaID=subarea.subareaID,
-                                # Remove this if your model doesn’t have this column
-                                criteriaBlueprintID=cb.criteriaBlueprintID,
-                                criteriaContent=cb.criteriaContent,
-                                criteriaType=cb.criteriaType,
-                                archived=False
-                            )
-                            db.session.add(criteria)
-
-                # Link program to template (corrected)
-                program = Program.query.get(programID)
-                if program:
-                    program.templateID = template.templateID
-
-            # Mark template as applied
-            template.isApplied = True
-
-            db.session.commit()
-            return jsonify({'success': True, 'message': 'Template applied to all selected programs successfully!'}), 201
-
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({'success': False, 'message': f"Failed to apply template: {str(e)}"}), 500
-
-    
-
     @app.route("/api/templates/edit/<int:templateID>", methods=["PUT"])
     def edit_template(templateID):
         data = request.get_json()
@@ -3781,7 +3689,7 @@ def register_routes(app):
             # ===== Delete Removed Areas =====
             for abp_id, abp in existing_area_bps.items():
                 if abp_id not in incoming_area_ids:
-                    # 🔹 Unlink all related records before delete
+                    # unlink dependent records first
                     Area.query.filter_by(areaBlueprintID=abp_id).update({"areaBlueprintID": None})
                     SubareaBlueprint.query.filter_by(areaBlueprintID=abp_id).update({"areaBlueprintID": None})
                     db.session.delete(abp)
@@ -3791,11 +3699,9 @@ def register_routes(app):
                 area_bp = existing_area_bps.get(area_data.get("areaBlueprintID")) if area_data.get("areaBlueprintID") else None
 
                 if area_bp:
-                    # Update existing
                     area_bp.areaName = area_data.get("areaName", area_bp.areaName)
                     area_bp.areaNum = area_data.get("areaNum", area_bp.areaNum)
                 else:
-                    # Create new
                     area_bp = AreaBlueprint(
                         templateID=templateID,
                         areaName=area_data.get("areaName"),
@@ -3821,7 +3727,6 @@ def register_routes(app):
                 # Update/add subareas
                 for sub_data in area_data.get("subareas", []):
                     sub_bp = existing_sub_bps.get(sub_data.get("subareaBlueprintID"))
-
                     if sub_bp:
                         sub_bp.subareaName = sub_data.get("subareaName", sub_bp.subareaName)
                     else:
@@ -3863,7 +3768,7 @@ def register_routes(app):
             # Commit template + blueprints first
             db.session.commit()
 
-            # ===== Apply updates to all programs using this template =====
+            # ===== Reapply template updates to all linked programs =====
             programs = Program.query.filter_by(templateID=templateID).all()
             for program in programs:
                 applied_template = AppliedTemplate.query.filter_by(programID=program.programID).first()
@@ -3874,6 +3779,8 @@ def register_routes(app):
 
                 reapply_template(templateID, applied_template)
 
+            db.session.commit()
+
             return jsonify({"success": True, "message": "Template and all linked programs updated successfully"}), 200
 
         except Exception as e:
@@ -3883,47 +3790,55 @@ def register_routes(app):
 
 
 
+
     @app.route('/api/templates/delete/<int:templateID>', methods=["DELETE"])
     def delete_template(templateID):
         try:
             template = Template.query.filter_by(templateID=templateID).first()
             if not template:
                 return jsonify({"success": False, "message": "Template not found"}), 404
-            
+
             # ================ Delete Blueprint Data ================
 
-            criteriaBP = (CriteriaBlueprint.query
-                            .join(SubareaBlueprint)  
-                            .join(AreaBlueprint)
-                            .filter(AreaBlueprint.templateID == templateID)
-                        ).all()
-            
+            # 1. Delete CriteriaBlueprints linked to this template
+            criteriaBP = (
+                CriteriaBlueprint.query
+                .join(SubareaBlueprint)
+                .join(AreaBlueprint)
+                .filter(AreaBlueprint.templateID == templateID)
+                .all()
+            )
             for crit in criteriaBP:
                 db.session.delete(crit)
 
-            subareaBP = (SubareaBlueprint.query
-                            .join(AreaBlueprint)
-                            .filter(AreaBlueprint.templateID == templateID)
-                        ).all()
-            
+            # 2. Delete SubareaBlueprints linked to this template
+            subareaBP = (
+                SubareaBlueprint.query
+                .join(AreaBlueprint)
+                .filter(AreaBlueprint.templateID == templateID)
+                .all()
+            )
             for sub in subareaBP:
                 db.session.delete(sub)
 
-            areaBP = AreaBlueprint.filter_by(templateID=templateID).all()
-            
+            # 3. Delete AreaBlueprints linked to this template
+            areaBP = AreaBlueprint.query.filter_by(templateID=templateID).all()
             for area in areaBP:
                 db.session.delete(area)
 
-            # ================ Delete AppliedTemplate record ================
+            # ================ Delete AppliedTemplate records ================
+            applied_templates = AppliedTemplate.query.filter_by(templateID=templateID).all()
+            for applied in applied_templates:
+                db.session.delete(applied)
 
-            applied_template = AppliedTemplate.query.filter_by(templateID=templateID).all()
-            for template in applied_template:
-                db.session.delete(template)
+            # 4. Finally delete the Template itself
+            db.session.delete(template)
 
+            db.session.commit()
             return jsonify({"success": True, "message": "Template deleted successfully"}), 200
 
         except Exception as e:
             db.session.rollback()
-            return jsonify({'success': False, 'message': f'Failed to delete template {str(e)}'}), 400
+            return jsonify({'success': False, 'message': f'Failed to delete template: {str(e)}'}), 400
 
 

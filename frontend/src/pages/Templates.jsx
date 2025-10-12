@@ -128,6 +128,7 @@ export default function Templates() {
     const closeModal = () => {
         setShowStatusModal(false);
         setShowTemplateDetails(false);
+        setShowDeleteModal(false);
     }
 
     const handleDelete = async (templateID) => {
@@ -136,7 +137,7 @@ export default function Templates() {
             setShowStatusModal(true);
             setStatusMessage(res.data.message);
             setStatusType("success");           
-            fetchTemplates(); 
+            fetchTemplates();
         }catch(err){
             console.log("Failed to delete template", err)
             setShowStatusModal(true);
