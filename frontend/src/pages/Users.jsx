@@ -13,12 +13,13 @@ import{
   faPhone,
   faBuilding,
   faTriangleExclamation,
-  faSpinner
+  faSpinner,
+  faEdit
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect } from 'react';
 import StatusModal from '../components/modals/StatusModal';
-import { adminHelper } from '../utils/auth_utils';
+import { adminHelper, coAdminHelper } from '../utils/auth_utils';
 import { apiDelete, apiGet, apiPostForm, apiGetBlob } from '../utils/api_utils';
 import { Navigate } from 'react-router-dom';
 import Switch from '../components/Switch'
@@ -27,9 +28,10 @@ import Select from 'react-select'
 import makeAnimated from 'react-select/animated'
 
 const Users = () => {
-  //check admin
+  //check admin or co-admin
   const isAdmin = adminHelper()
-  if (!isAdmin) return <Navigate to='/Dashboard' replace />
+  const isCoAdmin = coAdminHelper()
+  if (!isAdmin && !isCoAdmin) return <Navigate to='/Dashboard' replace />
 
   // user info
   const [employeeID, setEmployeeID] = useState("");  
@@ -42,10 +44,10 @@ const Users = () => {
   const [email, setEmail] = useState("");  
   const [contactNum, setContactNum] = useState("");  
   const [profilePic, setProfilePic] = useState(null); 
-  const [adminAccess, setAdminAccess] = useState(false);
+  const [CoAdminAccess, setCoAdminAccess] = useState(false);
   
   const [allAreas, setAllAreas] = useState([]);
-  const [filteredAreaOptions, setFilteredAreaOptions] = useState([]);
+  const [areaReferenceOptions, setAreaReferenceOptions] = useState([]);
   const [programOption, setProgramOption] = useState([]);    
   const [areaOption, setAreaOption] = useState([]);    
   const [visible, makeVisible] = useState("list");  
@@ -79,6 +81,7 @@ const Users = () => {
   const [crudInstitute, setCrudInstitute] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState([])
   const [folderOptions, setFolderOptions] = useState([])
+  const [showUserSelector, setShowUserSelector] = useState(false)
 
   //select animation
   const animatedComponents = makeAnimated()
@@ -93,8 +96,95 @@ const Users = () => {
   const detailsAndSelectedUser = (user) => {
       setSelectedUser(user); 
       setShowDetails(true);        
+      // Clear employeeID when viewing details to reset button text
+      setEmployeeID("");
   }
 
+  const handleEditUser = async (user) => {
+        console.log('Edit button clicked, user data:', user)
+        
+        // Populate form with existing user data for editing
+        setEmployeeID(user.employeeID)
+        setFName(user.fName)
+        setLName(user.lName)
+        setSuffix(user.suffix || "")
+        setEmail(user.email)
+        setContactNum(user.contactNum)
+        setPassword("") // Don't populate password for security
+        setCoAdminAccess(user.isCoAdmin || false)
+        setRatingEnable(user.isRating || false)
+        setCanEditUser(user.isEdit || false)
+        setCrudForms(user.crudFormsEnable || false)
+        setCrudPrograms(user.crudProgramEnable || false)
+        setCrudInstitute(user.crudInstituteEnable || false)
+
+        // Get detailed program and area information for the Select components
+        try {
+            // Fetch all programs and areas to match with user's assigned ones
+            const programsRes = await apiGet('/api/program')
+            const areasRes = await apiGet('/api/area')
+            
+            console.log('Programs API response:', programsRes)
+            console.log('Areas API response:', areasRes)
+
+            if (programsRes.success && areasRes.success) {
+                // Map user program names to program objects
+                const userPrograms = user.programs || []
+                // Get the actual arrays from the response
+                const programsArray = programsRes.data?.programs || programsRes.programs || []
+                const areasArray = areasRes.data?.areas || areasRes.areas || []
+                
+                const selectedPrograms = userPrograms.map(programName => {
+                    const program = programsArray.find(p => p.programName === programName)
+                    return program ? { value: program.programID, label: program.programName } : null
+                }).filter(Boolean)
+
+                // Map user area strings to area objects
+                const userAreas = user.areas || []
+                const selectedAreas = userAreas.map(areaString => {
+                    // areaString format: "areaNum: areaName"
+                    const area = areasArray.find(a => `${a.areaNum}: ${a.areaName}` === areaString)
+                    return area ? { value: area.areaID, label: `${area.areaNum}: ${area.areaName}`, areaNum: area.areaNum } : null
+                }).filter(Boolean)
+
+                setSelectedPrograms(selectedPrograms)
+                setSelectedAreas(selectedAreas)
+            }
+        } catch (error) {
+            console.error('Error fetching programs/areas for edit:', error)
+            // Fallback to empty arrays if fetch fails
+            setSelectedPrograms([])
+            setSelectedAreas([])
+        }
+
+        // Load user's folder permissions
+        try {
+            if (user.folders && user.folders.length > 0) {
+                // Map folder paths to the format expected by the Select component
+                const selectedFolders = user.folders.map(folderPath => {
+                    // Extract program name from path: UDMS_Repository/Programs/BSED -> BSED
+                    const parts = folderPath.split('/')
+                    const programName = parts[parts.length - 1]
+                    return {
+                        value: folderPath,
+                        label: programName
+                    }
+                })
+                setSelectedFolder(selectedFolders)
+                console.log('Loaded user folders:', selectedFolders)
+            } else {
+                setSelectedFolder([])
+            }
+        } catch (error) {
+            console.error('Error loading user folders:', error)
+            setSelectedFolder([])
+        }
+
+            // Close the details modal and show the edit form
+            setShowDetails(false)
+            setRemoveConfirmation(false)
+            makeVisible("edit")
+  }
 
   const handleCreateUser = async (e) => {
       e.preventDefault(); 
@@ -114,8 +204,38 @@ const Users = () => {
           return;
       }
 
+      // Check if this is an edit operation (employeeID already exists)
+      const isEdit = !!employeeID; // If employeeID exists, it's an edit
 
-      if ( adminAccess ){
+      if (!isEdit && !password) {
+          setStatusMessage("Password is required for new users");
+          setShowStatusModal(true);
+          setStatusType("error");
+          return;
+      }
+
+      // Validate that selected areas exist for all selected programs
+      const selectedProgramIDs = selectedPrograms.map(p => p.value);
+      const selectedAreaNums = selectedAreas.map(a => a.areaNum);
+      
+      // Check if all selected areas exist for all selected programs
+      for (const areaNum of selectedAreaNums) {
+          for (const programID of selectedProgramIDs) {
+              const areaExists = allAreas.some(area => 
+                  area.programID === programID && area.areaNum === areaNum
+              );
+              
+              if (!areaExists) {
+                  const program = programOption.find(p => p.programID === programID);
+                  setStatusMessage(`Area ${areaNum} does not exist for ${program?.programName || 'selected program'}. Please select valid areas.`);
+                  setShowStatusModal(true);
+                  setStatusType("error");
+                  return;
+              }
+          }
+      }
+
+      if ( CoAdminAccess ){
         if (!ratingEnable  && !canEditUser && !crudForms && !crudPrograms && !crudInstitute) {
             setStatusMessage("Please select at least one admin permission");
             setShowStatusModal(true);
@@ -125,9 +245,22 @@ const Users = () => {
       }
       
 
+      // Map selected area numbers to actual areaIDs for each program
+      const areaIDs = [];
+      for (const areaNum of selectedAreaNums) {
+          for (const programID of selectedProgramIDs) {
+              const area = allAreas.find(area => 
+                  area.programID === programID && area.areaNum === areaNum
+              );
+              if (area) {
+                  areaIDs.push(area.areaID);
+              }
+          }
+      }
+
       const formData = new FormData();
           formData.append("employeeID", employeeID);
-          formData.append("password", password);
+          if (password) formData.append("password", password); // Only include password if provided (for create/edit)
           formData.append("fName", fName);
           formData.append("lName", lName);
           formData.append("suffix", suffix);
@@ -135,8 +268,8 @@ const Users = () => {
           formData.append("contactNum", contactNum);
            if(profilePic?.file) formData.append("profilePic", profilePic.file); 
           formData.append("programs", JSON.stringify(selectedPrograms.map(p => p.value)));
-          formData.append("areas", JSON.stringify(selectedAreas.map(a => a.value)));
-          formData.append("isAdmin", adminAccess);
+          formData.append("areas", JSON.stringify(areaIDs));
+          formData.append("isCoAdmin", CoAdminAccess);
           formData.append("isRating", ratingEnable);
           formData.append("isEdit", canEditUser);
           formData.append("crudFormsEnable", crudForms);
@@ -178,7 +311,7 @@ const Users = () => {
                   areaID,
                   programName: selectedProgramName,
                   areaNum: selectedAreaName,
-                  isAdmin: adminAccess
+                  isCoAdmin: CoAdminAccess
                   
               }]);
 
@@ -194,12 +327,10 @@ const Users = () => {
           setProgramID("")
           setAreaID("")
           setProfilePic(null)
-          setAdminAccess(false)
+          setCoAdminAccess(false)
           setSelectedPrograms([])
           setSelectedAreas([])
           setSelectedFolder([])
-          setPrimaryProgram(null)
-          setPrimaryArea(null)
           setRatingEnable(false)
           setCanEditUser(false)
           setCrudForms(false)
@@ -223,7 +354,7 @@ const Users = () => {
 
   useEffect(() => {
   const fetchUsers = async () => {
-    if (!isAdmin) return
+    if (!isAdmin && !isCoAdmin) return
 
     setUsersLoading(true)
       try {                
@@ -270,11 +401,11 @@ const Users = () => {
   };
 
   fetchUsers();
-}, [isAdmin]);
+}, [isAdmin, isCoAdmin]);
 
  
 useEffect(() => {
-  if (!isAdmin) return 
+  if (!isAdmin && !isCoAdmin) return 
   const fetchProgram = async () =>{
 
       const res = await apiGet('/api/program', 
@@ -294,8 +425,6 @@ useEffect(() => {
 
   useEffect(() => {
   const fetchArea = async () => {
-
-      
      const res = await apiGet('/api/area', 
           {withCredentials: true}
      )
@@ -307,6 +436,28 @@ useEffect(() => {
       }
   }
   fetchArea();
+  }, [])
+
+  // Fetch static area reference options
+  useEffect(() => {
+    const fetchAreaReference = async () => {
+      try {
+        const res = await apiGet('/api/area/option', {withCredentials: true})
+        
+        const areaOptions = res.data.map((area, index) => ({
+          value: index + 1, // Using index as value since AreaReference might not have areaID
+          label: `${area.areaNum}: ${area.areaName}`,
+          areaNum: area.areaNum,
+          areaName: area.areaName
+        }));
+        
+        setAreaReferenceOptions(areaOptions);
+        console.log(areaReferenceOptions)
+      } catch (err) {
+        console.error("Error occurred during area reference fetching", err);
+      }
+    }
+    fetchAreaReference();
   }, [])
   
   function removeAndClose() {
@@ -362,47 +513,58 @@ useEffect(() => {
           user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Filter area options depending on the program
-  useEffect(() => {
-    if (selectedPrograms && selectedPrograms.length > 0) {
-        const selectedProgramIDS = selectedPrograms.map(p => String(p.value))
-
-        const filteredAreas = allAreas.filter(
-            (area) => selectedProgramIDS.includes(String(area.programID)) && !area.archived
-        )
-        setFilteredAreaOptions(filteredAreas)
-    } else {
-        setFilteredAreaOptions([])
-        setSelectedAreas([])
-    }
-  }, [selectedPrograms, allAreas])
 
 
   useEffect(() => {
     const fetchFolders = async () => {
         try {
             const res = await apiGet('/api/documents')
-            // Navigate to Accreditation -> Programs -> get folder names
-            const programsFolders = res.data?.folders?.Accreditation?.folders?.Programs?.folders;
+            console.log('Full API response:', res.data) // Debug log
             
-            if (programsFolders) {
-                const options = Object.keys(programsFolders).map(programName => ({
-                    value: `UDMS_Repository/Accreditation/Programs/${programName}`,
-                    label: programName
-                }));
+            // Based on your console output, the structure is:
+            // folders: { BSED: {...}, BSIT: {...} }
+            const programsFolders = res.data?.folders;
+            
+            console.log('Programs folders found:', programsFolders) // Debug log
+            
+            if (programsFolders && typeof programsFolders === 'object') {
+                const options = Object.keys(programsFolders)
+                    .filter(programName => programName && programName.trim() !== '') // Filter out empty or whitespace-only names
+                    .map(programName => ({
+                        value: `UDMS_Repository/Programs/${programName.trim()}`,
+                        label: programName.trim()
+                    }))
+                    .filter(option => option.value && option.label); // Additional safety check
+                
+                console.log('Folder options created:', options) // Debug log
                 setFolderOptions(options)
             } else {
+                console.log('No programs folders found or invalid structure') // Debug log
                 setFolderOptions([])
             }
         } catch (err) {
             console.error('Error fetching folders', err)
+            setFolderOptions([]) // Set empty array on error
         }
     }
     
-    if (adminAccess) {
+    // Always fetch folders for folder permissions (no longer dependent on CoAdminAccess)
         fetchFolders()
-    }
-  }, [adminAccess])
+  }, []) // Remove CoAdminAccess dependency
+
+  // Close user selector dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showUserSelector && !event.target.closest('.user-selector-container')) {
+        setShowUserSelector(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showUserSelector]);
 
     
       
@@ -480,6 +642,51 @@ useEffect(() => {
                       <FontAwesomeIcon icon={faPlus} className="mr-2" />
                       Add User
                   </button>
+                  <div className="relative user-selector-container">
+                    <button 
+                        className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
+                            visible === "edit" 
+                                ? 'bg-blue-500 text-white shadow-md transform scale-105' 
+                                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`} 
+                        onClick={() => {
+                          makeVisible("edit")
+                          setShowUserSelector(!showUserSelector)
+                        }}
+                    >
+                        <FontAwesomeIcon icon={faEdit} className="mr-2" />
+                        Edit User
+                    </button>
+                    {visible === "edit" && showUserSelector && (
+                      <div className="absolute top-full left-0 mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-10">
+                        <div className="p-4">
+                          <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Select User to Edit:
+                          </label>
+                          <Select
+                            placeholder="Choose a user..."
+                            options={submittedUsers.map(user => ({
+                              value: user.employeeID,
+                              label: `${user.name} (${user.employeeID})`
+                            }))}
+                            onChange={(selectedOption) => {
+                              if (selectedOption) {
+                                const selectedUser = submittedUsers.find(u => u.employeeID === selectedOption.value);
+                                if (selectedUser) {
+                                  handleEditUser(selectedUser);
+                                  setShowUserSelector(false); // Close dropdown after selection
+                                }
+                              }
+                            }}
+                            className="w-full text-black"
+                            instanceId="edit-user-selector"
+                            isSearchable={true}
+                            noOptionsMessage={() => "No users found"}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                       </div>
 
               <div className="relative">
@@ -500,7 +707,9 @@ useEffect(() => {
   {/* Add User Form */}
 <div className={`${visible === "add" ? "block" : "hidden"} mb-8`}>
   <div className="p-8 bg-gray-100 border border-gray-200 shadow-xl dark:bg-gray-800 rounded-2xl dark:border-gray-700">
-    <h2 className="mb-6 text-2xl font-bold text-gray-800 dark:text-white">Create New User</h2>
+    <h2 className="mb-6 text-2xl font-bold text-gray-800 dark:text-white">
+      {employeeID ? 'Edit User' : 'Create New User'}
+    </h2>
     
     <form onSubmit={handleCreateUser} className="flex flex-col gap-8 lg:flex-row">
       
@@ -792,13 +1001,13 @@ useEffect(() => {
                 isMulti
                 value={selectedPrograms}
                 onChange={setSelectedPrograms}
-                options=
-                {programOption.map((program) => ({
+                options={programOption.map((program) => ({
                     value: program.programID,
                     label: program.programName
                 }))}
                 placeholder='Select Programs...'
                 className='w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800'
+                instanceId="program-select"
             />
         </div>
 
@@ -812,34 +1021,49 @@ useEffect(() => {
             isMulti
             value={selectedAreas} 
             onChange={setSelectedAreas}
-            options={filteredAreaOptions
-                .filter((area, index, self) =>
-                    index === self.findIndex(a => a.areaID === area.areaID)
-                )
-                .map((area) => ({
-                    value: area.areaID,
-                    label: area.areaName
-                }))
-            }
+            options={areaReferenceOptions || []}
             placeholder='Select Areas...'
-            className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"/>
+            className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
+            instanceId="area-select"/>
 
         </div>
 
+        {/* Co-Admin Access Switch - Only admins can assign this */}
+        {isAdmin && (
         <div className="relative">
           <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
-            <label 
-              htmlFor="adminToggle" 
-              className="text-base font-medium text-gray-700 dark:text-gray-300"
-            >
-              Admin Access
+              <label className="text-base font-medium text-gray-700 dark:text-gray-300">
+                Co-Admin Access
             </label>
-              <Switch isChecked={adminAccess} onChange={() => {setAdminAccess((current) => !current)}}/>            
+              <Switch isChecked={CoAdminAccess} onChange={() => setCoAdminAccess((current) => !current)}/>
           </div>
         </div>
+        )}
 
-        {/* Conditional Admin Permissions */}
-        {adminAccess && (
+        {/* Additional Folder Access - Available for all users */}
+        <div className="relative">
+          <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            Additional Folder Access
+          </label>
+          <Select
+            isMulti
+            closeMenuOnSelect={false}
+            closeMenuOnScroll={false}
+            components={animatedComponents}
+            value={selectedFolder}
+            onChange={setSelectedFolder}
+            options={folderOptions || []}
+            placeholder='Select folders to give access...'
+            noOptionsMessage={() => "No folders available"}
+            className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
+            instanceId="folder-select"/>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Grant access to additional program folders beyond assigned programs
+          </p>
+        </div>
+
+        {/* Conditional Co-Admin Permissions - shown when Co-Admin is enabled */}
+        {CoAdminAccess && (
           <>
             {/* Rating Enable */}
             <div className="relative">
@@ -861,7 +1085,8 @@ useEffect(() => {
               </div>
             </div>
 
-            {/* CRUD Forms */}
+            {/* CRUD Forms - Only admins can assign this permission */}
+            {isAdmin && (
             <div className="relative">
               <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
                 <label className="text-base font-medium text-gray-700 dark:text-gray-300">
@@ -870,8 +1095,10 @@ useEffect(() => {
                 <Switch isChecked={crudForms} onChange={() => setCrudForms((current) => !current)}/>
               </div>
             </div>
+            )}
 
-            {/* CRUD Programs */}
+            {/* CRUD Programs - Only admins can assign this permission */}
+            {isAdmin && (
             <div className="relative">
               <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
                 <label className="text-base font-medium text-gray-700 dark:text-gray-300">
@@ -880,8 +1107,10 @@ useEffect(() => {
                 <Switch isChecked={crudPrograms} onChange={() => setCrudPrograms((current) => !current)}/>
               </div>
             </div>
+            )}
 
-            {/* CRUD Institute */}
+            {/* CRUD Institute - Only admins can assign this permission */}
+            {isAdmin && (
             <div className="relative">
               <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
                 <label className="text-base font-medium text-gray-700 dark:text-gray-300">
@@ -890,41 +1119,362 @@ useEffect(() => {
                 <Switch isChecked={crudInstitute} onChange={() => setCrudInstitute((current) => !current)}/>
               </div>
             </div>
-            {/* DOCUMENT PERMISSION */}
-            <div className="relative">
-              <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
-                <Select 
-                isMulti
-                closeMenuOnScroll={false}
-                closeMenuOnSelect={false}
-                components={animatedComponents}
-                value={selectedFolder}
-                onChange={setSelectedFolder}
-                options={folderOptions}
-                placeholder='Select Folder to give permission...'
-                className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"/>
-              </div>
-              <label className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                Additional folder access (optional)
-              </label>
-            </div>
+            )}
           </>
         )}
 
         {/* Submit */}
         <div className="flex justify-center mt-6 md:col-span-2">
-          <button 
-            type="submit"            
+          <button
+            type="submit"
             className={`px-8 py-3 text-lg font-semibold text-white transition-all duration-300 transform shadow-lg bg-gradient-to-r ${loading ? 'from-gray-500 to-gray-600': ' from-green-500 to-green-600'} rounded-xl hover:shadow-xl hover:scale-105`}
           >
             <FontAwesomeIcon icon={faPlus} className="mr-2"/>
-            Create User
+            {employeeID ? 'Update User' : 'Create User'}
             {loading && (
               <FontAwesomeIcon icon={faSpinner} className="ml-3 animate-spin"/>
             )}
-            
+
           </button>
         </div>        
+      </div>
+    </form>
+  </div>
+</div>
+
+{/* Edit User Form */}
+<div className={`${visible === "edit" ? "block" : "hidden"} mb-8`}>
+  <div className="p-8 bg-gray-100 border border-gray-200 shadow-xl dark:bg-gray-800 rounded-2xl dark:border-gray-700">
+    <h2 className="mb-6 text-2xl font-bold text-gray-800 dark:text-white">
+      Edit User
+    </h2>
+    
+    <form onSubmit={handleCreateUser} className="space-y-6">
+      {/* Employee ID */}
+            <div className="relative">
+        <input 
+          type="text" 
+          required 
+          name="employeeID" 
+          id="employeeID"
+          value={employeeID} 
+          onChange={(e) => setEmployeeID(e.target.value)}
+          className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
+          placeholder=" "
+        />
+            <label 
+          htmlFor="employeeID" 
+          className="absolute text-gray-500 transition-all left-4 top-3 dark:text-gray-400 peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-0 peer-focus:text-xs peer-focus:text-blue-500 peer-valid:top-0 peer-valid:text-xs peer-valid:text-blue-500"
+            >
+          Employee ID
+            </label>
+          </div>
+
+      {/* First Name */}
+      <div className="relative">
+        <input 
+          type="text" 
+          name="fName" 
+          id="fName"
+          value={fName} 
+          onChange={(e) => setFName(e.target.value)}  
+          className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
+          placeholder=" "
+        />
+        <label 
+          htmlFor="fName" 
+          className="absolute text-gray-500 transition-all left-4 top-3 dark:text-gray-400 peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-0 peer-focus:text-xs peer-focus:text-blue-500 peer-valid:top-0 peer-valid:text-xs peer-valid:text-blue-500"
+        >
+          First Name
+        </label>
+        </div>
+
+      {/* Last Name */}
+      <div className="relative">
+        <input 
+          type="text" 
+          name="lName" 
+          id="lName"
+          value={lName} 
+          onChange={(e) => setLName(e.target.value)}  
+          className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
+          placeholder=" "
+        />
+        <label 
+          htmlFor="lName" 
+          className="absolute text-gray-500 transition-all left-4 top-3 dark:text-gray-400 peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-0 peer-focus:text-xs peer-focus:text-blue-500 peer-valid:top-0 peer-valid:text-xs peer-valid:text-blue-500"
+        >
+          Last Name
+        </label>
+      </div>
+
+      {/* Suffix */}
+      <div className="relative">
+        <input 
+          type="text" 
+          name="suffix" 
+          id="suffix"
+          value={suffix} 
+          onChange={(e) => setSuffix(e.target.value)}  
+          className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
+          placeholder=" "
+        />
+        <label 
+          htmlFor="suffix" 
+          className="absolute text-gray-500 transition-all left-4 top-3 dark:text-gray-400 peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-0 peer-focus:text-xs peer-focus:text-blue-500 peer-valid:top-0 peer-valid:text-xs peer-valid:text-blue-500"
+        >
+          Suffix (Optional)
+        </label>
+      </div>
+
+      {/* Password */}
+      <div className="relative">
+        <input 
+          type={hidePassword ? "password" : "text"}
+          name="password" 
+          id="password"
+          value={password} 
+          onChange={(e) => setPassword(e.target.value)}  
+          className="w-full px-4 py-3 pr-12 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
+          placeholder=" "
+        />
+        <label 
+          htmlFor="password" 
+          className="absolute text-gray-500 transition-all left-4 top-3 dark:text-gray-400 peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-0 peer-focus:text-xs peer-focus:text-blue-500 peer-valid:top-0 peer-valid:text-xs peer-valid:text-blue-500"
+        >
+          Password (Optional - leave blank to keep current password)
+        </label>
+        <button
+            type="button"
+            onClick={() => setHidePassword(!hidePassword)}
+            className="absolute text-gray-500 -translate-y-1/2 right-4 top-1/2 hover:text-gray-700 dark:hover:text-gray-300"
+          >
+            <FontAwesomeIcon icon={!hidePassword ? faEye : faEyeSlash} />
+          </button>
+      </div>
+
+      {/* Email */}
+      <div className="relative">
+        <input 
+          type="email" 
+          name="email" 
+          id="email"
+          value={email} 
+          onChange={(e) => setEmail(e.target.value)}  
+          className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
+          placeholder=" "
+        />
+        <label 
+          htmlFor="email" 
+          className="absolute text-gray-500 transition-all left-4 top-3 dark:text-gray-400 peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-0 peer-focus:text-xs peer-focus:text-blue-500 peer-valid:top-0 peer-valid:text-xs peer-valid:text-blue-500"
+        >
+          Email Address
+        </label>
+      </div>
+
+      {/* Contact Number */}
+      <div className="relative">
+        <input 
+          type="tel" 
+          name="contactNum" 
+          id="contactNum"
+          value={contactNum} 
+          maxLength={16}
+          onChange={(e) => {
+              let value = e.target.value;
+              
+              // Remove all non-digits
+              let digitsOnly = value.replace(/\D/g, '');
+              
+              // Remove the country code (63) if it's at the start
+              if (digitsOnly.startsWith('63')) {
+                  digitsOnly = digitsOnly.slice(2);
+              }
+              
+              // Limit to 10 digits (Philippine mobile number without country code)
+              if (digitsOnly.length > 10) {
+                  return;
+              }
+              
+              
+              // Auto-format: +63 XXX XXX XXXX
+              let formatted = '';
+              if (digitsOnly.length === 0) {
+                  formatted = '';
+              } else if (digitsOnly.length <= 3) {
+                  formatted = '+63 ' + digitsOnly;
+              } else if (digitsOnly.length <= 6) {
+                  formatted = '+63 ' + digitsOnly.slice(0, 3) + ' ' + digitsOnly.slice(3);
+              } else {
+                  formatted = '+63 ' + digitsOnly.slice(0, 3) + ' ' + digitsOnly.slice(3, 6) + ' ' + digitsOnly.slice(6);
+              }
+              
+              setContactNum(formatted);
+              
+              // Clear error while typing
+              setContactNumError("");
+          }}
+          onBlur={(e) => {
+              const value = e.target.value;
+              if (value && value.length > 0) {
+                  validateContactNum(value);
+              }
+          }}
+          className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
+          placeholder=" "
+        />
+        <label 
+          htmlFor="contactNum" 
+          className="absolute text-gray-500 transition-all left-4 top-3 dark:text-gray-400 peer-placeholder-shown:top-3 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-0 peer-focus:text-xs peer-focus:text-blue-500 peer-valid:top-0 peer-valid:text-xs peer-valid:text-blue-500"
+        >
+          Contact Number
+        </label>
+        {contactNumError && (
+            <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                {contactNumError}
+            </p>
+        )}
+      </div>
+
+      {/* Program Select */}
+      <div className="relative">
+                <Select 
+              closeMenuOnScroll={false}
+              closeMenuOnSelect={false}
+              components={animatedComponents}
+                isMulti
+              value={selectedPrograms}
+              onChange={setSelectedPrograms}
+              options={programOption.map((program) => ({
+                  value: program.programID,
+                  label: program.programName
+              }))}
+              placeholder='Select Programs...'
+              className='w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800'
+              instanceId="edit-program-select"
+          />
+      </div>
+
+      {/* Area Select */}
+      <div className="relative">
+        <Select 
+                closeMenuOnScroll={false}
+                closeMenuOnSelect={false}
+          components={animatedComponents}
+          isMulti
+          value={selectedAreas} 
+          onChange={setSelectedAreas}
+          options={areaReferenceOptions || []}
+          placeholder='Select Areas...'
+          className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
+          instanceId="edit-area-select"/>
+      </div>
+
+      {/* Additional Folder Access - Available for all users */}
+      <div className="relative">
+            <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            Additional Folder Access
+            </label>
+            <Select
+            isMulti
+            closeMenuOnSelect={false}
+            closeMenuOnScroll={false}
+                    components={animatedComponents}
+                    value={selectedFolder}
+                    onChange={setSelectedFolder}
+            options={folderOptions || []}
+            placeholder='Select folders to give access...'
+            noOptionsMessage={() => "No folders available"}
+            className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
+            instanceId="edit-folder-select"/>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Grant access to additional program folders beyond assigned programs
+            </p>
+        </div>
+
+      {/* Co-Admin Access Switch - Only admins can assign this */}
+      {isAdmin && (
+        <div className="relative">
+          <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
+            <label className="text-base font-medium text-gray-700 dark:text-gray-300">
+              Co-Admin Access
+            </label>
+            <Switch isChecked={CoAdminAccess} onChange={() => setCoAdminAccess((current) => !current)}/>
+          </div>
+        </div>
+      )}
+
+      
+
+      {/* Conditional Co-Admin Permissions - shown when Co-Admin is enabled */}
+      {CoAdminAccess && (
+        <>
+          {/* Rating Enable */}
+          <div className="relative">
+            <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
+              <label className="text-base font-medium text-gray-700 dark:text-gray-300">
+                Rating Enable
+              </label>
+              <Switch isChecked={ratingEnable} onChange={() => setRatingEnable((current) => !current)}/>
+            </div>
+          </div>
+
+          {/* Can Edit User */}
+          <div className="relative">
+            <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
+              <label className="text-base font-medium text-gray-700 dark:text-gray-300">
+                Can Edit User
+              </label>
+              <Switch isChecked={canEditUser} onChange={() => setCanEditUser((current) => !current)}/>
+            </div>
+          </div>
+
+          {/* CRUD Forms - Only admins can assign this permission */}
+          {isAdmin && (
+            <div className="relative">
+              <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
+                <label className="text-base font-medium text-gray-700 dark:text-gray-300">
+                  CRUD Forms
+                </label>
+                <Switch isChecked={crudForms} onChange={() => setCrudForms((current) => !current)}/>
+              </div>
+            </div>
+          )}
+
+          {/* CRUD Programs - Only admins can assign this permission */}
+          {isAdmin && (
+            <div className="relative">
+              <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
+                <label className="text-base font-medium text-gray-700 dark:text-gray-300">
+                  CRUD Programs
+                </label>
+                <Switch isChecked={crudPrograms} onChange={() => setCrudPrograms((current) => !current)}/>
+              </div>
+            </div>
+          )}
+
+          {/* CRUD Institute - Only admins can assign this permission */}
+          {isAdmin && (
+            <div className="relative">
+              <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
+                <label className="text-base font-medium text-gray-700 dark:text-gray-300">
+                  CRUD Institute
+                </label>
+                <Switch isChecked={crudInstitute} onChange={() => setCrudInstitute((current) => !current)}/>
+              </div>
+            </div>
+          )}
+          </>
+        )}
+
+      {/* Submit Button */}
+      <div className="flex justify-end">
+          <button 
+            type="submit"            
+          className="px-8 py-3 text-white transition-all duration-300 bg-blue-600 rounded-xl hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+        >
+          Update User
+          </button>
       </div>
     </form>
   </div>

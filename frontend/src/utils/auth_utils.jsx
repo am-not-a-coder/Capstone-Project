@@ -79,8 +79,54 @@ export const adminHelper = () => {
     if (!user) {
         return false
     }
-    
+
     return !!user?.isAdmin
+}
+
+export const coAdminHelper = () => {
+    const user = getCurrentUser()
+
+    if (!user) {
+        return false
+    }
+
+    return !!user?.isCoAdmin
+}
+
+export const canRate = () => {
+    const user = getCurrentUser()
+    if (!user) return false
+    return !!user?.isAdmin || !!user?.isRating
+}
+
+export const canEditUsers = () => {
+    const user = getCurrentUser()
+    if (!user) return false
+    return !!user?.isAdmin || !!user?.isCoAdmin || !!user?.isEdit
+}
+
+export const canManageForms = () => {
+    const user = getCurrentUser()
+    if (!user) return false
+    return !!user?.isAdmin || !!user?.crudFormsEnable
+}
+
+export const canManagePrograms = () => {
+    const user = getCurrentUser()
+    if (!user) return false
+    return !!user?.isAdmin || !!user?.crudProgramEnable
+}
+
+export const canManageInstitutes = () => {
+    const user = getCurrentUser()
+    if (!user) return false
+    return !!user?.isAdmin || !!user?.crudInstituteEnable
+}
+
+export const hasAdminPrivileges = () => {
+    const user = getCurrentUser()
+    if (!user) return false
+    return !!user?.isAdmin || !!user?.isCoAdmin
 }
 
 export const PermissionGate = ({ requires, children }) => {

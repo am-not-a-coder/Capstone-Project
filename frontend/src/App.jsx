@@ -16,13 +16,22 @@ import Messages from './pages/Messages';
 import AreaProgress from './pages/AreaProgress';
 import { fetchCurrentUser, getCurrentUser } from './utils/auth_utils';
 import { useEffect, useRef, useState } from 'react';
-import { logoutAcc, adminHelper } from './utils/auth_utils';
+import { 
+  logoutAcc, 
+  adminHelper, 
+  coAdminHelper,
+  canRate,
+  canEditUsers,
+  canManageForms,
+  hasAdminPrivileges 
+} from './utils/auth_utils';
 import { apiPost } from './utils/api_utils';
 import { initPresenceListeners, getSocket } from './utils/websocket_utils';
 import toast, { Toaster } from 'react-hot-toast'
 
 function App() {
   
+  // Admin only route
   const AdminRoute = ({ children }) => {
     const allowed = adminHelper()
     useEffect(() => {
@@ -31,6 +40,48 @@ function App() {
     if (!authReady) return <div>Loading...</div>
     return allowed ? children : <Navigate to="/Dashboard" replace />
   }
+
+  // Dynamic permission route - can check any permission
+  const PermissionRoute = ({ permission, children, fallbackPath = "/Dashboard" }) => {
+    const allowed = permission()
+    useEffect(() => {
+      if (authReady && !allowed) toast.error('You have no permission to access this page.')
+    }, [authReady, allowed])
+    if (!authReady) return <div>Loading...</div>
+    return allowed ? children : <Navigate to={fallbackPath} replace />
+  }
+
+  // Admin or Co-Admin route
+  const AdminOrCoAdminRoute = ({ children }) => {
+    const allowed = hasAdminPrivileges()
+    useEffect(() => {
+      if (authReady && !allowed) toast.error('You have no permission to access this page.')
+    }, [authReady, allowed])
+    if (!authReady) return <div>Loading...</div>
+    return allowed ? children : <Navigate to="/Dashboard" replace />
+  }
+
+  // Rating permission route
+  const RatingRoute = ({ children }) => {
+    const allowed = canRate()
+    useEffect(() => {
+      if (authReady && !allowed) toast.error('You have no permission to access this page.')
+    }, [authReady, allowed])
+    if (!authReady) return <div>Loading...</div>
+    return allowed ? children : <Navigate to="/Dashboard" replace />
+  }
+
+  // User edit permission route
+  const UserEditRoute = ({ children }) => {
+    const allowed = canEditUsers()
+    useEffect(() => {
+      if (authReady && !allowed) toast.error('You have no permission to access this page.')
+    }, [authReady, allowed])
+    if (!authReady) return <div>Loading...</div>
+    return allowed ? children : <Navigate to="/Dashboard" replace />
+  }
+
+
 
   console.log('🚀 App component rendering...')
 
@@ -352,13 +403,13 @@ const PublicOnlyRoute = ({ children }) => {
           <Route path="/Institutes" element={<Institutes />} />
           <Route path="/Programs" element={<Programs />} />
           <Route path="/Accreditation" element={
-            <AdminRoute>
+            <RatingRoute>
               <Accreditation isAdmin={isAdmin}/>
-            </AdminRoute>} />
+            </RatingRoute>} />
           <Route path="/Users" element={
-            <AdminRoute>
+            <UserEditRoute>
               <Users isAdmin={isAdmin}/>
-            </AdminRoute>
+            </UserEditRoute>
             } />
           <Route path="/Tasks" element={<Tasks />} />
           <Route path="/Progress" element={<AreaProgress />} />
