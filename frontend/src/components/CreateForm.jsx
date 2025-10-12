@@ -41,7 +41,7 @@ const ActionButton = memo(({ action, color, icon, isActive, onClick, children })
 
 // Memoized InputField component to prevent unnecessary re-renders
 const InputField = memo(({ field, form, handleChange, handleFileChange, employees = [], activeModify, institutes = [] }) => {
-  const baseInputClasses = "w-full px-4 py-3 text-black dark:text-white rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 dark:bg-gray-800 dark:border-gray-600 dark:focus:ring-blue-400";
+  const baseInputClasses = "w-full px-4 py-3 text-gray-800 dark:text-white rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 dark:bg-gray-800 dark:border-gray-600 dark:focus:ring-blue-400";
   
   return (
     <div className="space-y-2">
@@ -61,7 +61,7 @@ const InputField = memo(({ field, form, handleChange, handleFileChange, employee
         >
           <option value="" className="text-gray-500">{field.placeholder || "Select Institute"}</option>
           {institutes && institutes.map((inst) => (
-            <option key={inst.instID} value={inst.instID}>{inst.instName || inst.Code}</option>
+            <option key={inst.instID} value={inst.instID} className='text-gray-800'>{inst.instName || inst.Code}</option>
           ))}
         </select>
 
@@ -76,7 +76,7 @@ const InputField = memo(({ field, form, handleChange, handleFileChange, employee
           <option value="">{field.placeholder || "Select user"}</option>
           {employees.map(emp => (
             // API returns employeeID and name
-            <option key={emp.employeeID} value={emp.employeeID}>
+            <option key={emp.employeeID} value={emp.employeeID} className='text-gray-800'>
               {emp.name || `${emp.fName} ${emp.lName || ''}`.trim()}
             </option>
           ))}
@@ -89,7 +89,7 @@ const InputField = memo(({ field, form, handleChange, handleFileChange, employee
             name={field.name}
             accept={field.accept}
             onChange={handleFileChange}
-            className="w-full px-4 py-3 text-black transition-colors duration-200 border-2 border-gray-300 border-dashed dark:text-white rounded-xl bg-gray-50 hover:border-blue-400 focus:outline-none focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600"
+            className="w-full px-4 py-3 text-gray-800 transition-colors duration-200 border-2 border-gray-300 border-dashed dark:text-white rounded-xl bg-gray-50 hover:border-blue-400 focus:outline-none focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600"
             required={activeModify === "add"} // File required only when adding
           />
           <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -354,14 +354,14 @@ export default function CreateForm({
                   <span className="ml-1 text-red-500">*</span>
                 </label>
                 <select 
-                  className="w-full px-4 py-3 transition-all duration-200 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-white" 
+                  className="w-full px-4 py-3 text-gray-800 transition-all duration-200 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-white" 
                   value={editIndex ?? ""} 
                   onChange={onEditSelect} 
                   required
                 >
-                  <option value="" disabled className="text-gray-500">Choose a {title.toLowerCase()} to edit</option>
+                  <option value="" disabled className="text-gray-800">Choose a {title.toLowerCase()} to edit</option>
                   {data.map((item, idx) => (
-                    <option value={idx} key={`${item.programID || idx}-${item.programCode}`}>
+                    <option value={idx} key={`${item.programID || idx}-${item.programCode}`} className='text-gray-800'>
                       {item.code || item.programCode} - {item.name || item.programName}
                     </option>
                   ))}
@@ -420,14 +420,14 @@ export default function CreateForm({
                   <span className="ml-1 text-red-500">*</span>
                 </label>
                 <select 
-                  className="w-full px-4 py-3 transition-all duration-200 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-white" 
+                  className="w-full px-4 py-3 text-gray-800 transition-all duration-200 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-white" 
                   value={editIndex ?? ""} 
                   onChange={onDeleteSelect} 
                   required
                 >
                   <option value="" disabled className="text-gray-500">Choose a {title.toLowerCase()} to delete</option>
                   {data.map((item, idx) => (
-                    <option value={idx} key={`${item.programID || idx}-${item.programCode}`}>
+                    <option value={idx} key={`${item.programID || idx}-${item.programCode}`} className='text-gray-800'>
                       {item.code || item.programCode} - {item.name || item.programName}
                     </option>
                   ))}

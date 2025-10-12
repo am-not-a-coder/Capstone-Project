@@ -233,13 +233,10 @@ useEffect(() => {
 }, [isAdmin])
 
   useEffect(() => {
-  const fetchArea = async () => {
-
-      
+  const fetchArea = async () => {      
      const res = await apiGet('/api/area', 
           {withCredentials: true}
      )
-
      try{
           Array.isArray(res.data.area) ? (setAreaOption(res.data.area), setAllAreas(res.data.area)) : (setAreaOption([]), setAllAreas([]));
       } catch (err) {
@@ -303,7 +300,7 @@ useEffect(() => {
   );
 
   // Filter area options depending on the program
-  useEffect(()=> {
+    useEffect(()=> {
           if(programID){
               const filteredAreas = allAreas.filter(
               (area) => String(area.programID) === String(programID)
@@ -313,7 +310,7 @@ useEffect(() => {
           } else {
               setFilteredAreaOptions([]);
           }
-      }, [programID, allAreas]);
+    }, [programID, allAreas]);
 
       
 
@@ -602,7 +599,7 @@ useEffect(() => {
             onChange={(e) => setAreaID(e.target.value)} 
             className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
           >
-                                <option value="">Select Area</option>
+            <option value="">Select Area</option>
             {filteredAreaOptions.filter((area, index, self) => 
               index === self.findIndex(a => a.areaID === area.areaID))
               .map((area) => (

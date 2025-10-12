@@ -8,12 +8,12 @@ import{
     faHourglassHalf,
     faCalendarDays 
 } from '@fortawesome/free-solid-svg-icons';
-import {useNavigate} from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {useNavigate} from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { apiGet, apiPost, apiDelete, API_URL } from '../utils/api_utils';
 import toast from 'react-hot-toast';
-import { Toaster } from 'react-hot-toast'
+import { Toaster } from 'react-hot-toast';
 import { getCurrentUser, adminHelper } from '../utils/auth_utils';
 import AnnouncementModal from '../components/modals/AnnouncementModal';
 import StatusModal from '../components/modals/StatusModal';
@@ -223,8 +223,8 @@ const Dashboard = () => {
                     ) : announcements && announcements.length > 0 ? (
                         <div className="space-y-3 max-h-[400px] overflow-y-auto">
                             {announcements.map((announcement, index) => (
-                                <div key={index} className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                                    <div className="flex justify-between items-start mb-2">
+                                <div key={index} className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm dark:bg-gray-800 dark:border-gray-700">
+                                    <div className="flex items-start justify-between mb-2">
                                         <h3 className="font-semibold text-gray-800 dark:text-white">{announcement.announceTitle}</h3>
                                         <div className="flex items-center gap-2">
                                             <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -233,14 +233,14 @@ const Dashboard = () => {
                                             {isAdmin && (
                                                 <button
                                                     onClick={() => handleDeleteAnnouncement(announcement.announceID)}
-                                                    className="px-2 py-1 text-xs text-red-600 hover:bg-red-100 dark:hover:bg-red-900 rounded transition-colors"
+                                                    className="px-2 py-1 text-xs text-red-600 transition-colors rounded hover:bg-red-100 dark:hover:bg-red-900"
                                                 >
                                                     Delete
                                                 </button>
                                             )}
                                         </div>
                                     </div>
-                                    <p className="text-gray-600 dark:text-gray-300 text-sm mb-2">{announcement.announceText}</p>
+                                    <p className="mb-2 text-sm text-gray-600 dark:text-gray-300">{announcement.announceText}</p>
                                     <p className="text-xs text-gray-500 dark:text-gray-400">By: {announcement.author}</p>
                                 </div>
                             ))}
@@ -264,42 +264,93 @@ const Dashboard = () => {
                         <FontAwesomeIcon icon={faHourglassHalf}  className="p-2 transition-all duration-500 dark:text-white" />
                         <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Pending Documents</h2>
                     </div>
-                    <div className="flex flex-col p-1 gap-1 transition-all duration-500 rounded-lg h-60 bg-neutral-300 dark:bg-gray-950/50">
+                    <div className="flex flex-col gap-1 p-1 transition-all duration-500 rounded-lg h-60 bg-neutral-300 dark:bg-gray-950/50">
                         {pendingDocs.map((pendingDoc)=> (
-                            <p key={pendingDoc.pendingDocID} className=" text-gray-700 hover:bg-gray-400 transition-all duration-500 dark:text-white">{pendingDoc.pendingDocName}</p>
+                            <p key={pendingDoc.pendingDocID} className="text-gray-700 transition-all duration-500 hover:bg-gray-400 dark:text-white">{pendingDoc.pendingDocName}</p>
                         ))}
                     </div>
                 </div>
-                {/* Audit Logs */}
-                
-                <div className="p-5 mb-10 transition-all duration-500 shadow-xl text-neutral-800 border-1 dark:border-gray-900 border-neutral-300 rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-900">
-                    <div className='flex flex-row'>
-                        <FontAwesomeIcon icon={faGears}  className="p-2 transition-all duration-500 dark:text-white" />
-                        <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Audit Logs</h2>
-                    </div>
+                 {/* Audit Logs */}                
+                    <div className="p-5 mb-10 transition-all duration-500 shadow-xl text-neutral-800 border-1 dark:border-gray-900 border-neutral-300 rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-900">
+                        <div className='flex flex-row'>
+                            <FontAwesomeIcon icon={faGears} className="p-2 transition-all duration-500 dark:text-white" />
+                            <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Audit Logs</h2>
+                        </div>
 
-                    {/* Display logs */}
-                    <div className="overflow-auto rounded-lg h-60 bg-neutral-300 dark:border-gray-900 dark:bg-gray-950/50">
-                        <table className="min-w-full text-left">
-                            <thead>
-                                <tr>
-                                    <th className="px-3 py-2">Action</th>
-                                    <th className="px-3 py-2">Date & Time</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {(Array.isArray(logs) ? logs : []).map((log) => (
-                                    <tr key={log.logID} className='hover:bg-gray-400'>
-                                        <td className="px-3 py-2 text-gray-700 transition-all duration-500 dark:text-white">{log.action}</td>
-                                        <td className="px-3 py-2 text-gray-700 transition-all duration-500 dark:text-white">{log.createdAt}</td>
+                    {/* Display logs */}                    
+                        <div className="overflow-auto rounded-lg h-60 bg-neutral-300 dark:bg-gray-950/50">
+                            <table className="w-full">
+                                <thead className="sticky top-0 border-b border-gray-400 bg-neutral-400 dark:bg-gray-900 dark:border-gray-800">
+                                    <tr>
+                                        <th className="px-4 py-2 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase dark:text-gray-300">
+                                            Action
+                                        </th>
+                                        <th className="px-4 py-2 text-xs font-semibold tracking-wider text-right text-gray-700 uppercase dark:text-gray-300">
+                                            Date & Time
+                                        </th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-gray-400 dark:divide-gray-800">
+                                    {logs.map((log) => {
+                                        const isLogin = log.action.includes('LOGGED IN');
+                                        const isDelete = log.action.includes('DELETED');
+                                        const isRate = log.action.includes('RATED');
+                                        const isCreate = log.action.includes('CREATED');
+                                        const isUpload = log.action.includes('UPLOADED');
+                                        const isLoggedOut = log.action.includes('LOGGED OUT');
+
+                                        return (
+                                            <tr 
+                                                key={log.logID} 
+                                                className="transition-colors duration-150 hover:bg-gray-400 dark:hover:bg-gray-800/70"
+                                            >
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center gap-2">
+                                                        {isLogin && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-blue-200 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
+                                                                Login
+                                                            </span>
+                                                        )}
+                                                        {isDelete && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-red-200 text-red-800 dark:bg-red-900/40 dark:text-red-300">
+                                                                Delete
+                                                            </span>
+                                                        )}
+                                                        {isRate && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-orange-200 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300">
+                                                                Rate
+                                                            </span>
+                                                        )}
+                                                        {isCreate && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-200 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                                                Create
+                                                            </span>
+                                                        )}
+                                                        {isUpload && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-purple-200 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
+                                                                Upload
+                                                            </span>
+                                                        )}
+                                                        {isLoggedOut && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-amber-200 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                                                                Logout
+                                                            </span>
+                                                        )}
+                                                        <span className="text-sm text-gray-700 transition-all duration-500 dark:text-white">
+                                                            {log.action}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-right text-gray-700 transition-all duration-500 dark:text-white">
+                                                    {log.createdAt}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                    
-                     
-                </div>
                 </section>
             )}
 

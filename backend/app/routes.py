@@ -10,6 +10,7 @@ from datetime import timedelta, datetime, timezone
 from app.utils.normalize_path import normalize_path
 from app.utils.file_extractor import extract_pdf, extract_docs, extract_excel, extract_image
 from app.utils.tagging_utils import rule_based_tag, extract_global_tfid_tags
+from app.utils.helper_functions import reapply_template
 from app.nextcloud_service import upload_to_nextcloud, preview_from_nextcloud, delete_from_nextcloud, ensure_directories, safe_path, list_files_from_nextcloud, preview_file_nextcloud, download_file_nextcloud, rename_file_nextcloud, edit_file_nextcloud
 from sentence_transformers import SentenceTransformer
 import numpy as np
@@ -23,7 +24,7 @@ import redis
 from app.otp_utils import generate_random
 from flask_mail import Message as MailMessage
 from app.login_handlers import complete_user_login
-from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message, MessageDeletion, Template, AreaBlueprint, SubareaBlueprint, CriteriaBlueprint, AppliedTemplate, Notification
+from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message, MessageDeletion, Template, AreaBlueprint, SubareaBlueprint, CriteriaBlueprint, AppliedTemplate, Notification, EmployeeProgram, EmployeeArea, EmployeeFolder, AreaReference
 from sqlalchemy import cast, String, func, text
 
 
@@ -150,20 +151,48 @@ def register_routes(app):
         user = Employee.query.filter_by(employeeID=emp_id).first()
         if not user:
             return jsonify({'success': False, 'message': 'User not found'})
-        program_name = user.program.programCode if user.program else None
+        
+        
+        # Get user's programs and areas from junction tables
+        user_programs = []
+        user_areas = []
+
+        for ep in user.employee_programs:
+            program = Program.query.get(ep.programID)
+            if program:
+                user_programs.append({
+                    'programID': program.programID,
+                    'programCode': program.programCode,
+                    'programName': program.programName
+                })
+
+        for ea in user.employee_areas:
+            area = Area.query.get(ea.areaID)
+            if area:
+                user_areas.append({
+                    'areaID': area.areaID,
+                    'areaName': area.areaName,
+                    'areaNum': area.areaNum
+                })
+
         return jsonify({
             'success': True,
             'user': {
                 'employeeID': user.employeeID,
                 'firstName': user.fName,
-                'lastName': user.lName,
-                'programID': user.programID,
-                'programCode': program_name,
+                'lastName': user.lName,                                
+                'programs': user_programs,
+                'areas': user_areas,
                 'suffix' : user.suffix,
                 'email': user.email,
                 'contactNum': user.contactNum,
                 'profilePic': user.profilePic,
                 'isAdmin': user.isAdmin,
+                'isRating': user.isRating,
+                'isEdit': user.isEdit,
+                'crudFormsEnable': user.crudFormsEnable,
+                'crudProgramEnable': user.crudProgramEnable,
+                'crudInstituteEnable': user.crudInstituteEnable,
                 'role': 'admin' if user.isAdmin else 'user'
             }
         }), 200
@@ -481,9 +510,26 @@ def register_routes(app):
         suffix = data.get("suffix", "").strip()
         email = data.get("email", "").strip()
         contactNum = data.get("contactNum", "").strip()
-        programID = data.get("programID")
-        areaID = data.get("areaID")
+       
+        # Parse JSON arrays for programs and areas
+        try:
+            programs = json.loads(data.get("programs", "[]"))
+            areas = json.loads(data.get("areas", "[]"))
+        except json.JSONDecodeError:
+            return jsonify({'success': False, 'message': 'Invalid programs or areas format'}), 400
+
+        # Parse selected folders for folder permissions
+        try:
+            selected_folders = json.loads(data.get("selectedFolder", "[]"))
+        except json.JSONDecodeError:
+            selected_folders = []
+
         isAdmin = str(data.get("isAdmin", "false")).lower() in ["true", "1", "yes", "y"]
+        isRating = str(data.get("isRating", "false")).lower() in ["true", "1", "yes", "y"]
+        isEdit = str(data.get("isEdit", "false")).lower() in ["true", "1", "yes", "y"]
+        crudFormsEnable = str(data.get("crudFormsEnable", "false")).lower() in ["true", "1", "yes", "y"]
+        crudProgramEnable = str(data.get("crudProgramEnable", "false")).lower() in ["true", "1", "yes", "y"]
+        crudInstituteEnable = str(data.get("crudInstituteEnable", "false")).lower() in ["true", "1", "yes", "y"]
         created_at = datetime.now()
 
         # email regex for validation
@@ -500,8 +546,9 @@ def register_routes(app):
             return jsonify({'success': False, 'message': 'Last name is required'}), 400
         if not email or not re.match(validEmail, email):
             return jsonify({'success': False, 'message': 'Please enter a valid email'}), 400
-        if not contactNum or not re.match(r'^\d{11}$', contactNum):
-            return jsonify({'success': False, 'message': 'Contact number must be 11 digits'}), 400
+        # Accept both formats: +63 XXX XXX XXXX or 09XXXXXXXXX
+        if not contactNum or not (re.match(r'^\+63 \d{3} \d{3} \d{4}$', contactNum) or re.match(r'^\d{11}$', contactNum)):
+            return jsonify({'success': False, 'message': 'Contact number must be in format +63 XXX XXX XXXX'}), 400
         
         # === Handle the Profile Picture (optional) ===
         profilePicPath = None
@@ -543,8 +590,13 @@ def register_routes(app):
         # Checks if the user already exists
         if Employee.query.filter_by(employeeID=empID).first():
             return jsonify({'success': False, "message": "Employee already exists"}), 400
+         # Validate that programs and areas are provided
+        if not programs or len(programs) == 0:
+            return jsonify({'success': False, 'message': 'At least one program is required'}), 400
+        if not areas or len(areas) == 0:
+            return jsonify({'success': False, 'message': 'At least one area is required'}), 400
 
-        # Create user
+        # Create user (programID and areaID are now nullable, set to primary or None)
         new_user = Employee(
             employeeID=empID,
             password=generate_password_hash(password, method="pbkdf2:sha256"),
@@ -553,13 +605,41 @@ def register_routes(app):
             suffix=suffix,
             email=email,
             contactNum=contactNum,
-            profilePic=profilePicPath, 
-            programID=programID,
-            areaID=areaID,
+            profilePic=profilePicPath,             
             isAdmin=isAdmin,
+            isRating=isRating,
+            isEdit=isEdit,
+            crudFormsEnable=crudFormsEnable,
+            crudProgramEnable=crudProgramEnable,
+            crudInstituteEnable=crudInstituteEnable,
             created_at=created_at
         )
         db.session.add(new_user)
+        db.session.flush()  # Flush to get the employeeID for junction tables
+
+        # Create EmployeeProgram entries
+        for program_id in programs:
+            emp_program = EmployeeProgram(
+                employeeID=empID,
+                programID=int(program_id)
+            )
+            db.session.add(emp_program)
+
+        # Create EmployeeArea entries
+        for area_id in areas:
+            emp_area = EmployeeArea(
+                employeeID=empID,
+                areaID=int(area_id)
+            )
+            db.session.add(emp_area)
+
+        # Create EmployeeFolder entries
+        for folder_path in selected_folders:
+            emp_folder = EmployeeFolder(
+                employeeID=empID,
+                folderPath=folder_path
+            )
+            db.session.add(emp_folder)
 
         # Audit created user
         new_log = AuditLog(
@@ -568,13 +648,11 @@ def register_routes(app):
         )
         db.session.add(new_log)
         db.session.commit()
-
         return jsonify({
             'success': True,
             'message': 'Employee created successfully!',
             'profilePic': profilePicPath,  # Return None if no upload
         }), 200
-
  
         
 
@@ -738,31 +816,36 @@ def register_routes(app):
     @jwt_required()
     def get_user_profile(employeeID):
         try:
-            # Query user with additional related data
-            user = (Employee.query
-                   .outerjoin(Program, Employee.programID == Program.programID)
-                   .outerjoin(Area, Employee.areaID == Area.areaID)
-                   .filter(Employee.employeeID == employeeID)
-                   .add_columns(
-                       Employee.employeeID,
-                       Employee.fName, 
-                       Employee.lName,
-                       Employee.suffix,
-                       Employee.email,
-                       Employee.contactNum,
-                       Employee.profilePic,
-                       Employee.isAdmin,
-                       Program.programName,
-                       Program.programCode,
-                       Area.areaName,
-                       Area.areaNum
-                   ).first())
-            
+            # Query user
+            user = Employee.query.filter_by(employeeID=employeeID).first()
+
             if not user:
                 return jsonify({
                     'success': False, 
                     'message': 'Employee not found'
                 }), 404
+            
+               # Get user's programs and areas from junction tables
+            user_programs = []
+            user_areas = []
+
+            for ep in user.employee_programs:
+                program = Program.query.get(ep.programID)
+                if program:
+                    user_programs.append({
+                        'programID': program.programID,
+                        'programName': program.programName,
+                        'programCode': program.programCode
+                    })
+
+            for ea in user.employee_areas:
+                area = Area.query.get(ea.areaID)
+                if area:
+                    user_areas.append({
+                        'areaID': area.areaID,
+                        'areaName': area.areaName,
+                        'areaNum': area.areaNum
+                    })
             
             # Prepare detailed profile data
             profile_data = {
@@ -775,11 +858,14 @@ def register_routes(app):
                 'profilePic': user.profilePic,
                 'isAdmin': user.isAdmin,
                 'role': 'admin' if user.isAdmin else 'user',
-                # Additional program/area info for profile display
-                'programName': user.programName or 'Not Assigned',
-                'programCode': user.programCode or 'N/A', 
-                'areaName': user.areaName or 'Not Assigned',
-                'areaNum': user.areaNum or 'N/A'
+                
+                'programs': user_programs,
+                'areas': user_areas,
+
+                'programName': user_programs[0]['programName'] if user_programs else 'Not Assigned',
+                'programCode': user_programs[0]['programCode'] if user_programs else 'N/A', 
+                'areaName': user_areas[0]['areaName'] if user_areas else 'Not Assigned',
+                'areaNum': user_areas[0]['areaNum'] if user_areas else 'N/A'
             }
             
             return jsonify({
@@ -906,32 +992,32 @@ def register_routes(app):
     @app.route('/api/users', methods=["GET"])
     @jwt_required()
     def get_users():
-        users  = (Employee.query
-                  .join(Program, Employee.programID == Program.programID)
-                  .join(Area, Employee.areaID == Area.areaID)
-                  .add_columns(
-                      Employee.employeeID,
-                      Program.programName,
-                      Area.areaName,
-                      Area.areaNum,
-                      Employee.fName,
-                      Employee.lName,
-                      Employee.suffix,
-                      Employee.email,
-                      Employee.contactNum,
-                      Employee.profilePic,
-                      Employee.isAdmin,
-                      Employee.isOnline,
-                  ).all()                
-                )        
+
+        users = Employee.query.all()
+
+         # Get user's programs and areas from junction tables
+        user_programs = []
+        user_areas = []
+
+        for ep in user.employee_programs:
+            program = Program.query.get(ep.programID)
+            if program:
+                user_programs.append(program.programName)
+
+        for ea in user.employee_areas:
+            area = Area.query.get(ea.areaID)
+            if area:
+                user_areas.append(f"{area.areaNum}: {area.areaName}")
         
         user_list = []
         for user in users:
             user_data = {
                 'employeeID': user.employeeID,
-                'programName': user.programName,
-                'areaName': user.areaName,
-                'areaNum': user.areaNum,
+                'programs': user_programs,
+                'areas': user_areas,
+                'programName': ', '.join(user_programs) if user_programs else 'Not Assigned',
+                'areaName': ', '.join(user_areas) if user_areas else 'Not Assigned',
+                'areaNum': user_areas[0].split(':')[0] if user_areas else 'N/A',                
                 'name': f"{user.fName} {user.lName} {user.suffix or ''}",
                 'email': user.email,
                 'contactNum': user.contactNum,
@@ -942,6 +1028,23 @@ def register_routes(app):
         
             user_list.append(user_data)
         return jsonify({"users" : user_list}), 200
+
+    @app.route('/api/area/option', methods=["GET"])
+    def get_area_option():
+
+        area_options = AreaReference.query.all()
+
+        option_list = []
+
+        for opt in area_options:
+            area_data = {
+                'areaName': opt.areaName,
+                'areaNum': opt.areaNum,
+                'title': f'{opt.areaName}: {opt.areaNum}'
+            }
+
+            option_list.append(area_data)
+        return jsonify(option_list), 200
 
     # ============================================ INSTITUTES PAGE ROUTES ============================================
     
@@ -1425,8 +1528,9 @@ def register_routes(app):
                 return jsonify({'error': 'Program not found'}), 404
             
             updated_counts = {}
-            
-            employees_updated = Employee.query.filter_by(programID=programID).update({'programID': None})
+
+            # Delete employee-program relationships instead of updating Employee table
+            employees_updated = EmployeeProgram.query.filter_by(programID=programID).delete()
             updated_counts['employees'] = employees_updated
             
             areas_updated = Area.query.filter_by(programID=programID).update({'programID': None})
@@ -1468,11 +1572,12 @@ def register_routes(app):
                 return jsonify({'success': False, 'message': 'User not found'}), 404
             
             # If user is admin, return all programs
-            if current_user.isAdmin:
+            if current_user.isAdmin or current_user.crudProgramEnable:
                 programs = Program.query.all()
             else:
-                # If regular user, return only their assigned program
-                programs = Program.query.filter_by(programID=current_user.programID).all()
+                # If regular user, return only their assigned programs
+                user_program_ids = [ep.programID for ep in current_user.employee_programs]
+                programs = Program.query.filter(Program.programID.in_(user_program_ids)).all()
                     
             program_list = []
             for program in programs:
@@ -1801,8 +1906,9 @@ def register_routes(app):
     def get_area():
         areas = (Area.query
                  .join(Program, Area.programID == Program.programID)
-                 .order_by(Area.areaID.asc())                 
-                 .outerjoin(Subarea, Area.areaID == Subarea.areaID)                 
+                 .order_by(Area.areaID.asc())               
+                 .filter(Area.archived == False)  
+                 .outerjoin(Subarea, Area.areaID == Subarea.areaID)                                  
                  .add_columns(
                     Area.areaID,
                     Area.programID,
@@ -1811,6 +1917,7 @@ def register_routes(app):
                     Area.areaName,
                     Area.areaNum,
                     Area.progress,
+                    Area.archived,
                     Subarea.subareaName
                 )
             ).all()
@@ -1827,7 +1934,8 @@ def register_routes(app):
                 'areaNum': area.areaNum,
                 'areaName': f"{area.areaNum}: {area.areaName}",
                 'progress': area.progress,
-                'subareaName': area.subareaName,                
+                'subareaName': area.subareaName,  
+                'archived': area.archived              
             }
             area_list.append(area_data)
         
@@ -1944,28 +2052,28 @@ def register_routes(app):
 
         data = (
         db.session.query(
-            Area.areaID,
-            Program.programCode,
-            Area.areaName,
-            Area.areaNum,
-            Area.progress,
-            Subarea.subareaID,
-            Subarea.subareaName,
-            Criteria.criteriaID,
-            Criteria.criteriaContent,
-            Criteria.criteriaType,
-            Criteria.rating,
-            Document.docID,
-            Document.docName,
-            Document.docType,
-            Document.docPath,
-            Document.isApproved,
-            Document.predicted_rating
-        )
+                Area.areaID,
+                Program.programCode,
+                Area.areaName,
+                Area.areaNum,
+                Area.progress,
+                Subarea.subareaID,
+                Subarea.subareaName,
+                Criteria.criteriaID,
+                Criteria.criteriaContent,
+                Criteria.criteriaType,
+                Criteria.rating,
+                Document.docID,
+                Document.docName,
+                Document.docType,
+                Document.docPath,
+                Document.isApproved,
+                Document.predicted_rating
+            )
         .outerjoin(Program, Area.programID == Program.programID)
         .outerjoin(Subarea, (Area.areaID == Subarea.areaID) & (Subarea.archived == False))
         .outerjoin(Criteria, (Subarea.subareaID == Criteria.subareaID) & (Criteria.archived == False))
-        .outerjoin(Document, Criteria.docID == Document.docID)       
+        .outerjoin(Document, Criteria.docID == Document.docID)
         .filter(Program.programCode == program_code, Area.archived == False)
         .order_by(Area.areaID.asc(), Subarea.subareaID.asc(), Criteria.criteriaID.asc())
         .all()
@@ -2025,104 +2133,7 @@ def register_routes(app):
 
         return jsonify(list(result.values())) 
     
-    @app.route('/api/accreditation/create_area', methods=["POST"])
-    @jwt_required()
-    def create_area():
-        current_user_id = get_jwt_identity()
-        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
-        if not admin_user or not admin_user.isAdmin:
-            return jsonify({'success': False, 'message': 'Admins only'}), 403
-        data = request.form
-        programID = data.get("programID")
-        areaNum = data.get("areaNum")
-        areaName = data.get("areaName")
-
-    # create new area
-
-        new_area = Area(
-            programID = programID,
-            areaName = areaName,
-            areaNum = areaNum
-        )
-        db.session.add(new_area)
-
-        # Audit new area
-        new_log = AuditLog(
-            EmployeeID = admin_user.employeeID,
-            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW AREA {areaName}"
-        )
-        db.session.add(new_log)
-        db.session.commit()
-
-        return jsonify({'message' : 'Area created successfully!'}), 200
-
-
-    @app.route('/api/accreditation/create_subarea', methods=["POST"])
-    @jwt_required()
-    def create_sub_area():
-        current_user_id = get_jwt_identity()
-        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
-        if not admin_user or not admin_user.isAdmin:
-            return jsonify({'success': False, 'message': 'Admins only'}), 403
-        data = request.form
-        areaID = data.get("selectedAreaID")
-        subareaName = data.get("subAreaName")
-
-        area = Area.query.get(areaID)
-        # Check if the area exists
-        if not area:
-            return jsonify({'error': 'Area not found'}), 404
-
-
-        new_subArea = Subarea(subareaName = subareaName)
-        area.subareas.append(new_subArea)
-        db.session.add(new_subArea)
-
-        # Audit new subarea
-        new_log = AuditLog(
-            employeeID = admin_user.employeeID,
-            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW SUBAREA {subareaName}"
-        )
-        db.session.add(new_log)
-        db.session.commit()
-
-        return jsonify({'message': 'Sub-Area created successfully!'}), 200
-
-        
-    @app.route('/api/accreditation/create_criteria', methods=["POST"])
-    @jwt_required()
-    def create_criteria():
-        current_user_id = get_jwt_identity()
-        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
-        if not admin_user or not admin_user.isAdmin:
-            return jsonify({'success': False, 'message': 'Admins only'}), 403
-        data = request.form
-        subareaID = data.get("selectedSubAreaID")
-        criteriaContent = data.get("criteria")
-        criteriaType = data.get("criteriaType")
-
-        subarea = Subarea.query.get(subareaID)
-
-        if not subarea:
-            return jsonify({'error': 'Subarea not found'}), 404
-        
-        new_criteria = Criteria(
-            subareaID = subareaID,
-            criteriaContent = criteriaContent,
-            criteriaType = criteriaType
-        )
-        subarea.criteria.append(new_criteria)
-        db.session.add(new_criteria)
-
-        # Audit new criteria
-        new_log = AuditLog(
-            employeeID = admin_user.employeeID,
-            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW CRITERIA {criteriaType} IN {subarea.subareaName}"
-        )
-        db.session.add(new_log)
-        db.session.commit()
-
-        return jsonify({'message': 'Criteria created successfully!'}), 200
+    
     
     # ===== Load Models for Document Processing =====
 
@@ -2666,9 +2677,10 @@ def register_routes(app):
         for tag_list, in tags:
             if tag_list:
                 unique_tags.update(tag_list)
-                sorted_tags = sorted(unique_tags)
         
+        sorted_tags = sorted(unique_tags)
         return jsonify(sorted_tags), 200
+
 
     @app.route('/api/documents/filter', methods=["GET"])
     def filter_by_tags():
@@ -3220,15 +3232,201 @@ def register_routes(app):
 
         socketio.emit('conversation_deleted', {'conversationID': conversation_id}, room=f'conversation:{conversation_id}')
         return jsonify({'success': True}), 200
+
+    
+    
+    # ================ Create Routes ================
+
+    @app.route('/api/accreditation/create_area', methods=["POST"])
+    @jwt_required()
+    def create_area():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
+        data = request.form
+        programID = data.get("programID")
+        areaNum = data.get("areaNum")
+        areaName = data.get("areaName")
+
+    # create new area
+
+        new_area = Area(
+            programID = programID,
+            areaName = areaName,
+            areaNum = areaNum
+        )
+        db.session.add(new_area)
+
+        # Audit new area
+        new_log = AuditLog(
+            employeeID = admin_user.employeeID,
+            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW AREA {areaName}"
+        )
+        db.session.add(new_log)
+        db.session.commit()
+
+        return jsonify({'message' : 'Area created successfully!'}), 200
+
+
+    @app.route('/api/accreditation/create_subarea', methods=["POST"])
+    @jwt_required()
+    def create_sub_area():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
+        data = request.form
+        areaID = data.get("selectedAreaID")
+        subareaName = data.get("subAreaName")
+        area = Area.query.get(areaID)
+        # Check if the area exists
+        if not area:
+            return jsonify({'error': 'Area not found'}), 404
+
+        new_subArea = Subarea(subareaName = subareaName)
+        area.subareas.append(new_subArea)
+
+        db.session.add(new_subArea)
+
+        # Audit new subarea
+        new_log = AuditLog(
+            employeeID = admin_user.employeeID,
+            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW SUBAREA {subareaName}"
+        )
+        db.session.add(new_log)
+        db.session.commit()
+
+        return jsonify({'message': 'Sub-Area created successfully!'}), 200
+        
+    @app.route('/api/accreditation/create_criteria', methods=["POST"])
+    @jwt_required()
+    def create_criteria():
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
+        data = request.form
+        subareaID = data.get("selectedSubAreaID")
+        criteriaContent = data.get("criteria")
+        criteriaType = data.get("criteriaType")
+        subarea = Subarea.query.get(subareaID)
+        if not subarea:
+            return jsonify({'error': 'Subarea not found'}), 404
+        
+        new_criteria = Criteria(
+            subareaID = subareaID,
+            criteriaContent = criteriaContent,
+            criteriaType = criteriaType
+        )
+
+        subarea.criteria.append(new_criteria)
+
+        db.session.add(new_criteria)
+
+        # Audit new criteria
+        new_log = AuditLog(
+            employeeID = admin_user.employeeID,
+            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW CRITERIA {criteriaType} IN {subarea.subareaName}"
+        )
+        db.session.add(new_log)
+        db.session.commit()
+
+        return jsonify({'message': 'Criteria created successfully!'}), 200
+    # ================ Update Routes ================
+    # Update area
+    @app.route('/api/areas/<int:areaID>/edit', methods=["PUT"])
+    @jwt_required()
+    def update_area(areaID):
+        data = request.get_json()
+        try:
+            area = Area.query.get(areaID)
+            if not area:
+                return jsonify({'success': False, 'message': 'Area not found.'}), 404
+            area.areaName = data.get("areaName")
+            area.areaNum = data.get("areaNum")
+            db.session.commit()
+            return jsonify({"success": True, "message": "Area updated"})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"success": False, "message": f"Failed to update: {str(e)}"}), 500
+        
+    # Update subarea   
+    @app.route('/api/subareas/<int:subareaID>/edit', methods=["PUT"])
+    @jwt_required()
+    def update_subarea(subareaID):
+        data = request.get_json()
+        try:
+            subarea = Subarea.query.get(subareaID)
+            if not subarea:
+                return jsonify({'success': False, 'message': 'Subarea not found.'}), 404
+            subarea.subareaName = data.get("subareaName")            
+            db.session.commit()
+            return jsonify({"success": True, "message": "Subarea updated"})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"success": False, "message": f"Failed to update: {str(e)}"}), 500
+   # Update criteria 
+    @app.route('/api/criterias/<int:criteriaID>/edit', methods=["PUT"])
+    @jwt_required()
+    def update_criteria(criteriaID):
+        data = request.get_json()
+        try:
+            criteria = Criteria.query.get(criteriaID)
+            if not criteria:
+                return jsonify({'success': False, 'message': 'Criteria not found.'}), 404
+            criteria.criteriaContent = data.get("criteriaContent")            
+            db.session.commit()
+            return jsonify({"success": True, "message": "Criteria updated"})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"success": False, "message": f"Failed to update: {str(e)}"}), 500
+          
+    # ================ Delete Routes ================
+    # Delete Area
+    @app.route('/api/areas/<int:areaID>/delete', methods=["DELETE"])
+    @jwt_required()
+    def delete_area(areaID):        
+        area = Area.query.get(areaID)
+        if not area:
+            return jsonify({"success": False, "message": "Area not found"}), 404    
+    
+        db.session.delete(area)
+        db.session.commit()
+        return jsonify({"success": True, "message": "Area Deleted"})
+    
+    # Delete Subarea
+    @app.route('/api/subareas/<int:subareaID>/delete', methods=["DELETE"])
+    @jwt_required()
+    def delete_subarea(subareaID):
+        subarea = Subarea.query.get(subareaID)
+        if not subarea:
+            return jsonify({"success": False, "message": "Subarea not found"}), 404    
+    
+        db.session.delete(subarea)
+        db.session.commit()
+        return jsonify({"success": True, "message": "Subarea Deleted"})
+    
+    # Delete Criteria
+    @app.route('/api/criterias/<int:criteriaID>/delete', methods=["DELETE"])
+    @jwt_required()
+    def delete_criteria(criteriaID):        
+        criteria = Criteria.query.get(criteriaID)
+        if not criteria:
+            return jsonify({"success": False, "message": "Criteri not found"}), 404    
+    
+        db.session.delete(criteria)
+        db.session.commit()
+        return jsonify({"success": True, "message": "Criteria Deleted"})
            
 
     
+    
     # ============================================ Template Routes ============================================
-
 
     @app.route('/api/templates', methods=["GET"])
     @jwt_required()
-    def get_templates():            
+    def get_templates():
         data = (
             db.session.query(
                 Template.templateID,
@@ -3236,11 +3434,11 @@ def register_routes(app):
                 Template.description,
                 Template.createdBy,
                 Template.createdAt,
-                Template.isArchived,
+                Template.isApplied,
                 Employee.employeeID,
                 Employee.fName,
                 Employee.lName,
-                Employee.suffix,                
+                Employee.suffix,
                 AreaBlueprint.areaBlueprintID,
                 AreaBlueprint.areaName,
                 AreaBlueprint.areaNum,
@@ -3249,72 +3447,117 @@ def register_routes(app):
                 CriteriaBlueprint.criteriaBlueprintID,
                 CriteriaBlueprint.criteriaContent,
                 CriteriaBlueprint.criteriaType,
+                Program.programID,
+                Program.programName,
+                Program.programCode
             )
             .outerjoin(Employee, Template.createdBy == Employee.employeeID)
             .outerjoin(AreaBlueprint, AreaBlueprint.templateID == Template.templateID)
             .outerjoin(SubareaBlueprint, SubareaBlueprint.areaBlueprintID == AreaBlueprint.areaBlueprintID)
             .outerjoin(CriteriaBlueprint, CriteriaBlueprint.subareaBlueprintID == SubareaBlueprint.subareaBlueprintID)
-            .order_by(AreaBlueprint.areaBlueprintID.asc(), SubareaBlueprint.subareaBlueprintID.asc(), CriteriaBlueprint.criteriaBlueprintID.asc())
+            .outerjoin(Program, Program.templateID == Template.templateID)
+            .filter(Template.archived == False)
+            .order_by(
+                AreaBlueprint.areaBlueprintID.asc(),
+                SubareaBlueprint.subareaBlueprintID.asc(),
+                CriteriaBlueprint.criteriaBlueprintID.asc(),
+            )
             .all()
         )
 
-
-        
         template_dict = {}
-        
 
         for row in data:
             if row.templateID not in template_dict:
-                template_dict[row.templateID]= {
-                    'templateID': row.templateID,
-                    'templateName': row.templateName,
-                    'description': row.description,
-                    'createdBy': f"{row.fName} {row.lName}{row.suffix or ''}",
-                    'createdAt': row.createdAt,
-                    'isArchived': row.isArchived,
-                    'areas': {}
+                template_dict[row.templateID] = {
+                    "templateID": row.templateID,
+                    "templateName": row.templateName,
+                    "description": row.description,
+                    "createdBy": f"{row.fName} {row.lName}{row.suffix or ''}",
+                    "createdAt": row.createdAt,
+                    "isApplied": "Applied" if row.isApplied == True else "Inactive",                                          
+                    "areas": {},
+                    "programs": []
                 }
 
             template = template_dict[row.templateID]
 
+            # --- Programs ---
+            if row.programID and not any(p["programID"] == row.programID for p in template["programs"]):
+                template["programs"].append({
+                    "programID": row.programID,
+                    "programName": row.programName,
+                    "programCode": row.programCode
+                })
+
+            # --- Areas ---
             if row.areaBlueprintID and row.areaBlueprintID not in template["areas"]:
                 template["areas"][row.areaBlueprintID] = {
                     "areaID": row.areaBlueprintID,
                     "areaName": row.areaName,
                     "areaNum": row.areaNum,
-                    "subareas": {}
-                }    
-            if row.areaBlueprintID:
-                area = template["areas"][row.areaBlueprintID]
+                    "subareas": {},
+                }
 
-                if row.subareaBlueprintID and row.subareaBlueprintID not in area["subareas"]:
-                    area["subareas"][row.subareaBlueprintID] = {
-                        "subareaID": row.subareaBlueprintID,
-                        "subareaName": row.subareaName,
-                        "criteria": []
-                    }
+            area = template["areas"].get(row.areaBlueprintID)
+            if not area:
+                continue
 
-                if row.subareaBlueprintID:
-                    subarea = area["subareas"][row.subareaBlueprintID]
+            # --- Subareas ---
+            if row.subareaBlueprintID and row.subareaBlueprintID not in area["subareas"]:
+                area["subareas"][row.subareaBlueprintID] = {
+                    "subareaID": row.subareaBlueprintID,
+                    "subareaName": row.subareaName,
+                    "criteria": {
+                        "inputs": [],
+                        "processes": [],
+                        "outcomes": [],
+                    },
+                }
 
-                    if row.criteriaBlueprintID:
-                        subarea["criteria"].append({
-                            "criteriaID": row.criteriaBlueprintID,
-                            "criteriaContent": row.criteriaContent,
-                            "criteriaType": row.criteriaType                        
-                        })
+            subarea = area["subareas"].get(row.subareaBlueprintID)
+            if not subarea:
+                continue
 
+            # --- Group criteria ---
+            if row.criteriaBlueprintID and row.criteriaType:
+                crit_type = row.criteriaType.lower()
+                if "input" in crit_type:
+                    subarea["criteria"]["inputs"].append({
+                        "criteriaID": row.criteriaBlueprintID,
+                        "criteriaContent": row.criteriaContent,
+                        "criteriaType": row.criteriaType,
+                    })
+                elif "process" in crit_type:
+                    subarea["criteria"]["processes"].append({
+                        "criteriaID": row.criteriaBlueprintID,
+                        "criteriaContent": row.criteriaContent,
+                        "criteriaType": row.criteriaType,
+                    })
+                elif "outcome" in crit_type:
+                    subarea["criteria"]["outcomes"].append({
+                        "criteriaID": row.criteriaBlueprintID,
+                        "criteriaContent": row.criteriaContent,
+                        "criteriaType": row.criteriaType,
+                    })
+                else:
+                    # fallback for undefined types
+                    subarea["criteria"]["inputs"].append({
+                        "criteriaID": row.criteriaBlueprintID,
+                        "criteriaContent": row.criteriaContent,
+                        "criteriaType": row.criteriaType,
+                    })
 
+        # --- Convert nested dicts to lists ---
         template_list = []
-
         for temp in template_dict.values():
             temp["areas"] = list(temp["areas"].values())
             for area in temp["areas"]:
                 area["subareas"] = list(area["subareas"].values())
             template_list.append(temp)
-        
 
-        return jsonify(template_list),200
+        return jsonify(template_list), 200
+
 
 
     @app.route('/api/templates/create', methods=["POST"])
@@ -3338,7 +3581,7 @@ def register_routes(app):
                 description=description,
                 createdBy=createdBy,
                 createdAt=datetime.utcnow(),
-                isArchived=False
+                isApplied=False
             )   
 
             db.session.add(new_template)
@@ -3409,7 +3652,8 @@ def register_routes(app):
                     "description": new_template.description,
                     "createdBy": new_template.createdBy,
                     "createdAt": new_template.createdAt,
-                    "areas": created_areas
+                    "areas": created_areas,
+                    "isApplied": new_template.isApplied
                 }
             }), 201
         
@@ -3421,75 +3665,265 @@ def register_routes(app):
             return jsonify({"success": False, "message": f"Failed to save template: {str(e)}"}), 500
 
 
-    @app.route('/api/programs/<int:programID>/apply-template/<int:templateID>', methods=["POST"])
+    @app.route('/api/programs/apply-template/<int:templateID>', methods=["POST"])
     @jwt_required()
-    def apply_template(programID, templateID):
+    def apply_template(templateID): 
         try:
-            # Archive existing areas
-            active_areas = Area.query.filter_by(programID=programID, archived=False).all()
-            for area in active_areas:
-                area.archived = True
-                for sub in area.subareas:
-                    sub.archived = True
-                    for crit in sub.criteria:
-                        crit.archived = True
+            data = request.get_json()
+            programIDs = data.get("programIDs", [])
+            
+            if not programIDs:
+                return jsonify({"success": False, "message": "No programs selected"}), 400
 
-            # Get template
+            # Get the template
             template = Template.query.filter_by(templateID=templateID).first()
             if not template:
                 return jsonify({"success": False, "message": "Template not found"}), 404
 
-            # Create applied template record
-            applied_template = AppliedTemplate(
-                programID=programID,
-                templateID=template.templateID,
-                templateName=template.templateName,
-                description=template.description,
-                appliedBy=get_jwt_identity()
-            )
-            db.session.add(applied_template)
-            db.session.flush()
+            for programID in programIDs:
+                # === Archive existing areas ===
+                active_areas = Area.query.filter_by(programID=programID, archived=False).all()
+                for area in active_areas:
+                    area.archived = True
+                    for sub in area.subareas:
+                        sub.archived = True
+                        for crit in sub.criteria:
+                            crit.archived = True
 
-            # Copy areas from blueprint
-            area_blueprints = AreaBlueprint.query.filter_by(templateID=templateID).all()
-            for ab in area_blueprints:
-                area = Area(
-                    appliedTemplateID=applied_template.appliedTemplateID,
+                # === Create Applied Template for this program ===
+                applied_template = AppliedTemplate(
                     programID=programID,
-                    areaName=ab.areaName,
-                    areaNum=ab.areaNum,
-                    archived=False
+                    templateID=template.templateID,
+                    templateName=template.templateName,
+                    description=template.description,
+                    appliedBy=get_jwt_identity()
                 )
-                db.session.add(area)
+                db.session.add(applied_template)
                 db.session.flush()
 
-                # Copy subareas from blueprint
-                subarea_blueprints = SubareaBlueprint.query.filter_by(areaBlueprintID=ab.areaBlueprintID).all()
-                for sb in subarea_blueprints:
-                    subarea = Subarea(
-                        areaID=area.areaID,
-                        subareaName=sb.subareaName,
+                # === Copy Areas, Subareas, Criteria ===
+                area_blueprints = AreaBlueprint.query.filter_by(templateID=templateID).all()
+                for ab in area_blueprints:
+                    area = Area(
+                        appliedTemplateID=applied_template.appliedTemplateID,
+                        programID=programID,
+                        # Remove this if your model doesn’t have this column
+                        areaBlueprintID=ab.areaBlueprintID,
+                        areaName=ab.areaName,
+                        areaNum=ab.areaNum,
                         archived=False
                     )
-                    db.session.add(subarea)
+                    db.session.add(area)
                     db.session.flush()
 
-                    # Copy criteria from blueprint (make sure FK matches your model)
-                    criteria_blueprints = CriteriaBlueprint.query.filter_by(subareaBlueprintID=sb.subareaBlueprintID).all()
-                    for cb in criteria_blueprints:
-                        criteria = Criteria(
-                            subareaID=subarea.subareaID,
-                            criteriaContent=cb.criteriaContent,
-                            criteriaType=cb.criteriaType,
+                    subarea_blueprints = SubareaBlueprint.query.filter_by(areaBlueprintID=ab.areaBlueprintID).all()
+                    for sb in subarea_blueprints:
+                        subarea = Subarea(
+                            areaID=area.areaID,
+                            # Remove this if your model doesn’t have this column
+                            subareaBlueprintID=sb.subareaBlueprintID,
+                            subareaName=sb.subareaName,
                             archived=False
                         )
-                        db.session.add(criteria)
+                        db.session.add(subarea)
+                        db.session.flush()
+
+                        criteria_blueprints = CriteriaBlueprint.query.filter_by(subareaBlueprintID=sb.subareaBlueprintID).all()
+                        for cb in criteria_blueprints:
+                            criteria = Criteria(
+                                subareaID=subarea.subareaID,
+                                # Remove this if your model doesn’t have this column
+                                criteriaBlueprintID=cb.criteriaBlueprintID,
+                                criteriaContent=cb.criteriaContent,
+                                criteriaType=cb.criteriaType,
+                                archived=False
+                            )
+                            db.session.add(criteria)
+
+                # Link program to template (corrected)
+                program = Program.query.get(programID)
+                if program:
+                    program.templateID = template.templateID
+
+            # Mark template as applied
+            template.isApplied = True
 
             db.session.commit()
-            return jsonify({'success': True, 'message': 'Template applied successfully!'}), 201
+            return jsonify({'success': True, 'message': 'Template applied to all selected programs successfully!'}), 201
 
         except Exception as e:
             db.session.rollback()
-            return jsonify({'success': False, 'message': f"Failed to apply template {str(e)}"}), 500
+            return jsonify({'success': False, 'message': f"Failed to apply template: {str(e)}"}), 500
+
+    
+
+    @app.route("/api/templates/edit/<int:templateID>", methods=["PUT"])
+    def edit_template(templateID):
+        data = request.get_json()
+
+        try:
+            template = Template.query.get(templateID)
+            if not template:
+                return jsonify({"message": "Template not found"}), 404
+
+            # ===== Update Template Info =====
+            template.templateName = data.get("templateName", template.templateName)
+            template.description = data.get("description", template.description)
+
+            # ===== Track Existing Areas =====
+            existing_area_bps = {
+                a.areaBlueprintID: a for a in AreaBlueprint.query.filter_by(templateID=templateID).all()
+            }
+            incoming_area_ids = {
+                a.get("areaBlueprintID") for a in data.get("areas", []) if a.get("areaBlueprintID")
+            }
+
+            # ===== Delete Removed Areas =====
+            for abp_id, abp in existing_area_bps.items():
+                if abp_id not in incoming_area_ids:
+                    # 🔹 Unlink all related records before delete
+                    Area.query.filter_by(areaBlueprintID=abp_id).update({"areaBlueprintID": None})
+                    SubareaBlueprint.query.filter_by(areaBlueprintID=abp_id).update({"areaBlueprintID": None})
+                    db.session.delete(abp)
+
+            # ===== Update/Add Areas =====
+            for area_data in data.get("areas", []):
+                area_bp = existing_area_bps.get(area_data.get("areaBlueprintID")) if area_data.get("areaBlueprintID") else None
+
+                if area_bp:
+                    # Update existing
+                    area_bp.areaName = area_data.get("areaName", area_bp.areaName)
+                    area_bp.areaNum = area_data.get("areaNum", area_bp.areaNum)
+                else:
+                    # Create new
+                    area_bp = AreaBlueprint(
+                        templateID=templateID,
+                        areaName=area_data.get("areaName"),
+                        areaNum=area_data.get("areaNum")
+                    )
+                    db.session.add(area_bp)
+                    db.session.flush()
+
+                # ===== Handle Subareas =====
+                existing_sub_bps = {
+                    s.subareaBlueprintID: s for s in SubareaBlueprint.query.filter_by(areaBlueprintID=area_bp.areaBlueprintID).all()
+                }
+                incoming_sub_ids = {
+                    s.get("subareaBlueprintID") for s in area_data.get("subareas", []) if s.get("subareaBlueprintID")
+                }
+
+                # Delete removed subareas
+                for sb_id, sb in existing_sub_bps.items():
+                    if sb_id not in incoming_sub_ids:
+                        Subarea.query.filter_by(subareaBlueprintID=sb_id).update({"subareaBlueprintID": None})
+                        db.session.delete(sb)
+
+                # Update/add subareas
+                for sub_data in area_data.get("subareas", []):
+                    sub_bp = existing_sub_bps.get(sub_data.get("subareaBlueprintID"))
+
+                    if sub_bp:
+                        sub_bp.subareaName = sub_data.get("subareaName", sub_bp.subareaName)
+                    else:
+                        sub_bp = SubareaBlueprint(
+                            areaBlueprintID=area_bp.areaBlueprintID,
+                            subareaName=sub_data.get("subareaName")
+                        )
+                        db.session.add(sub_bp)
+                        db.session.flush()
+
+                    # ===== Handle Criteria =====
+                    existing_crit_bps = {
+                        c.criteriaBlueprintID: c for c in CriteriaBlueprint.query.filter_by(subareaBlueprintID=sub_bp.subareaBlueprintID).all()
+                    }
+                    incoming_crit_ids = {
+                        c.get("criteriaBlueprintID") for c in sub_data.get("criteria", []) if c.get("criteriaBlueprintID")
+                    }
+
+                    # Delete removed criteria
+                    for cb_id, cb in existing_crit_bps.items():
+                        if cb_id not in incoming_crit_ids:
+                            Criteria.query.filter_by(criteriaBlueprintID=cb_id).update({"criteriaBlueprintID": None})
+                            db.session.delete(cb)
+
+                    # Add/update criteria
+                    for crit in sub_data.get("criteria", []):
+                        c_bp = existing_crit_bps.get(crit.get("criteriaBlueprintID"))
+                        if c_bp:
+                            c_bp.criteriaContent = crit.get("criteriaContent", c_bp.criteriaContent)
+                            c_bp.criteriaType = crit.get("criteriaType", c_bp.criteriaType)
+                        else:
+                            c_bp = CriteriaBlueprint(
+                                subareaBlueprintID=sub_bp.subareaBlueprintID,
+                                criteriaContent=crit.get("criteriaContent"),
+                                criteriaType=crit.get("criteriaType")
+                            )
+                            db.session.add(c_bp)
+
+            # Commit template + blueprints first
+            db.session.commit()
+
+            # ===== Apply updates to all programs using this template =====
+            programs = Program.query.filter_by(templateID=templateID).all()
+            for program in programs:
+                applied_template = AppliedTemplate.query.filter_by(programID=program.programID).first()
+                if not applied_template:
+                    applied_template = AppliedTemplate(programID=program.programID, templateID=templateID)
+                    db.session.add(applied_template)
+                    db.session.flush()
+
+                reapply_template(templateID, applied_template)
+
+            return jsonify({"success": True, "message": "Template and all linked programs updated successfully"}), 200
+
+        except Exception as e:
+            db.session.rollback()
+            print("❌ Template update error:", e)
+            return jsonify({"error": f"Failed to update template: {str(e)}"}), 500
+
+
+
+    @app.route('/api/templates/delete/<int:templateID>', methods=["DELETE"])
+    def delete_template(templateID):
+        try:
+            template = Template.query.filter_by(templateID=templateID).first()
+            if not template:
+                return jsonify({"success": False, "message": "Template not found"}), 404
+            
+            # ================ Delete Blueprint Data ================
+
+            criteriaBP = (CriteriaBlueprint.query
+                            .join(SubareaBlueprint)  
+                            .join(AreaBlueprint)
+                            .filter(AreaBlueprint.templateID == templateID)
+                        ).all()
+            
+            for crit in criteriaBP:
+                db.session.delete(crit)
+
+            subareaBP = (SubareaBlueprint.query
+                            .join(AreaBlueprint)
+                            .filter(AreaBlueprint.templateID == templateID)
+                        ).all()
+            
+            for sub in subareaBP:
+                db.session.delete(sub)
+
+            areaBP = AreaBlueprint.filter_by(templateID=templateID).all()
+            
+            for area in areaBP:
+                db.session.delete(area)
+
+            # ================ Delete AppliedTemplate record ================
+
+            applied_template = AppliedTemplate.query.filter_by(templateID=templateID).all()
+            for template in applied_template:
+                db.session.delete(template)
+
+            return jsonify({"success": True, "message": "Template deleted successfully"}), 200
+
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': f'Failed to delete template {str(e)}'}), 400
 
 

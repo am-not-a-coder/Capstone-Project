@@ -14,7 +14,8 @@ import Profile from './pages/Profile';
 import Notification from './pages/Notification';
 import Messages from './pages/Messages';
 import AreaProgress from './pages/AreaProgress';
-import { fetchCurrentUser, getCurrentUser } from './utils/auth_utils';
+import Templates from './pages/Templates';
+import { fetchCurrentUser } from './utils/auth_utils';
 import { useEffect, useRef, useState } from 'react';
 import { logoutAcc, adminHelper } from './utils/auth_utils';
 import { apiPost } from './utils/api_utils';
@@ -360,11 +361,16 @@ const PublicOnlyRoute = ({ children }) => {
               <Users isAdmin={isAdmin}/>
             </AdminRoute>
             } />
+          <Route path="/Templates" element={
+            <AdminRoute>
+              <Templates isAdmin={isAdmin}/>
+            </AdminRoute>
+            } />
           <Route path="/Tasks" element={<Tasks />} />
           <Route path="/Progress" element={<AreaProgress />} />
           <Route path="/Documents" element={<Documents />} />
 
-          {/* Profile page */}
+        {/* Profile page */}
          <Route path='/Profile' element={<Profile />}/>
          <Route path='/Notification' element={<Notification />}/>
          <Route path='/Messages' element={<Messages />} />

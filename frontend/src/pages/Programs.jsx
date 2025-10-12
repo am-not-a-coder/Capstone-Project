@@ -4,7 +4,8 @@ import {
   faCircleXmark,
   faPlus,
   faPen,
-  faFolderOpen
+  faFolderOpen,
+  faBoxArchive
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import ProgramCard from "../components/ProgramCard";
@@ -12,7 +13,6 @@ import CreateCard from "../components/CreateCard";
 import CreateForm from "../components/CreateForm";
 import { useState, useEffect, useCallback } from "react";
 import { apiGet, apiGetBlob, apiPut, apiPost, apiDelete } from '../utils/api_utils';
-import { getCurrentUser } from '../utils/auth_utils';
 import AreaCont from "../components/AreaCont";
 import SubCont from "../components/SubCont";
 import CreateModal from '../components/modals/CreateModal';
@@ -24,8 +24,8 @@ import { adminHelper } from '../utils/auth_utils';
 import { CardSkeleton } from '../components/Skeletons';
 import StatusModal from "../components/modals/StatusModal";
 import { ApplyTempModal } from '../components/modals/TemplateModal';
-import TemplateBuilder from '../components/TemplateBuilder';
 import toast, { Toaster } from 'react-hot-toast'
+import ArchiveModal from '../components/modals/ArchiveModal';
 
   const Programs = () => {
     //admin
@@ -43,6 +43,7 @@ import toast, { Toaster } from 'react-hot-toast'
   const [activeModify, setActiveModify] = useState(null);
   const [editIndex, setEditIndex] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
     
   const [expandedAreaIndex, setExpandedAreaIndex] = useState(null);
   const [showWord, setShowWord] = useState(false);
@@ -201,6 +202,48 @@ import toast, { Toaster } from 'react-hot-toast'
         console.error('Error refreshing areas:', err);
       }
     }
+
+    // Sample archived data structure
+  const archivedData = [
+    {
+      areaID: 'area1',
+      title: 'Area I: Governance and Administration',
+      subareas: [
+        {
+          subareaID: 'sub1',
+          title: 'A. Administrative Organization',
+          criteria: {
+            inputs: [
+              { criteriaID: '978', content: 'The institution has a clear organizational structure', docName: 'org-chart.pdf' },
+              { criteriaID: '979', content: 'Administrative policies are documented and accessible' }
+            ],
+            processes: [
+              { criteriaID: '980', content: 'Regular administrative meetings are conducted' }
+            ],
+            outcomes: [
+              { criteriaID: '981', content: 'Efficient decision-making processes' }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      areaID: 'area2',
+      title: 'Area II: Faculty',
+      subareas: [
+        {
+          subareaID: 'sub2',
+          title: 'A. Faculty Qualifications',
+          criteria: {
+            inputs: [],
+            processes: [],
+            outcomes: []
+          }
+        }
+      ]
+    }
+  ];
+
     
 
     //  ============================================ Program Create, Edit, Delete ============================================
@@ -362,34 +405,34 @@ import toast, { Toaster } from 'react-hot-toast'
         setEditIndex(null);
         setForm({ code: "", name: "", color: "", programDean: "" });
       }
-    }
+    };
 
     function handleEditSelect(e) {
       const idx = e.target.value;
       setEditIndex(idx);
       const prog = programs[idx];
       setForm({ ...prog });
-    }
+    };
 
     function handleDeleteSelect(e) {
       setEditIndex(e.target.value);
-    }
-
-  function handleDelete(e) {
-      handleDeleteProgram(e);
-  };
-
-  const handleSubmit = (e) => {
-      e.preventDefault();
-
-        if (activeModify === "edit" && editIndex !== null) {
-          // Edit mode
-          handleEditProgram(e);
-        } else {
-          // Add mode
-          handleCreateProgram(e);
-        }
     };
+
+    function handleDelete(e) {
+        handleDeleteProgram(e);
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+
+          if (activeModify === "edit" && editIndex !== null) {
+            // Edit mode
+            handleEditProgram(e);
+          } else {
+            // Add mode
+            handleCreateProgram(e);
+          }
+      };
 
     // form state
     const [form, setForm] = useState({
@@ -408,46 +451,8 @@ import toast, { Toaster } from 'react-hot-toast'
     }));
   }, []);
 
-  //  ============================================ Template Functions ============================================
-
-  const [loading, setLoading] = useState(false);
-
-
-  const handleApplyTemplate = async (programID, templateID) => {
-    setLoading(true);
-    try{
-      const res = await apiPost(`/api/programs/${programID}/apply-template/${templateID}`)
-      if (res.success){
-        setLoading(false);
-        await refreshAreas(selectedProgram.programCode);
-        setShowStatusModal(true)
-        setStatusType("success");
-        setStatusMessage("Template applied successfully!");
-        setVisible("areas");
-        setShowApplyTempModal(false);
-      } else {
-        throw new Error(res.message || "Failed to apply template")
-      }
-    } catch(err){
-      setShowStatusModal(true)
-      setStatusType("error");
-      setStatusMessage("Failed to apply template");
-    } finally{
-      setLoading(false);
-    }
-  }
-
-  const handleClose = () => {
-    setVisible("templates")  
-  }
-
-  const handleCreateClick = () => {
-    setShowApplyTempModal(false)  
-    setVisible("canvas")
-  };
-
-
   //  ============================================ Document Uploading, etc. ============================================
+
   const [visible, setVisible] = useState("programs");
   const [selectedProgram, setSelectedProgram] = useState(null);
   const [selectedArea, setSelectedArea] = useState(null);
@@ -466,7 +471,7 @@ import toast, { Toaster } from 'react-hot-toast'
 
   // Function to set the visible area to "areas" and set the selected program
   const visibleArea = (program) => {
-    setVisible(editMode ? "templates" : "areas");
+    setVisible("areas");
     setSelectedProgram(program);
     fetchAreasForProgram(program.programCode);      
 
@@ -699,7 +704,7 @@ import toast, { Toaster } from 'react-hot-toast'
 
           {showApplyTempModal && (
             <ApplyTempModal
-              loading={loading}
+              loading={isLoading}
               createTemp={handleCreateClick}
               onClick={() => setShowApplyTempModal(false)} 
               programCode={selectedProgram.programCode}              
@@ -714,7 +719,7 @@ import toast, { Toaster } from 'react-hot-toast'
               <div className="relative flex flex-col w-full pt-2">
 
                 {/* Navigation route */}
-                <div className='flex flex-row gap-3 mb-5'>             
+                <div className='flex flex-row gap-3 mb-5'>      
                   <FontAwesomeIcon icon={faHouse}
                   onClick={() => {backToPrograms()}}
                   className={`${visible === "programs" 
@@ -804,33 +809,45 @@ import toast, { Toaster } from 'react-hot-toast'
                   </nav>
                 </div>
 
-                 {isAdmin && visible !== "templates" && (
-                  <button
-                    title='Edit'               
-                    onClick={() => setEditMode(prev => !prev)}
-                    className={`${editMode 
-                    ?   'text-gray-500 inset-shadow-sm inset-shadow-gray-400 bg-zuccini-300 dark:inset-shadow-gray-900 dark:text-gray-700 dark:bg-zuccini-500' 
-                    :'cursor-pointer text-gray-500 bg-gray-200 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 shadow-md dark:inset-shadow-sm dark:inset-shadow-gray-400 dark:bg-gray-950/50'
-                } p-3 px-4 text-xl transition-all duration-200 border border-neutral-300 rounded-xl dark:border-neutral-500 cursor-pointer`}
-              >                
-
-                <FontAwesomeIcon icon={faPen} className="z-10" />
-              </button>
-                  )}
-
+                 
+                {/* Edit, Archive and Create Button */}
                 {isAdmin && visible === "areas" && (
-                  <button onMouseEnter={() => setShowWord(true)}
-                    onMouseLeave={() => setShowWord(false)}
-                    onClick={() => setShowCreateModal(true)}
-                    className={`p-3 px-4 text-xl flex items-center transition-all duration-300 cursor-pointer rounded-xl text-gray-500 bg-gray-200 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 shadow-md border-neutral-700 dark:border-neutral-500 dark:text-gray-200 dark:inset-shadow-sm dark:inset-shadow-gray-400  dark:bg-gray-950/50`}
-                    >
-                      
-                      <span
-                        className={`transition-all duration-500 overflow-hidden whitespace-nowrap ${ showWord ? "opacity-100 max-w-[200px] mr-2" : "opacity-0 max-w-0 mr-0"}`}
-                      >
-                        Create</span>
-                      <FontAwesomeIcon icon={faPlus} className='z-10'/>
-                  </button>)}
+                  <>                      
+                      {/* Edit Button */}
+                    <button
+                      title='Edit'               
+                      onClick={() => setEditMode(prev => !prev)}
+                      className={`${editMode 
+                      ?   'text-gray-500 inset-shadow-sm inset-shadow-gray-400 bg-zuccini-300 dark:inset-shadow-gray-900 dark:text-gray-700 dark:bg-zuccini-500' 
+                      :'cursor-pointer text-gray-500 bg-gray-200 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 shadow-md dark:inset-shadow-sm dark:inset-shadow-gray-400 dark:bg-gray-950/50'
+                  } p-3 px-4 text-xl transition-all duration-200 border border-neutral-300 rounded-xl dark:border-neutral-500 cursor-pointer`}
+                >                
+                      <FontAwesomeIcon icon={faPen} className="z-10" />
+                    </button>
+                  
+                  {/* Archive Button */}
+
+                  
+                    {/* <button
+                      title='Archived'                    
+                      onClick={() => setShowArchiveModal(true)}
+                      className={`p-3 px-4 text-xl flex items-center transition-all duration-300 cursor-pointer rounded-xl text-gray-500 bg-gray-200 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 shadow-md border-neutral-700 dark:border-neutral-500 dark:text-gray-200 dark:inset-shadow-sm dark:inset-shadow-gray-400  dark:bg-gray-950/50`}
+                      >                    
+                        <FontAwesomeIcon icon={faBoxArchive} className='z-10'/>
+                    </button> */}
+
+                    {/* Create Button */}
+
+                    <button
+                      title='Create'                    
+                      onClick={() => setShowCreateModal(true)}
+                      className={`p-3 px-4 text-xl flex items-center transition-all duration-300 cursor-pointer rounded-xl text-gray-500 bg-gray-200 hover:text-zuccini-500 dark:hover:text-zuccini-500/70 shadow-md border-neutral-700 dark:border-neutral-500 dark:text-gray-200 dark:inset-shadow-sm dark:inset-shadow-gray-400  dark:bg-gray-950/50`}
+                      >                    
+                        <FontAwesomeIcon icon={faPlus} className='z-10'/>
+                    </button>
+                  </>
+                )}
+                {/* Archive and Create Modals */}
                 {showCreateModal && (
                   <CreateModal 
                     onCreate={() => refreshAreas(selectedProgram.programCode)} 
@@ -838,6 +855,15 @@ import toast, { Toaster } from 'react-hot-toast'
                     onClick={() => setShowCreateModal(false)}
                   />
                 )}
+                {/* {showArchiveModal && (
+                       <ArchiveModal
+                        showModal={() => setShowArchiveModal(true)}
+                        onClose={() => setShowArchiveModal(false)}
+                        archivedData={archivedData}
+                        onRestore={handleRestore}
+                        onPermanentDelete={handlePermanentDelete}
+                      />
+                )} */}
                 </div>
 
                 {/* Content Area */}
@@ -869,81 +895,7 @@ import toast, { Toaster } from 'react-hot-toast'
                     </>
                   )}
                   
-                        </div>
-                      {isAdmin && selectedProgram && visible === "templates" && (
-                       <div className={`${visible == "templates" ? 'block' : 'hidden'} flex flex-row flex-wrap gap-5`}>
-                          {/* Create new template */}
-                           <button
-                            onClick={() => setVisible("canvas")}
-                            className={` group relative flex flex-col items-center justify-center cursor-pointer h-full max-h-screen overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-100 shadow-sm transition-all duration-300 hover:shadow-xl hover:scale-105 hover:border-blue-400 hover:bg-blue-50 dark:bg-gray-800 dark:border-gray-600 dark:hover:border-blue-500 dark:hover:bg-gray-700 w-full max-w-[475px]`}>
-                            {/* Icon Section */}
-                            <div className="flex items-center justify-center w-16 h-16 mb-3 transition-colors duration-300 bg-gray-200 rounded-full group-hover:bg-blue-100 dark:bg-gray-700 dark:group-hover:bg-blue-900">
-                              <div 
-                                className="w-8 h-8 text-gray-500 transition-colors duration-300 group-hover:text-blue-600 dark:text-gray-400 dark:group-hover:text-blue-400"                                 
-                              >
-                                <FontAwesomeIcon icon={faPlus} className="text-3xl text-gray-600"/>
-                              </div>
-                            </div>
-
-                            {/* Text Content */}
-                            <div className="space-y-1 text-center">
-                              <h3 className="text-lg font-semibold text-gray-700 transition-colors duration-200 group-hover:text-blue-700 dark:text-gray-300 dark:group-hover:text-blue-300">
-                                Add New
-                              </h3>
-                              <p className="text-sm text-gray-500 dark:text-gray-400">
-                                Create a new template
-                              </p>
-                            </div>
-
-                            {/* Subtle animated background effect */}
-                            <div className="absolute inset-0 transition-opacity duration-300 opacity-0 pointer-events-none bg-gradient-to-br from-blue-500/5 to-purple-500/5 group-hover:opacity-100"></div>
-                            
-                            {/* Corner accent */}
-                            <div className="absolute w-2 h-2 transition-opacity duration-300 bg-blue-400 rounded-full opacity-0 top-3 right-3 group-hover:opacity-100"></div>
-                          </button>
-
-                          
-                          {/* Use Existing template*/}
-                           <button
-                           onClick={() => setShowApplyTempModal(true)}
-                            className={` group relative flex flex-col items-center justify-center cursor-pointer h-56 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-100 shadow-sm transition-all duration-300 hover:shadow-xl hover:scale-105 hover:border-blue-400 hover:bg-blue-50 dark:bg-gray-800 dark:border-gray-600 dark:hover:border-blue-500 dark:hover:bg-gray-700 w-full max-w-[475px]`}>
-                            {/* Icon Section */}
-                            <div className="flex items-center justify-center w-16 h-16 mb-3 transition-colors duration-300 bg-gray-200 rounded-full group-hover:bg-blue-100 dark:bg-gray-700 dark:group-hover:bg-blue-900">
-                              <div 
-                                className="w-8 h-8 text-gray-500 transition-colors duration-300 group-hover:text-blue-600 dark:text-gray-400 dark:group-hover:text-blue-400"                                 
-                              >
-                                <FontAwesomeIcon icon={faFolderOpen} className="text-3xl text-gray-600"/>
-                              </div>
-                            </div>
-
-                            {/* Text Content */}
-                            <div className="space-y-1 text-center">
-                              <h3 className="text-lg font-semibold text-gray-700 transition-colors duration-200 group-hover:text-blue-700 dark:text-gray-300 dark:group-hover:text-blue-300">
-                                Use Existing
-                              </h3>
-                              <p className="text-sm text-gray-500 dark:text-gray-400">
-                                Use and existing template
-                              </p>
-                            </div>
-
-                            {/* Subtle animated background effect */}
-                            <div className="absolute inset-0 transition-opacity duration-300 opacity-0 pointer-events-none bg-gradient-to-br from-blue-500/5 to-purple-500/5 group-hover:opacity-100"></div>
-                            
-                            {/* Corner accent */}
-                            <div className="absolute w-2 h-2 transition-opacity duration-300 bg-blue-400 rounded-full opacity-0 top-3 right-3 group-hover:opacity-100"></div>
-                          </button>
-
-                        </div>  
-                      )}
-
-                      
-                      {isAdmin && selectedProgram && visible === "canvas" && (
-                      
-                        <TemplateBuilder 
-                          onClose={handleClose}
-                          program={selectedProgram}                        
-                        />
-                      )}
+                        </div>                                                              
 
 
                       {/* Areas Section */}
