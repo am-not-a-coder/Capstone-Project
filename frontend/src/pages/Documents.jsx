@@ -128,9 +128,10 @@ const Documents = () => {
       try{
         const res = await apiGet('/api/documents/tags')
 
-        setTags(res.data)        
+        setTags(Array.isArray(res.data) ? res.data : [])        
       } catch (err) {
         console.error("Failed to fetch tags", err)
+        setTags([]);
       }
     } 
     fetchTags();
@@ -300,6 +301,7 @@ const Documents = () => {
       case 'jpg':      
       case 'jpeg':              
       case 'png':
+      case 'webp':
          return faFileImage;        
       case 'xlsx':         
       case 'xls':
@@ -549,7 +551,7 @@ useEffect(() => {
             <div className="flex flex-wrap items-center gap-3 mb-3">
               <p className="text-sm font-medium text-neutral-800 dark:text-white">Filter by:</p>
 
-              {activeTags.length > 0 && activeTags.map((tag, index) => (
+              {activeTags.length > 0 && activeTags?.map((tag, index) => (
                 <div
                   key={index}
                   className="inline-flex items-center px-4 py-1 text-sm text-gray-700 capitalize border rounded-full border-neutral-400 dark:text-white"
@@ -1253,7 +1255,7 @@ useEffect(() => {
                       {formatSize(selectedFile.size)}
                     </p>
                     <h2 className="text-lg font-medium">Modified:</h2>
-                    <p className="ml-3 mb-5 text-gray-600 text-md dark:text-gray-400">
+                    <p className="mb-5 ml-3 text-gray-600 text-md dark:text-gray-400">
                       {selectedFile.modified}
                     </p>
 
@@ -1285,7 +1287,7 @@ useEffect(() => {
                       {formatSize(getFolderSize(selectedFile))}
                     </p>
                     <h2 className="text-lg font-medium">Modified:</h2>
-                    <p className="ml-3 mb-5 text-gray-600 text-md dark:text-gray-400">
+                    <p className="mb-5 ml-3 text-gray-600 text-md dark:text-gray-400">
                       {selectedFile.meta.modified}
                     </p>  
                   </>
@@ -1302,11 +1304,11 @@ useEffect(() => {
                 )}
                 
                 {/* Show tags for filtered documents */}
-                {selectedFile.docTags && selectedFile.docTags.length > 0 && (
+                {selectedFile.docTag && selectedFile.docTag.length > 0 && (
                   <>
                     <h2 className="mb-2 text-lg font-medium">Tags:</h2>
                     <div className="flex flex-wrap gap-2 mb-5 ml-3">
-                      {selectedFile.docTags.map((tag, index) => (
+                      {selectedFile.docTag.map((tag, index) => (
                         <span
                           key={index}
                           className="px-2 py-1 text-xs text-gray-700 capitalize border rounded-full border-neutral-400 dark:text-white dark:border-gray-500"

@@ -248,7 +248,7 @@ def list_files_from_nextcloud():
         responses.append((relative_path, resp))  # map path → XML node
 
     root = {"files": [], "folders": {}}
-    file_ext = {"pdf", "docx", "xlsx", "txt", "pptx", "jpg", "png", "jpeg", "xls", "ppt", "csv"}
+    file_ext = {"pdf", "docx", "xlsx", "txt", "pptx", "jpg", "png", "jpeg", "xls", "ppt", "csv", "webp"}
 
     # Preload all docs from DB into a dict {path: Document}
     db_docs = {doc.docPath: doc for doc in Document.query.all()}

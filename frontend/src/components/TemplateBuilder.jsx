@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   faChevronDown,
   faChevronUp,
@@ -9,10 +9,11 @@ import {
   faSpinner
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { apiPost } from "../utils/api_utils";
+import { apiGet, apiPost, apiPut } from "../utils/api_utils";
+import Select from 'react-select';
+import StatusModal from "./modals/StatusModal";
 
-export default function TemplateBuilder({ program, onClose }) {
-
+export default function TemplateBuilder({onClose, template = null}) {  
 
   const [templateName, setTemplateName] = useState("");
   const [description, setDescription] = useState("");
@@ -24,10 +25,100 @@ export default function TemplateBuilder({ program, onClose }) {
   const [error, setError] = useState(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+  const [areaOption, setAreaOption] = useState([]);
+  
+  const [showConfirm, setShowConfirm] = useState(false)
   
   const [showStatusModal, setShowStatusModal] = useState(false); // shows the status modal
   const [statusMessage, setStatusMessage] = useState(null); // status message
   const [statusType, setStatusType] = useState("success"); // status type (success/error)
+
+  const isEditMode = !!template;
+
+  // Custom Styles for Selects
+  const customInputStyle = {
+    padding: "0.5rem 0.7rem",             
+    fontSize: "1.125rem",            
+    color: "#1f2937",                
+    backgroundColor: "#e5e7eb",      
+    border: "1px solid #9ca3af",     
+    borderRadius: "0.75rem",         
+    boxShadow: "inset 0 1px 2px rgba(156, 163, 175, 0.6)",
+    outline: "none",                 
+    transition: "box-shadow 0.2s, border-color 0.2s",
+  };
+
+  /* Focus styles (apply dynamically on focus) */
+  const focusedStyle = {
+    ...customInputStyle,
+    boxShadow: "inset 0 1px 2px rgba(156, 163, 175, 0.6), 0 0 0 2px rgba(59,130,246,0.5)", 
+  };
+
+  useEffect(() => {
+    if (template) {
+      setTemplateName(template.templateName || "");
+      setDescription(template.description || "");
+
+      console.log("Template data:", template); // Debug log
+
+      const mappedAreas = (template.areas || []).map(area => ({
+        areaID: area.areaID || area.areaBlueprintID, // keep DB ID for backend
+        areaName: area.areaName,
+        areaNum: area.areaNum,
+        subareas: (area.subareas || []).map(subarea => {
+          // Backend already sends criteria in the correct object format
+          const criteria = subarea.criteria || { inputs: [], processes: [], outcomes: [] };
+          
+          console.log("Subarea criteria:", subarea.subareaName, criteria); // Debug log
+          
+          return {
+            subareaID: subarea.subareaID || subarea.subareaBlueprintID, // keep DB ID
+            subareaName: subarea.subareaName,
+            criteria: {
+              inputs: (criteria.inputs || []).map(c => ({
+                criteriaID: c.criteriaID || c.criteriaBlueprintID, // keep DB ID
+                criteriaContent: c.criteriaContent,
+                criteriaType: c.criteriaType
+              })),
+              processes: (criteria.processes || []).map(c => ({
+                criteriaID: c.criteriaID || c.criteriaBlueprintID,
+                criteriaContent: c.criteriaContent,
+                criteriaType: c.criteriaType
+              })),
+              outcomes: (criteria.outcomes || []).map(c => ({
+                criteriaID: c.criteriaID || c.criteriaBlueprintID,
+                criteriaContent: c.criteriaContent,
+                criteriaType: c.criteriaType
+              })),
+            }
+          };
+        })
+      }));
+
+      console.log("Mapped areas:", mappedAreas); // Debug log
+      setAreas(mappedAreas);
+      setShowBuilder(true); // Auto-show builder when editing
+    }
+  }, [template]);
+
+
+
+  // Fetch areas for options
+  useEffect(() => {
+    const fetchAreaOption = async () => {
+      try{
+        const res = await apiGet(`/api/area/option`);
+
+        Array.isArray(res.data) ? setAreaOption(res.data) : setAreaOption([]);
+      } catch (err) {
+        console.error("Failed to fetch areas", err);
+      }
+    }
+    fetchAreaOption();
+  }, []);
+
+
+
 
 
   // Generates a temporary ID for the areas/subareas/criteria
@@ -214,62 +305,90 @@ export default function TemplateBuilder({ program, onClose }) {
     try {
       // Send entire template structure to backend in one call
       const data = {
-        programID: program.programID,
+        templateID: template?.templateID,        
         templateName,
         description,
         areas: areas.map(area => ({
+          areaID: area.areaID,
           areaName: area.areaName,
           areaNum: area.areaNum,
           subareas: area.subareas.map(subarea => ({
+            subareaID: subarea.subareaID,
             subareaName: subarea.subareaName,
             criteria: [
               ...subarea.criteria.inputs.map(c => ({
+                criteriaID: c.criteriaID, 
                 criteriaContent: c.criteriaContent,
                 criteriaType: "Inputs",
               })),
               ...subarea.criteria.processes.map(c => ({
+                criteriaID: c.criteriaID,
                 criteriaContent: c.criteriaContent,
                 criteriaType: "Processes",
               })),
               ...subarea.criteria.outcomes.map(c => ({
+                criteriaID: c.criteriaID,
                 criteriaContent: c.criteriaContent,
                 criteriaType: "Outcomes",
-              }))
+              })),
             ]
           }))
         }))
+
       };      
 
-      const res = await apiPost("/api/templates/create", data);
-      
-      if (res?.success || res?.data?.success) {
-        setShowStatusModal(true)
-        setStatusMessage(res.data.message)
-        setStatusType("success")
-        setHasUnsavedChanges(false);
-        onClose();
-      } else {
-        throw new Error(res?.message || res?.data?.message || "Failed to save template");
-      }
+      const endpoint = isEditMode 
+      ? `/api/templates/edit/${template.templateID}`
+      : "/api/templates/create"
+
+      const res = isEditMode ? await apiPut(endpoint, data) : await apiPost(endpoint, data);
+                
+        setShowStatusModal(true);
+        setStatusMessage(isEditMode ? "Template updated successfully!" : res.data.message);
+        setStatusType("success");
+        setHasUnsavedChanges(false);        
+     
     } catch (err) {
-      console.error("Failed to create template", err)
-      setStatusMessage("Failed to create template")
-      setShowStatusModal(true)
-      setStatusType("error")
+      console.error("Failed to create template", err);
+      setStatusMessage(
+        isEditMode ? "Failed to create template" : "Failed to update template"
+      );
+      setShowStatusModal(true);
+      setStatusType("error");
     } finally {
       setLoading(false);
     }
   };
 
+
+  const handleConfirm = () => {
+      setShowConfirm(true);
+      onClose();
+  };
+
   return (
     <>
+      {/* Status Modal */}
+      {showStatusModal && (
+          <StatusModal message={statusMessage} type={statusType} showModal={showStatusModal} onClick={onClose}  />
+      )}
+      {/* Error  */}
       {error && (
-        <div className="p-3 mb-4 text-red-700 bg-red-100 border border-red-400 rounded">
+        <div className="p-3 mb-4 text-red-700 bg-red-100 border border-red-400 rounded ">
           {error}
         </div>
       )}
+
+
+      {/* Cancel Confirmation */}
+      {showConfirm}
       
-      <div className="relative w-full h-full p-4 border border-gray-300 shadow-2xl rounded-xl dark:border-gray-700 dark:shadow-md dark:shadow-zuccini-800"> 
+      <div className="relative w-full min-h-full p-4 border border-gray-300 shadow-2xl rounded-xl dark:border-gray-700 dark:shadow-md dark:shadow-zuccini-800"> 
+          {error && (
+            <div className="absolute p-3 mb-4 text-red-700 bg-red-100 border border-red-400 rounded bottom-2">
+              {error}
+            </div>
+          )}
         <div className="absolute flex items-center justify-between top-3 right-3">    
           {hasUnsavedChanges && (
             <span className="px-3 py-1 text-sm text-orange-700 bg-orange-100 border border-orange-300 rounded-2xl dark:text-orange-700/80 dark:bg-orange-300/80">
@@ -279,11 +398,13 @@ export default function TemplateBuilder({ program, onClose }) {
           )}
         </div>
         
-        <h3 className="mb-5 text-2xl font-semibold text-gray-700 dark:text-gray-100">Create Template</h3>
+        <h3 className="mb-5 text-2xl font-semibold text-gray-700 dark:text-gray-100">
+          {isEditMode ? 'Edit Template' : 'Create Template'}
+        </h3>
 
-        {/* Step 1: Template Info (no DB save) */}
+        {/* Step 1: Template Info */}
         {!showBuilder ? (
-          <div className="space-y-4">          
+          <div className="space-y-4">
             <input
               className="w-full p-3 text-gray-800 bg-gray-300 border border-gray-300 rounded-2xl inset-shadow-sm inset-shadow-gray-400 focus:outline-none focus:ring-2 focus:ring-zuccini-500 dark:border-gray-700 dark:text-gray-200 dark:bg-gray-800"
               placeholder="Template Name"
@@ -291,7 +412,7 @@ export default function TemplateBuilder({ program, onClose }) {
               onChange={e => setTemplateName(e.target.value)}
             />
             <textarea
-              className="w-full p-3 text-gray-800 bg-gray-300 border border-gray-300 rounded-2xl inset-shadow-sm inset-shadow-gray-400 h-28 focus:outline-none focus:ring-2 focus:ring-zuccini-500 dark:border-gray-700 dark:text-gray-200 dark:bg-gray-800"
+              className="w-full p-3 text-gray-800 bg-gray-300 border border-gray-300 rounded-2xl inset-shadow-sm inset-shadow-gray-400 h-85 focus:outline-none focus:ring-2 focus:ring-zuccini-500 dark:border-gray-700 dark:text-gray-200 dark:bg-gray-800"
               placeholder="Description"
               value={description}
               onChange={e => setDescription(e.target.value)}
@@ -299,7 +420,7 @@ export default function TemplateBuilder({ program, onClose }) {
             <div className="flex gap-3 place-self-end">
               <button
                 className="px-6 py-2 transition bg-gray-400 rounded-full shadow-lg cursor-pointer hover:bg-gray-500"
-                onClick={onClose}
+                onClick={handleConfirm}
               >
                 Cancel
               </button>
@@ -342,12 +463,50 @@ export default function TemplateBuilder({ program, onClose }) {
                     
                     <div className="flex-1 space-y-2">
                       <div className="flex gap-2">
-                        <input
-                          className="p-2 px-3 text-lg text-gray-800 bg-gray-200 border border-gray-400 inset-shadow-sm inset-shadow-gray-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-gray-100 dark:bg-gray-900 dark:border-gray-700"
-                          placeholder="Area Num (e.g., Area I)"
-                          value={area.areaNum}
-                          onChange={e => updateArea(area.areaID, 'areaNum', e.target.value)}
+                        <Select
+                          styles={{
+                            control: (base, state) => ({
+                              ...base,
+                              ...customInputStyle,
+                              ...(state.isFocused ? focusedStyle : {}),
+                              boxShadow: state.isFocused
+                                ? "inset 0 1px 2px rgba(156, 163, 175, 0.6), 0 0 0 2px rgba(59,130,246,0.5)"
+                                : "inset 0 1px 2px rgba(156, 163, 175, 0.6)",
+                              backgroundColor: "#e5e7eb",
+                              borderColor: "#9ca3af",
+                            }),
+                            menu: (base) => ({
+                              ...base,
+                              backgroundColor: "#f9fafb",
+                              borderRadius: "0.75rem",
+                              border: "1px solid #d1d5db",
+                              boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+                              zIndex: 10,
+                            }),
+                            option: (base, state) => ({
+                              ...base,
+                              backgroundColor: state.isFocused ? "#dbeafe" : "#f9fafb",
+                              color: "#1f2937",
+                              cursor: "pointer",
+                            }),
+                          }}
+                          value={
+                            area.areaNum
+                              ? { value: area.areaNum, label: area.areaNum }
+                              : null
+                          }
+                          options={areaOption.map(opt => ({
+                            value: opt.areaNum,
+                            label: opt.areaNum,
+                          }))}
+                          onChange={(selectedOption) => {
+                            updateArea(area.areaID, "areaNum", selectedOption ? selectedOption.value : "");
+                          }}
+                          placeholder="Select Area Number"
+                          isClearable={true}
+                          isSearchable={true}
                         />
+
                         <input
                           className="flex-1 p-2 px-3 text-lg text-gray-800 bg-gray-200 border border-gray-400 inset-shadow-sm inset-shadow-gray-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-900 dark:border-gray-700 dark:text-gray-100"
                           placeholder="Area Name (e.g., Governance and Organization)"

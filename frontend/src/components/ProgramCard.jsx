@@ -3,7 +3,7 @@ export default function ProgramCard({ program, onClick, className = "" }) {
 
   return (
     <div 
-      className={`${className} group relative flex flex-col cursor-pointer h-56 overflow-hidden rounded-xl border border-gray-200 bg-gray-200 shadow-sm transition-all duration-300 hover:shadow-xl hover:scale-105 hover:border-gray-300 dark:bg-gray-900 dark:border-gray-700 dark:hover:border-gray-600 sm:w-1/2 md:w-1/3 lg:w-1/5`}             
+      className={`${className} group relative flex flex-col cursor-pointer h-56 overflow-hidden rounded-xl border border-gray-200 bg-gray-200 shadow-sm transition-all duration-300 hover:shadow-xl hover:scale-105 hover:border-gray-300 dark:bg-gray-900 dark:border-gray-700 dark:hover:border-gray-600 sm:w-1/2 md:w-1/3 lg:w-1/5`}
       onClick={onClick}
     >
       {/* Header Image/Color Section */}
@@ -20,7 +20,7 @@ export default function ProgramCard({ program, onClick, className = "" }) {
           </div>
         ) : (
           // Program cards with color
-          <div 
+          <div
             style={{ backgroundColor: program.programColor }} 
             className="relative w-full h-full transition-all duration-300 group-hover:brightness-110"
           >
@@ -53,7 +53,7 @@ export default function ProgramCard({ program, onClick, className = "" }) {
               <span className="text-gray-600 dark:text-gray-400">
                 {program.instituteHead || program.programDean}
               </span>
-            </div>            
+            </div>
           </div>
         </div>
       </div>

@@ -424,11 +424,14 @@ useEffect(() => {
 }, [isAdmin])
 
   useEffect(() => {
+<<<<<<< HEAD
   const fetchArea = async () => {
+=======
+  const fetchArea = async () => {      
+>>>>>>> origin/template-page-feature
      const res = await apiGet('/api/area', 
           {withCredentials: true}
      )
-
      try{
           Array.isArray(res.data.area) ? (setAreaOption(res.data.area), setAllAreas(res.data.area)) : (setAreaOption([]), setAllAreas([]));
       } catch (err) {
@@ -513,6 +516,21 @@ useEffect(() => {
           user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+<<<<<<< HEAD
+=======
+  // Filter area options depending on the program
+    useEffect(()=> {
+          if(programID){
+              const filteredAreas = allAreas.filter(
+              (area) => String(area.programID) === String(programID)
+              );
+              setFilteredAreaOptions(filteredAreas);
+              setAreaID("");
+          } else {
+              setFilteredAreaOptions([]);
+          }
+    }, [programID, allAreas]);
+>>>>>>> origin/template-page-feature
 
 
   useEffect(() => {
@@ -1013,6 +1031,7 @@ useEffect(() => {
 
         {/* Area Select */}
         <div className="relative">
+<<<<<<< HEAD
           <Select 
             closeMenuOnScroll={false}
             closeMenuOnSelect={false}
@@ -1026,6 +1045,25 @@ useEffect(() => {
             className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
             instanceId="area-select"/>
 
+=======
+          <select 
+            name="areaID" 
+            id="areaID"
+            value={areaID} 
+            required 
+            onChange={(e) => setAreaID(e.target.value)} 
+            className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
+          >
+            <option value="">Select Area</option>
+            {filteredAreaOptions.filter((area, index, self) => 
+              index === self.findIndex(a => a.areaID === area.areaID))
+              .map((area) => (
+                  <option key={area.areaID} value={area.areaID}>
+                  {area.areaName}
+                  </option>
+              ))}
+            </select>
+>>>>>>> origin/template-page-feature
         </div>
 
         {/* Co-Admin Access Switch - Only admins can assign this */}

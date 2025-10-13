@@ -17,7 +17,8 @@ import{
     faFileAlt, 
     faMoon,
     faIdCardClip,
-    faArrowRightFromBracket
+    faArrowRightFromBracket,
+    faPenFancy
 } from '@fortawesome/free-solid-svg-icons';
 import { getCurrentUser, adminHelper } from './utils/auth_utils';
 import { apiPost } from './utils/api_utils';
@@ -86,6 +87,12 @@ const MainLayout = () => {
                   text="Users"
                   active={activePage === 'Users'}
                   onClick={() => navigate('/Users')}
+                />)}
+                { isAdmin && (<SidebarLinks
+                  icon={faPenFancy}
+                  text="Templates"
+                  active={activePage === 'Templates'}
+                  onClick={() => navigate('/Templates')}
                 />)}
                 <SidebarLinks
                   icon={faCircleCheck}
