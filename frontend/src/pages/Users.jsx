@@ -512,18 +512,6 @@ useEffect(() => {
           user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Filter area options depending on the program
-    useEffect(()=> {
-          if(programID){
-              const filteredAreas = allAreas.filter(
-              (area) => String(area.programID) === String(programID)
-              );
-              setFilteredAreaOptions(filteredAreas);
-              setAreaID("");
-          } else {
-              setFilteredAreaOptions([]);
-          }
-    }, [programID, allAreas]);
 
 
   useEffect(() => {

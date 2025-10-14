@@ -1119,22 +1119,7 @@ def register_routes(app):
     @app.route('/api/users', methods=["GET"])
     @jwt_required()
     def get_users():
-
         users = Employee.query.all()
-
-         # Get user's programs and areas from junction tables
-        user_programs = []
-        user_areas = []
-
-        for ep in user.employee_programs:
-            program = Program.query.get(ep.programID)
-            if program:
-                user_programs.append(program.programName)
-
-        for ea in user.employee_areas:
-            area = Area.query.get(ea.areaID)
-            if area:
-                user_areas.append(f"{area.areaNum}: {area.areaName}")
         
         user_list = []
         for user in users:
@@ -2162,9 +2147,8 @@ def register_routes(app):
                 'areaNum': area.areaNum,
                 'areaName': f"{area.areaNum}: {area.areaName}",
                 'progress': area.progress,
-                'subareaName': area.subareaName,  
+                'subareaName': area.subareaName,                
                 'archived': area.archived,                
-                'archived': area.archived              
             }
             area_list.append(area_data)
         
@@ -2302,7 +2286,7 @@ def register_routes(app):
             .outerjoin(Program, Area.programID == Program.programID)
         .outerjoin(Subarea, (Area.areaID == Subarea.areaID) & (Subarea.archived == False))
         .outerjoin(Criteria, (Subarea.subareaID == Criteria.subareaID) & (Criteria.archived == False))
-            .outerjoin(Document, Criteria.docID == Document.docID)
+            .outerjoin(Document, Criteria.docID == Document.docID)       
         .filter(Program.programCode == program_code, Area.archived == False)
             .order_by(Area.areaID.asc(), Subarea.subareaID.asc(), Criteria.criteriaID.asc())
             .all() 

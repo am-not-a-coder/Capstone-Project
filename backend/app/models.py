@@ -23,7 +23,7 @@ class Vector(UserDefinedType):
 class Employee(db.Model):
     __tablename__ = 'employee'
 
-    employeeID = db.Column(db.String(10), primary_key=True, nullable=False)        
+    employeeID = db.Column(db.String(10), primary_key=True, nullable=False)
     fName = db.Column(db.String(50), nullable=False)
     lName = db.Column(db.String(50))
     suffix = db.Column(db.String(10))
@@ -362,11 +362,3 @@ class Notification(db.Model):
     # Relationships
     recipient = db.relationship("Employee", foreign_keys=[recipientID], backref="received_notifications")
     sender = db.relationship("Employee", foreign_keys=[senderID], backref="sent_notifications")
-
-
-class AreaReference(db.Model):
-    _tablename_ = 'area_reference'
-
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    areaName = db.Column(db.String(120), nullable=False) 
-    areaNum = db.Column(db.String(25), nullable=False)
