@@ -1025,7 +1025,7 @@ useEffect(() => {
         </div>
 
         {/* Area Select */}
-        <div className="relative">
+        <div className="relative col-span-2">
           <Select 
             closeMenuOnScroll={false}
             closeMenuOnSelect={false}

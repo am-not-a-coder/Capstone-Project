@@ -1119,7 +1119,22 @@ def register_routes(app):
     @app.route('/api/users', methods=["GET"])
     @jwt_required()
     def get_users():
+
         users = Employee.query.all()
+
+         # Get user's programs and areas from junction tables
+        user_programs = []
+        user_areas = []
+
+        for ep in user.employee_programs:
+            program = Program.query.get(ep.programID)
+            if program:
+                user_programs.append(program.programName)
+
+        for ea in user.employee_areas:
+            area = Area.query.get(ea.areaID)
+            if area:
+                user_areas.append(f"{area.areaNum}: {area.areaName}")
         
         user_list = []
         for user in users:
@@ -1819,6 +1834,24 @@ def register_routes(app):
 
         return jsonify({'success': True, 'message': 'Area progress saved!'}), 200
 
+    @app.route('/api/area/option', methods=["GET"])
+    def get_area_option():
+
+        area_options = AreaReference.query.all()
+
+        option_list = []
+
+        for opt in area_options:
+            area_data = {
+                'areaName': opt.areaName,
+                'areaNum': opt.areaNum,
+                'title': f'{opt.areaName}: {opt.areaNum}'
+            }
+
+            option_list.append(area_data)
+        return jsonify(option_list), 200
+
+
     # ============================================ Notifications ============================================
     @app.route('/api/notifications', methods=['GET', 'OPTIONS'])
     def notifications_options_handler():
@@ -2112,8 +2145,9 @@ def register_routes(app):
                 'areaNum': area.areaNum,
                 'areaName': f"{area.areaNum}: {area.areaName}",
                 'progress': area.progress,
-                'subareaName': area.subareaName,                
+                'subareaName': area.subareaName,  
                 'archived': area.archived,                
+                'archived': area.archived              
             }
             area_list.append(area_data)
         
@@ -2251,7 +2285,7 @@ def register_routes(app):
             .outerjoin(Program, Area.programID == Program.programID)
         .outerjoin(Subarea, (Area.areaID == Subarea.areaID) & (Subarea.archived == False))
         .outerjoin(Criteria, (Subarea.subareaID == Criteria.subareaID) & (Criteria.archived == False))
-            .outerjoin(Document, Criteria.docID == Document.docID)       
+            .outerjoin(Document, Criteria.docID == Document.docID)
         .filter(Program.programCode == program_code, Area.archived == False)
             .order_by(Area.areaID.asc(), Subarea.subareaID.asc(), Criteria.criteriaID.asc())
             .all() 
@@ -4011,6 +4045,7 @@ def register_routes(app):
             return jsonify({'success': False, 'message': f"Failed to apply template: {str(e)}"}), 500
 
 
+
     @app.route("/api/templates/edit/<int:templateID>", methods=["PUT"])
     def edit_template(templateID):
         data = request.get_json()
@@ -4188,4 +4223,3 @@ def register_routes(app):
             return jsonify({'success': False, 'message': f'Failed to delete template: {str(e)}'}), 400
 
 
-    
