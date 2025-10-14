@@ -1836,24 +1836,6 @@ def register_routes(app):
 
         return jsonify({'success': True, 'message': 'Area progress saved!'}), 200
 
-    @app.route('/api/area/option', methods=["GET"])
-    def get_area_option():
-
-        area_options = AreaReference.query.all()
-
-        option_list = []
-
-        for opt in area_options:
-            area_data = {
-                'areaName': opt.areaName,
-                'areaNum': opt.areaNum,
-                'title': f'{opt.areaName}: {opt.areaNum}'
-            }
-
-            option_list.append(area_data)
-        return jsonify(option_list), 200
-
-
     # ============================================ Notifications ============================================
     @app.route('/api/notifications', methods=['GET', 'OPTIONS'])
     def notifications_options_handler():
