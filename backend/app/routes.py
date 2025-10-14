@@ -1170,23 +1170,6 @@ def register_routes(app):
             user_list.append(user_data)
         return jsonify({"users" : user_list}), 200
 
-    @app.route('/api/area/option', methods=["GET"])
-    def get_area_option():
-
-        area_options = AreaReference.query.all()
-
-        option_list = []
-
-        for opt in area_options:
-            area_data = {
-                'areaName': opt.areaName,
-                'areaNum': opt.areaNum,
-                'title': f'{opt.areaName}: {opt.areaNum}'
-            }
-
-            option_list.append(area_data)
-        return jsonify(option_list), 200
-
     # ============================================ INSTITUTES PAGE ROUTES ============================================
     
     #edit institute base on institute 
@@ -1835,6 +1818,23 @@ def register_routes(app):
         db.session.commit()
 
         return jsonify({'success': True, 'message': 'Area progress saved!'}), 200
+
+    @app.route('/api/area/option', methods=["GET"])
+    def get_area_option():
+
+        area_options = AreaReference.query.all()
+
+        option_list = []
+
+        for opt in area_options:
+            area_data = {
+                'areaName': opt.areaName,
+                'areaNum': opt.areaNum,
+                'title': f'{opt.areaName}: {opt.areaNum}'
+            }
+
+            option_list.append(area_data)
+        return jsonify(option_list), 200
 
 
     # ============================================ Notifications ============================================
@@ -4200,7 +4200,7 @@ def register_routes(app):
 
             db.session.commit()
             return jsonify({"success": True, "message": "Template deleted successfully"}), 200
-
+            
         except Exception as e:
             db.session.rollback()
             return jsonify({'success': False, 'message': f'Failed to delete template: {str(e)}'}), 400

@@ -9,9 +9,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import EventModal from '../components/modals/EventModal';
-import StatusModal from '../components/modals/StatusModal';
-import DeadlineModal from '../components/modals/DeadlineModal';
-import { apiGet, apiPost } from '../utils/api_utils';
 import { adminHelper, getCurrentUser } from '../utils/auth_utils';
 import { useNavigate } from 'react-router-dom';
 import AreaProgressPage from './AreaProgress';
@@ -369,7 +366,7 @@ const Tasks = () => {
                     </div>
 
                     {/* Select Criteria */}
-                    <div className="min-h-[100px] p-3 flex flex-col justify-center">
+                    {/* <div className="min-h-[100px] p-3 flex flex-col justify-center">
                         <label htmlFor="criteria"
                             className='mb-1 text-lg font-extralight'>Criteria</label>
                         <select name="criteria" id="criteria"
@@ -384,7 +381,7 @@ const Tasks = () => {
                                 </option>
                             ))}
                         </select>
-                    </div>
+                    </div> */}
 
 
                     {/* Select Criteria */}
@@ -403,7 +400,7 @@ const Tasks = () => {
                     <input 
                     type="submit" 
                     value="Create Deadline"
-                    className='absolute px-6 py-2 font-semibold text-gray-600 transition-all duration-500 border-gray-500 shadow-xl cursor-pointer from-gray-300/50 via-gray-200 to-gray-400/50 dark:text-gray-200 hover:text-gray-200 top-3 right-3 place-self-center rounded-xl bg-gradient-to-br hover:from-zuccini-400 hover:via-zuccini-500 hover:to-zuccini-700'
+                    className='px-6 py-2 font-semibold text-gray-600 transition-colors duration-500 border-gray-500 shadow-xl cursor-pointer from-gray-300/50 via-gray-200 to-gray-400/50 dark:text-gray-200 hover:text-gray-200 place-self-center rounded-xl bg-gradient-to-br hover:from-zuccini-400 hover:via-zuccini-500 hover:to-zuccini-700 dark:from-gray-800/50 dark:via-gray-700 dark:to-gray-900/50'
                     />
                     <div className='flex flex-col col-span-4 px-3 py-3 '>
                         <label htmlFor="content"

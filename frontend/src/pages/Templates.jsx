@@ -160,7 +160,7 @@ export default function Templates() {
                             <FontAwesomeIcon icon={faSearch} className="absolute text-gray-400 top-4 left-4" />
                             <input type="text"
                             placeholder="Search Template"
-                            className="w-full h-12 p-3 pl-10 text-gray-800 bg-gray-200 border border-gray-400 rounded-full outline-none dark:text-gray-100 focus:outline-none focus:ring focus:ring-zuccini-600"
+                            className="w-full h-12 p-3 pl-10 text-gray-800 bg-gray-200 border border-gray-400 rounded-full outline-none dark:text-gray-100 focus:outline-none focus:ring focus:ring-zuccini-600 dark:bg-gray-800"
                             />
                         </div>
                         <button 
@@ -259,14 +259,14 @@ export default function Templates() {
 
          {showTemplateDetails && selectedTemplate && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">                                                    
-                    <div className="relative w-full max-w-2xl max-h-[90vh] h-full bg-gray-100 rounded-lg shadow flex flex-col">
+                    <div className="relative w-full max-w-2xl max-h-[90vh] h-full bg-gray-100 rounded-lg shadow flex flex-col dark:bg-gray-800">
                         <div>
                             <div    
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     setOpenSettings(!openSettings);
                                 }}
-                                className="absolute flex items-center justify-center w-10 h-10 bg-gray-200 rounded-full cursor-pointer hover:bg-gray-300 right-10 top-5 ">
+                                className="absolute flex items-center justify-center w-10 h-10 bg-gray-200 rounded-full cursor-pointer hover:bg-gray-300 right-10 top-5 dark:bg-gray-700 dark:hover:bg-gray-600">
                                 <FontAwesomeIcon icon={faEllipsis} className="text-xl text-gray-800"/>
                             </div>
 
@@ -275,13 +275,14 @@ export default function Templates() {
                                 <div   
                                     ref={settingsRef}        
                                     onClick={(e) => e.stopPropagation()}
-                                    className='absolute z-50 p-3 border shadow-xl bg-gray-200 backdrop-blur-sm rounded-xl min-w-[150px] top-16 right-8'
+                                    className='absolute z-50 p-3 border shadow-xl dark:bg-gray-700 dark:border-gray-700 bg-gray-200 backdrop-blur-sm rounded-xl min-w-[150px] top-16 right-8'
                                 >
                                 <button 
                                 onClick={(e) => {
                                     e.stopPropagation();  
                                     setShowTemplateDetails(false);
                                     setVisible("edit"); 
+                                    setOpenSettings(false);
                                 }}
                                 className='relative block w-full px-2 py-1 text-gray-600 transition-all duration-300 rounded-md hover:text-gray-100 hover:bg-blue-400/80 dark:text-gray-200'>
                                     Edit
@@ -293,7 +294,8 @@ export default function Templates() {
                                 <button 
                                     onClick={(e) => {
                                         e.stopPropagation();                                        
-                                        setShowDeleteModal(true);                                                              
+                                        setShowDeleteModal(true);  
+                                        setOpenSettings(false);                                                            
                                     }}
                                     className='relative block w-full px-2 py-1 text-gray-600 transition-all duration-300 rounded-md hover:text-gray-100 hover:bg-red-500/80 dark:text-gray-200'
                                 >
@@ -306,9 +308,9 @@ export default function Templates() {
                         </div>
                         {/* Scrollable content area */}
                         <div className="flex-1 p-4 mb-5 overflow-y-auto">
-                            <h1 className="text-xl font-bold text-zuccini-700">{selectedTemplate.templateName}</h1>
-                            <p className="text-sm text-gray-600">{selectedTemplate.description}</p>
-                            <p className="mb-3 text-xs text-gray-500">
+                            <h1 className="text-xl font-bold text-zuccini-700 dark:text-zuccini-500">{selectedTemplate.templateName}</h1>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">{selectedTemplate.description}</p>
+                            <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
                                 Created by {selectedTemplate.createdBy} on{" "}
                                 {new Date(selectedTemplate.createdAt).toLocaleDateString("en-US", {
                                     year: "numeric",
@@ -319,7 +321,7 @@ export default function Templates() {
 
                             {/* Programs Applied */}
                             
-                            <h1 className="mb-2 text-sm font-medium text-gray-800">Programs Applied:</h1>
+                            <h1 className="mb-2 text-sm font-medium text-gray-800 dark:text-gray-100">Programs Applied:</h1>
                             <div className="flex flex-row gap-1">
                             {selectedTemplate.programs?.map((program) => (
                                 <div key={program.programID}
@@ -345,10 +347,10 @@ export default function Templates() {
                                     <div className="mt-2 ml-4 space-y-2">
                                         {area.subareas?.map((sub) => (
                                             <div key={sub.subareaID} className="pl-3 border-l-2 border-gray-300">
-                                                <h3 className="font-medium text-gray-700">{sub.subareaName}</h3>
+                                                <h3 className="font-medium text-gray-700 dark:text-gray-100">{sub.subareaName}</h3>
 
                                                 {/* Criteria */}
-                                                <ul className="ml-4 text-sm text-gray-600 list-disc">
+                                                <ul className="ml-4 text-sm text-gray-600 list-disc dark:text-gray-100">
                                                     {sub.criteria && Object.values(sub.criteria).flat().map((crit) => (
                                                         <li key={crit.criteriaID}>
                                                             {crit.criteriaContent}

@@ -8,11 +8,11 @@ import{
   faTimes,
   faTrash,
   faBookOpen,
+  faBuilding,
+  faTriangleExclamation,
   faUser,
   faEnvelope,
   faPhone,
-  faBuilding,
-  faTriangleExclamation,
   faSpinner,
   faEdit
 } from '@fortawesome/free-solid-svg-icons';
@@ -96,6 +96,95 @@ const Users = () => {
   const detailsAndSelectedUser = (user) => {
       setSelectedUser(user); 
       setShowDetails(true);        
+      // Clear employeeID when viewing details to reset button text
+      setEmployeeID("");
+  }
+
+  const handleEditUser = async (user) => {
+        console.log('Edit button clicked, user data:', user)
+        
+        // Populate form with existing user data for editing
+        setEmployeeID(user.employeeID)
+        setFName(user.fName)
+        setLName(user.lName)
+        setSuffix(user.suffix || "")
+        setEmail(user.email)
+        setContactNum(user.contactNum)
+        setPassword("") // Don't populate password for security
+        setCoAdminAccess(user.isCoAdmin || false)
+        setRatingEnable(user.isRating || false)
+        setCanEditUser(user.isEdit || false)
+        setCrudForms(user.crudFormsEnable || false)
+        setCrudPrograms(user.crudProgramEnable || false)
+        setCrudInstitute(user.crudInstituteEnable || false)
+
+        // Get detailed program and area information for the Select components
+        try {
+            // Fetch all programs and areas to match with user's assigned ones
+            const programsRes = await apiGet('/api/program')
+            const areasRes = await apiGet('/api/area')
+            
+            console.log('Programs API response:', programsRes)
+            console.log('Areas API response:', areasRes)
+
+            if (programsRes.success && areasRes.success) {
+                // Map user program names to program objects
+                const userPrograms = user.programs || []
+                // Get the actual arrays from the response
+                const programsArray = programsRes.data?.programs || programsRes.programs || []
+                const areasArray = areasRes.data?.areas || areasRes.areas || []
+                
+                const selectedPrograms = userPrograms.map(programName => {
+                    const program = programsArray.find(p => p.programName === programName)
+                    return program ? { value: program.programID, label: program.programName } : null
+                }).filter(Boolean)
+
+                // Map user area strings to area objects
+                const userAreas = user.areas || []
+                const selectedAreas = userAreas.map(areaString => {
+                    // areaString format: "areaNum: areaName"
+                    const area = areasArray.find(a => `${a.areaNum}: ${a.areaName}` === areaString)
+                    return area ? { value: area.areaID, label: `${area.areaNum}: ${area.areaName}`, areaNum: area.areaNum } : null
+                }).filter(Boolean)
+
+                setSelectedPrograms(selectedPrograms)
+                setSelectedAreas(selectedAreas)
+            }
+        } catch (error) {
+            console.error('Error fetching programs/areas for edit:', error)
+            // Fallback to empty arrays if fetch fails
+            setSelectedPrograms([])
+            setSelectedAreas([])
+        }
+
+        // Load user's folder permissions
+        try {
+            if (user.folders && user.folders.length > 0) {
+                // Map folder paths to the format expected by the Select component
+                const selectedFolders = user.folders.map(folderPath => {
+                    // Extract program name from path: UDMS_Repository/Programs/BSED -> BSED
+                    const parts = folderPath.split('/')
+                    const programName = parts[parts.length - 1]
+                    return {
+                        value: folderPath,
+                        label: programName
+                    }
+                })
+                setSelectedFolder(selectedFolders)
+                console.log('Loaded user folders:', selectedFolders)
+            } else {
+                setSelectedFolder([])
+            }
+        } catch (error) {
+            console.error('Error loading user folders:', error)
+            setSelectedFolder([])
+        }
+
+            // Close the details modal and show the edit form
+            setShowDetails(false)
+            setRemoveConfirmation(false)
+            makeVisible("edit")
+  }
       // Clear employeeID when viewing details to reset button text
       setEmployeeID("");
   }
@@ -989,6 +1078,20 @@ useEffect(() => {
               </p>
           )}
         </div>
+
+        {/* Co-Admin Access Switch - Only admins can assign this */}
+        {isAdmin && (
+        <div className="relative ">
+          <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
+              <label className="text-base font-medium text-gray-700 dark:text-gray-300">
+                Co-Admin Access
+            </label>
+              <Switch isChecked={CoAdminAccess} onChange={() => setCoAdminAccess((current) => !current)}/>
+          </div>
+        </div>
+        )}
+
+
 
         {/* Program Select */}
         <div className="relative">

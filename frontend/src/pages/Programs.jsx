@@ -28,9 +28,11 @@ import toast, { Toaster } from 'react-hot-toast'
 import ArchiveModal from '../components/modals/ArchiveModal';
 
 
+
   const Programs = () => {
 
     const isAdmin = adminHelper()
+    const user = getCurrentUser()
     // use state function
   const [institutes, setInstitutes] = useState([]);
   const [programs, setPrograms] = useState([]);
