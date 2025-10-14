@@ -363,10 +363,3 @@ class Notification(db.Model):
     recipient = db.relationship("Employee", foreign_keys=[recipientID], backref="received_notifications")
     sender = db.relationship("Employee", foreign_keys=[senderID], backref="sent_notifications")
 
-
-class AreaReference(db.Model):
-    _tablename_ = 'area_reference'
-
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    areaName = db.Column(db.String(120), nullable=False) 
-    areaNum = db.Column(db.String(25), nullable=False)

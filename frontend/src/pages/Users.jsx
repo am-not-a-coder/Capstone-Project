@@ -47,7 +47,7 @@ const Users = () => {
   const [CoAdminAccess, setCoAdminAccess] = useState(false);
   
   const [allAreas, setAllAreas] = useState([]);
-  const [areaReferenceOptions, setAreaReferenceOptions] = useState([]);
+  const [areaReferenceOptions, setAreaReferenceOptions] = useState([]);  
   const [programOption, setProgramOption] = useState([]);    
   const [areaOption, setAreaOption] = useState([]);    
   const [visible, makeVisible] = useState("list");  
@@ -424,11 +424,8 @@ useEffect(() => {
 }, [isAdmin])
 
   useEffect(() => {
-<<<<<<< HEAD
-  const fetchArea = async () => {
-=======
+
   const fetchArea = async () => {      
->>>>>>> origin/template-page-feature
      const res = await apiGet('/api/area', 
           {withCredentials: true}
      )
@@ -516,21 +513,6 @@ useEffect(() => {
           user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-<<<<<<< HEAD
-=======
-  // Filter area options depending on the program
-    useEffect(()=> {
-          if(programID){
-              const filteredAreas = allAreas.filter(
-              (area) => String(area.programID) === String(programID)
-              );
-              setFilteredAreaOptions(filteredAreas);
-              setAreaID("");
-          } else {
-              setFilteredAreaOptions([]);
-          }
-    }, [programID, allAreas]);
->>>>>>> origin/template-page-feature
 
 
   useEffect(() => {
@@ -676,7 +658,7 @@ useEffect(() => {
                         Edit User
                     </button>
                     {visible === "edit" && showUserSelector && (
-                      <div className="absolute top-full left-0 mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-10">
+                      <div className="absolute left-0 z-10 mt-2 bg-white border border-gray-200 shadow-lg top-full w-80 dark:bg-gray-800 dark:border-gray-700 rounded-xl">
                         <div className="p-4">
                           <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                             Select User to Edit:
@@ -1009,8 +991,22 @@ useEffect(() => {
           )}
         </div>
 
+        {/* Co-Admin Access Switch - Only admins can assign this */}
+        {isAdmin && (
+        <div className="relative ">
+          <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
+              <label className="text-base font-medium text-gray-700 dark:text-gray-300">
+                Co-Admin Access
+            </label>
+              <Switch isChecked={CoAdminAccess} onChange={() => setCoAdminAccess((current) => !current)}/>
+          </div>
+        </div>
+        )}
+
+
+
         {/* Program Select */}
-        <div className="relative">
+        <div className="relative col-span-2">
             <Select 
                 closeMenuOnScroll={false}
                 closeMenuOnSelect={false}
@@ -1030,8 +1026,8 @@ useEffect(() => {
         </div>
 
         {/* Area Select */}
-        <div className="relative">
-<<<<<<< HEAD
+        <div className="relative col-span-2">
+
           <Select 
             closeMenuOnScroll={false}
             closeMenuOnSelect={false}
@@ -1045,41 +1041,11 @@ useEffect(() => {
             className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
             instanceId="area-select"/>
 
-=======
-          <select 
-            name="areaID" 
-            id="areaID"
-            value={areaID} 
-            required 
-            onChange={(e) => setAreaID(e.target.value)} 
-            className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 dark:text-white"
-          >
-            <option value="">Select Area</option>
-            {filteredAreaOptions.filter((area, index, self) => 
-              index === self.findIndex(a => a.areaID === area.areaID))
-              .map((area) => (
-                  <option key={area.areaID} value={area.areaID}>
-                  {area.areaName}
-                  </option>
-              ))}
-            </select>
->>>>>>> origin/template-page-feature
         </div>
-
-        {/* Co-Admin Access Switch - Only admins can assign this */}
-        {isAdmin && (
-        <div className="relative">
-          <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
-              <label className="text-base font-medium text-gray-700 dark:text-gray-300">
-                Co-Admin Access
-            </label>
-              <Switch isChecked={CoAdminAccess} onChange={() => setCoAdminAccess((current) => !current)}/>
-          </div>
-        </div>
-        )}
+      
 
         {/* Additional Folder Access - Available for all users */}
-        <div className="relative">
+        <div className="relative col-span-2">
           <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
             Additional Folder Access
           </label>
@@ -1394,7 +1360,7 @@ useEffect(() => {
       </div>
 
       {/* Area Select */}
-      <div className="relative">
+      <div className="relative cols-span-2">
         <Select 
                 closeMenuOnScroll={false}
                 closeMenuOnSelect={false}
