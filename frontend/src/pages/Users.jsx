@@ -47,7 +47,11 @@ const Users = () => {
   const [CoAdminAccess, setCoAdminAccess] = useState(false);
   
   const [allAreas, setAllAreas] = useState([]);
+<<<<<<<<< Temporary merge branch 1
+  const [areaReferenceOptions, setAreaReferenceOptions] = useState([]);
+=========
   const [areaReferenceOptions, setAreaReferenceOptions] = useState([]);  
+>>>>>>>>> Temporary merge branch 2
   const [programOption, setProgramOption] = useState([]);    
   const [areaOption, setAreaOption] = useState([]);    
   const [visible, makeVisible] = useState("list");  
@@ -657,7 +661,11 @@ useEffect(() => {
                         Edit User
                     </button>
                     {visible === "edit" && showUserSelector && (
+<<<<<<<<< Temporary merge branch 1
+                      <div className="absolute top-full left-0 mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-10">
+=========
                       <div className="absolute left-0 z-10 mt-2 bg-white border border-gray-200 shadow-lg top-full w-80 dark:bg-gray-800 dark:border-gray-700 rounded-xl">
+>>>>>>>>> Temporary merge branch 2
                         <div className="p-4">
                           <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                             Select User to Edit:
@@ -990,22 +998,9 @@ useEffect(() => {
           )}
         </div>
 
-        {/* Co-Admin Access Switch - Only admins can assign this */}
-        {isAdmin && (
-        <div className="relative ">
-          <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
-              <label className="text-base font-medium text-gray-700 dark:text-gray-300">
-                Co-Admin Access
-            </label>
-              <Switch isChecked={CoAdminAccess} onChange={() => setCoAdminAccess((current) => !current)}/>
-          </div>
-        </div>
-        )}
-
-
-
+<<<<<<<<< Temporary merge branch 1
         {/* Program Select */}
-        <div className="relative col-span-2">
+        <div className="relative">
             <Select 
                 closeMenuOnScroll={false}
                 closeMenuOnSelect={false}
@@ -1040,10 +1035,72 @@ useEffect(() => {
             instanceId="area-select"/>
 
         </div>
+
+        {/* Co-Admin Access Switch - Only admins can assign this */}
+        {isAdmin && (
+        <div className="relative">
+=========
+        {/* Co-Admin Access Switch - Only admins can assign this */}
+        {isAdmin && (
+        <div className="relative ">
+>>>>>>>>> Temporary merge branch 2
+          <div className="flex items-center justify-between px-4 py-3 border-2 border-gray-200 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl">
+              <label className="text-base font-medium text-gray-700 dark:text-gray-300">
+                Co-Admin Access
+            </label>
+              <Switch isChecked={CoAdminAccess} onChange={() => setCoAdminAccess((current) => !current)}/>
+          </div>
+        </div>
+        )}
+
+<<<<<<<<< Temporary merge branch 1
+        {/* Additional Folder Access - Available for all users */}
+        <div className="relative">
+=========
+
+
+        {/* Program Select */}
+        <div className="relative col-span-2">
+            <Select 
+                closeMenuOnScroll={false}
+                closeMenuOnSelect={false}
+                components={animatedComponents}
+                required
+                isMulti
+                value={selectedPrograms}
+                onChange={setSelectedPrograms}
+                options={programOption.map((program) => ({
+                    value: program.programID,
+                    label: program.programName
+                }))}
+                placeholder='Select Programs...'
+                className='w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800'
+                instanceId="program-select"
+            />
+        </div>
+
+        {/* Area Select */}
+        <div className="relative col-span-2">
+
+          <Select 
+            closeMenuOnScroll={false}
+            closeMenuOnSelect={false}
+            components={animatedComponents}
+            required
+            isMulti
+            value={selectedAreas} 
+            onChange={setSelectedAreas}
+            options={areaReferenceOptions || []}
+            placeholder='Select Areas...'
+            className="w-full px-4 py-3 text-gray-800 transition-all duration-300 border-2 border-gray-200 outline-none peer bg-gray-50 dark:bg-gray-700 dark:border-gray-600 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800"
+            instanceId="area-select"/>
+
+        </div>
       
 
         {/* Additional Folder Access - Available for all users */}
         <div className="relative col-span-2">
+>>>>>>>>> Temporary merge branch 2
           <label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
             Additional Folder Access
           </label>
@@ -1358,7 +1415,11 @@ useEffect(() => {
       </div>
 
       {/* Area Select */}
+<<<<<<<<< Temporary merge branch 1
+      <div className="relative">
+=========
       <div className="relative cols-span-2">
+>>>>>>>>> Temporary merge branch 2
         <Select 
                 closeMenuOnScroll={false}
                 closeMenuOnSelect={false}
