@@ -312,12 +312,7 @@ const Tasks = () => {
     <section className="grid grid-cols-2 grid-rows-[auto_1fr] relative p-3 gap-5 text-neutral-800 border-1 border-neutral-300 rounded-lg shadow-xl transition-all duration-500 dark:shadow-sm dark:shadow-zuccini-800">
     {/* Create Deadlines */} {/* admin */}
     
-<<<<<<<<< Temporary merge branch 1
     { (isAdmin || user.isCoAdmin) &&(<div className="col-span-2 transition-all duration-500 dark:text-white">
-=========
-    { (isAdmin || user.isCoAdmin) &&(
-        <div className="col-span-2 transition-all duration-500 dark:text-white">
->>>>>>>>> Temporary merge branch 2
         
             <div className="relative col-span-2 pt-3 px-3 min-h-[100px] border border-neutral-300 rounded-md transition-all duration-500 inset-shadow-sm inset-shadow-gray-400 dark:shadow-sm dark:shadow-zuccini-900 dark:bg-gray-900">
                 <h1 className="mx-3 my-1 font-medium text-md">
