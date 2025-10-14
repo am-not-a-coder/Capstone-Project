@@ -3942,6 +3942,93 @@ def register_routes(app):
             return jsonify({"success": False, "message": f"Failed to save template: {str(e)}"}), 500
 
 
+    @app.route('/api/programs/apply-template/<int:templateID>', methods=["POST"])
+    @jwt_required()
+    def apply_template(templateID): 
+        try:
+            data = request.get_json()
+            programIDs = data.get("programIDs", [])
+            
+            if not programIDs:
+                return jsonify({"success": False, "message": "No programs selected"}), 400
+
+            # Get the template
+            template = Template.query.filter_by(templateID=templateID).first()
+            if not template:
+                return jsonify({"success": False, "message": "Template not found"}), 404
+            for programID in programIDs:
+                # === Archive existing areas ===
+                active_areas = Area.query.filter_by(programID=programID, archived=False).all()
+                for area in active_areas:
+                    area.archived = True
+                    for sub in area.subareas:
+                        sub.archived = True
+                        for crit in sub.criteria:
+                            crit.archived = True
+
+                # === Create Applied Template for this program ===
+                applied_template = AppliedTemplate(
+                    programID=programID,
+                    templateID=template.templateID,
+                    templateName=template.templateName,
+                    description=template.description,
+                    appliedBy=get_jwt_identity()
+                )
+                db.session.add(applied_template)
+                db.session.flush()
+
+                # === Copy Areas, Subareas, Criteria ===
+                area_blueprints = AreaBlueprint.query.filter_by(templateID=templateID).all()
+                for ab in area_blueprints:
+                    area = Area(
+                        appliedTemplateID=applied_template.appliedTemplateID,
+                        programID=programID,                        
+                        areaBlueprintID=ab.areaBlueprintID,
+                        areaName=ab.areaName,
+                        areaNum=ab.areaNum,
+                        archived=False
+                    )
+                    db.session.add(area)
+                    db.session.flush()
+
+                    subarea_blueprints = SubareaBlueprint.query.filter_by(areaBlueprintID=ab.areaBlueprintID).all()
+                    for sb in subarea_blueprints:
+                        subarea = Subarea(
+                            areaID=area.areaID,                            
+                            subareaBlueprintID=sb.subareaBlueprintID,
+                            subareaName=sb.subareaName,
+                            archived=False
+                        )
+                        db.session.add(subarea)
+                        db.session.flush()
+
+                        criteria_blueprints = CriteriaBlueprint.query.filter_by(subareaBlueprintID=sb.subareaBlueprintID).all()
+                        for cb in criteria_blueprints:
+                            criteria = Criteria(
+                                subareaID=subarea.subareaID,                                
+                                criteriaBlueprintID=cb.criteriaBlueprintID,
+                                criteriaContent=cb.criteriaContent,
+                                criteriaType=cb.criteriaType,
+                                archived=False
+                            )
+                            db.session.add(criteria)
+
+                    # Link program to template
+                    program = Program.query.get(programID)
+                    if program:
+                        program.templateID = template.templateID
+
+                    # Mark template as applied
+                    template.isApplied = True
+
+                    db.session.commit()
+                    return jsonify({'success': True, 'message': 'Template applied to all selected programs successfully!'}), 201
+
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'message': f"Failed to apply template: {str(e)}"}), 500
+
+
     @app.route("/api/templates/edit/<int:templateID>", methods=["PUT"])
     def edit_template(templateID):
         data = request.get_json()
@@ -4119,3 +4206,4 @@ def register_routes(app):
             return jsonify({'success': False, 'message': f'Failed to delete template: {str(e)}'}), 400
 
 
+    
