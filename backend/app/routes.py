@@ -24,7 +24,7 @@ import redis
 from app.otp_utils import generate_random
 from flask_mail import Message as MailMessage
 from app.login_handlers import complete_user_login
-from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message, MessageDeletion, Template, AreaBlueprint, SubareaBlueprint, CriteriaBlueprint, AppliedTemplate, Notification, EmployeeProgram, EmployeeArea, EmployeeFolder, AreaReference
+from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message, MessageDeletion, Template, AreaBlueprint, SubareaBlueprint, CriteriaBlueprint, AppliedTemplate, Notification, EmployeeProgram, EmployeeArea, EmployeeFolder, AreaReference, EmployeeProgram, EmployeeArea, EmployeeFolder, AreaReference
 from sqlalchemy import cast, String, func, text
 
 
@@ -152,11 +152,10 @@ def register_routes(app):
         if not user:
             return jsonify({'success': False, 'message': 'User not found'})
         
-        
         # Get user's programs and areas from junction tables
         user_programs = []
         user_areas = []
-
+        
         for ep in user.employee_programs:
             program = Program.query.get(ep.programID)
             if program:
@@ -165,7 +164,7 @@ def register_routes(app):
                     'programCode': program.programCode,
                     'programName': program.programName
                 })
-
+        
         for ea in user.employee_areas:
             area = Area.query.get(ea.areaID)
             if area:
@@ -174,13 +173,13 @@ def register_routes(app):
                     'areaName': area.areaName,
                     'areaNum': area.areaNum
                 })
-
+        
         return jsonify({
             'success': True,
             'user': {
                 'employeeID': user.employeeID,
                 'firstName': user.fName,
-                'lastName': user.lName,                                
+                'lastName': user.lName,
                 'programs': user_programs,
                 'areas': user_areas,
                 'suffix' : user.suffix,
@@ -193,7 +192,8 @@ def register_routes(app):
                 'crudFormsEnable': user.crudFormsEnable,
                 'crudProgramEnable': user.crudProgramEnable,
                 'crudInstituteEnable': user.crudInstituteEnable,
-                'role': 'admin' if user.isAdmin else 'user'
+                'role': 'admin' if user.isAdmin else 'user',
+                'isCoAdmin': user.isCoAdmin
             }
         }), 200
     
@@ -407,7 +407,7 @@ def register_routes(app):
                 announceTitle = title, 
                 announceText = message, 
                 duration = duration
-                )
+            )
             db.session.add(new_announcement)
 
             # Audit new announcement
@@ -418,6 +418,26 @@ def register_routes(app):
             )
             db.session.add(new_log)
             db.session.commit()
+
+            # Real-time notifications: notify all active users about the announcement
+            try:
+                from app.socket_handlers import create_notification
+                # Notify every employee except the author
+                employees = Employee.query.with_entities(Employee.employeeID).all()
+                for (emp_id,) in employees:
+                    if str(emp_id) == str(userID):
+                        continue
+                create_notification(
+                        recipient_id=str(emp_id),
+                    notification_type='announcement',
+                        title=title or 'New Announcement',
+                        content=message or '',
+                        sender_id=str(userID),
+                        link='/Dashboard'
+                    )
+            except Exception as notify_err:
+                current_app.logger.error(f"Announcement notification emit failed: {notify_err}")
+
             return jsonify({'success': True, 'message': 'Announcement created successfully'}), 200 
         except Exception as e:
             return jsonify({'success': False, 'message': f'Failed to create announcement, {e}'}), 500
@@ -510,23 +530,24 @@ def register_routes(app):
         suffix = data.get("suffix", "").strip()
         email = data.get("email", "").strip()
         contactNum = data.get("contactNum", "").strip()
-       
+        
         # Parse JSON arrays for programs and areas
         try:
             programs = json.loads(data.get("programs", "[]"))
             areas = json.loads(data.get("areas", "[]"))
         except json.JSONDecodeError:
             return jsonify({'success': False, 'message': 'Invalid programs or areas format'}), 400
-
+        
         # Parse selected folders for folder permissions
         try:
             selected_folders = json.loads(data.get("selectedFolder", "[]"))
         except json.JSONDecodeError:
             selected_folders = []
-
+        
         isAdmin = str(data.get("isAdmin", "false")).lower() in ["true", "1", "yes", "y"]
         isRating = str(data.get("isRating", "false")).lower() in ["true", "1", "yes", "y"]
         isEdit = str(data.get("isEdit", "false")).lower() in ["true", "1", "yes", "y"]
+        isCoAdmin = str(data.get("isCoAdmin", "false")).lower() in ["true", "1", "yes", "y"]
         crudFormsEnable = str(data.get("crudFormsEnable", "false")).lower() in ["true", "1", "yes", "y"]
         crudProgramEnable = str(data.get("crudProgramEnable", "false")).lower() in ["true", "1", "yes", "y"]
         crudInstituteEnable = str(data.get("crudInstituteEnable", "false")).lower() in ["true", "1", "yes", "y"]
@@ -535,20 +556,37 @@ def register_routes(app):
         # email regex for validation
         validEmail = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         
-        # Validate required fields
-        if not password:
-            return jsonify({'success': False, 'message': 'Password cannot be empty'}), 400
+        # Check if this is an update operation (user already exists)
+        existing_user = Employee.query.filter_by(employeeID=empID).first()
+        is_update = existing_user is not None
+
+        # Validate required fields based on operation type
         if not empID:
             return jsonify({'success': False, 'message': 'Employee ID is required'}), 400
-        if not first_name:
-            return jsonify({'success': False, 'message': 'First name is required'}), 400
-        if not last_name:
-            return jsonify({'success': False, 'message': 'Last name is required'}), 400
-        if not email or not re.match(validEmail, email):
-            return jsonify({'success': False, 'message': 'Please enter a valid email'}), 400
-        # Accept both formats: +63 XXX XXX XXXX or 09XXXXXXXXX
-        if not contactNum or not (re.match(r'^\+63 \d{3} \d{3} \d{4}$', contactNum) or re.match(r'^\d{11}$', contactNum)):
-            return jsonify({'success': False, 'message': 'Contact number must be in format +63 XXX XXX XXXX'}), 400
+            
+        if not is_update:
+            # For new users, all fields are required
+            if not password:
+                return jsonify({'success': False, 'message': 'Password cannot be empty'}), 400
+            if not first_name:
+                return jsonify({'success': False, 'message': 'First name is required'}), 400
+            if not last_name:
+                return jsonify({'success': False, 'message': 'Last name is required'}), 400
+            if not email or not re.match(validEmail, email):
+                return jsonify({'success': False, 'message': 'Please enter a valid email'}), 400
+            # Accept both formats: +63 XXX XXX XXXX or 09XXXXXXXXX
+            if not contactNum or not (re.match(r'^\+63 \d{3} \d{3} \d{4}$', contactNum) or re.match(r'^\d{11}$', contactNum)):
+                return jsonify({'success': False, 'message': 'Contact number must be in format +63 XXX XXX XXXX'}), 400
+        else:
+            # For updates, only validate fields that are provided
+            if first_name and not first_name.strip():
+                return jsonify({'success': False, 'message': 'First name cannot be empty if provided'}), 400
+            if last_name and not last_name.strip():
+                return jsonify({'success': False, 'message': 'Last name cannot be empty if provided'}), 400
+            if email and not (re.match(validEmail, email)):
+                return jsonify({'success': False, 'message': 'Please enter a valid email'}), 400
+            if contactNum and not (re.match(r'^\+63 \d{3} \d{3} \d{4}$', contactNum) or re.match(r'^\d{11}$', contactNum)):
+                return jsonify({'success': False, 'message': 'Contact number must be in format +63 XXX XXX XXXX'}), 400
         
         # === Handle the Profile Picture (optional) ===
         profilePicPath = None
@@ -587,70 +625,159 @@ def register_routes(app):
             
             profilePicPath = f"{path}/{filename}"  # Save path if uploaded
 
-        # Checks if the user already exists
-        if Employee.query.filter_by(employeeID=empID).first():
-            return jsonify({'success': False, "message": "Employee already exists"}), 400
-         # Validate that programs and areas are provided
-        if not programs or len(programs) == 0:
-            return jsonify({'success': False, 'message': 'At least one program is required'}), 400
-        if not areas or len(areas) == 0:
-            return jsonify({'success': False, 'message': 'At least one area is required'}), 400
+        # For updates, make validation more flexible
+        if is_update:
+            # For updates, only validate fields that are provided and not empty
+            if first_name and not first_name.strip():
+                return jsonify({'success': False, 'message': 'First name cannot be empty if provided'}), 400
+            if last_name and not last_name.strip():
+                return jsonify({'success': False, 'message': 'Last name cannot be empty if provided'}), 400
+            if email and not (re.match(validEmail, email)):
+                return jsonify({'success': False, 'message': 'Please enter a valid email'}), 400
+            if contactNum and not (re.match(r'^\+63 \d{3} \d{3} \d{4}$', contactNum) or re.match(r'^\d{11}$', contactNum)):
+                return jsonify({'success': False, 'message': 'Contact number must be in format +63 XXX XXX XXXX'}), 400
+            
+            # For updates, programs and areas are optional - only validate if provided
+            if programs and len(programs) > 0 and not all(program.strip() for program in programs if isinstance(program, str)):
+                return jsonify({'success': False, 'message': 'Invalid program selection'}), 400
+            if areas and len(areas) > 0 and not all(area.strip() for area in areas if isinstance(area, str)):
+                return jsonify({'success': False, 'message': 'Invalid area selection'}), 400
+        else:
+            # For new users, all fields are required
+            # Validate that programs and areas are provided
+            if not programs or len(programs) == 0:
+                return jsonify({'success': False, 'message': 'At least one program is required'}), 400
+            if not areas or len(areas) == 0:
+                return jsonify({'success': False, 'message': 'At least one area is required'}), 400
 
-        # Create user (programID and areaID are now nullable, set to primary or None)
-        new_user = Employee(
-            employeeID=empID,
-            password=generate_password_hash(password, method="pbkdf2:sha256"),
-            fName=first_name,
-            lName=last_name,
-            suffix=suffix,
-            email=email,
-            contactNum=contactNum,
-            profilePic=profilePicPath,             
-            isAdmin=isAdmin,
-            isRating=isRating,
-            isEdit=isEdit,
-            crudFormsEnable=crudFormsEnable,
-            crudProgramEnable=crudProgramEnable,
-            crudInstituteEnable=crudInstituteEnable,
-            created_at=created_at
-        )
-        db.session.add(new_user)
+        if is_update:
+            # Update existing user - only update fields that are provided
+            if first_name and first_name.strip():
+                existing_user.fName = first_name
+            if last_name and last_name.strip():
+                existing_user.lName = last_name
+            if suffix is not None:  # Allow empty suffix
+                existing_user.suffix = suffix
+            if email and email.strip():
+                existing_user.email = email
+            if contactNum and contactNum.strip():
+                existing_user.contactNum = contactNum
+            if profilePicPath:  # Only update if new profile pic was uploaded
+                existing_user.profilePic = profilePicPath
+            
+            # Always update permissions (these are boolean values)
+            existing_user.isAdmin = isAdmin
+            existing_user.isRating = isRating
+            existing_user.isEdit = isEdit
+            existing_user.isCoAdmin = isCoAdmin
+            existing_user.crudFormsEnable = crudFormsEnable
+            existing_user.crudProgramEnable = crudProgramEnable
+            existing_user.crudInstituteEnable = crudInstituteEnable
+
+            # Update password only if provided
+            if password and password.strip():
+                existing_user.password = generate_password_hash(password, method="pbkdf2:sha256")
+
+            user = existing_user
+        else:
+            # Create new user
+            user = Employee(
+                employeeID=empID,
+                password=generate_password_hash(password, method="pbkdf2:sha256"),
+                fName=first_name,
+                lName=last_name,
+                suffix=suffix,
+                email=email,
+                contactNum=contactNum,
+                profilePic=profilePicPath,
+                isAdmin=isAdmin,
+                isRating=isRating,
+                isEdit=isEdit,
+                isCoAdmin=isCoAdmin,
+                crudFormsEnable=crudFormsEnable,
+                crudProgramEnable=crudProgramEnable,
+                crudInstituteEnable=crudInstituteEnable,
+                created_at=created_at
+            )
+        db.session.add(user)
         db.session.flush()  # Flush to get the employeeID for junction tables
 
-        # Create EmployeeProgram entries
-        for program_id in programs:
-            emp_program = EmployeeProgram(
-                employeeID=empID,
-                programID=int(program_id)
-            )
-            db.session.add(emp_program)
+        if is_update:
+            # For updates, only update junction tables if programs/areas are provided
+            if programs and len(programs) > 0:
+                # Delete existing EmployeeProgram entries for update
+                EmployeeProgram.query.filter_by(employeeID=empID).delete()
+                # Create new EmployeeProgram entries
+                for program_id in programs:
+                    emp_program = EmployeeProgram(
+                        employeeID=empID,
+                        programID=int(program_id)
+                    )
+                    db.session.add(emp_program)
+            
+            if areas and len(areas) > 0:
+                # Delete existing EmployeeArea entries for update
+                EmployeeArea.query.filter_by(employeeID=empID).delete()
+                # Create new EmployeeArea entries
+                for area_id in areas:
+                    emp_area = EmployeeArea(
+                        employeeID=empID,
+                        areaID=int(area_id)
+                    )
+                    db.session.add(emp_area)
+        else:
+            # For new users, always create junction table entries
+            # Create EmployeeProgram entries
+            for program_id in programs:
+                emp_program = EmployeeProgram(
+                    employeeID=empID,
+                    programID=int(program_id)
+                )
+                db.session.add(emp_program)
 
-        # Create EmployeeArea entries
-        for area_id in areas:
-            emp_area = EmployeeArea(
-                employeeID=empID,
-                areaID=int(area_id)
-            )
-            db.session.add(emp_area)
+            # Create EmployeeArea entries
+            for area_id in areas:
+                emp_area = EmployeeArea(
+                    employeeID=empID,
+                    areaID=int(area_id)
+                )
+                db.session.add(emp_area)
+            
+        # Handle EmployeeFolder entries
+        if is_update:
+            # For updates, only update folder permissions if provided
+            if selected_folders and len(selected_folders) > 0:
+                # Delete existing EmployeeFolder entries for update
+                EmployeeFolder.query.filter_by(employeeID=empID).delete()
+                # Create new EmployeeFolder entries
+                for folder_path in selected_folders:
+                    emp_folder = EmployeeFolder(
+                        employeeID=empID,
+                        folderPath=folder_path
+                    )
+                    db.session.add(emp_folder)
+        else:
+            # For new users, create folder permissions if provided
+            for folder_path in selected_folders:
+                emp_folder = EmployeeFolder(
+                    employeeID=empID,
+                    folderPath=folder_path
+                )
+                db.session.add(emp_folder)
 
-        # Create EmployeeFolder entries
-        for folder_path in selected_folders:
-            emp_folder = EmployeeFolder(
-                employeeID=empID,
-                folderPath=folder_path
-            )
-            db.session.add(emp_folder)
-
-        # Audit created user
+        # Audit user operation
+        action_type = "UPDATED" if is_update else "CREATED NEW"
         new_log = AuditLog(
             employeeID = admin_user.employeeID,
-            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW USER {last_name}, {first_name} {suffix}. Admin={isAdmin}"
+            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} {action_type} USER {empID}. Admin={isAdmin}, CoAdmin={isCoAdmin}"
         )
         db.session.add(new_log)
         db.session.commit()
+
+        message = 'Employee updated successfully!' if is_update else 'Employee created successfully!'
         return jsonify({
             'success': True,
-            'message': 'Employee created successfully!',
+            'message': message,
             'profilePic': profilePicPath,  # Return None if no upload
         }), 200
  
@@ -818,17 +945,17 @@ def register_routes(app):
         try:
             # Query user
             user = Employee.query.filter_by(employeeID=employeeID).first()
-
+            
             if not user:
                 return jsonify({
                     'success': False, 
                     'message': 'Employee not found'
                 }), 404
             
-               # Get user's programs and areas from junction tables
+            # Get user's programs and areas from junction tables
             user_programs = []
             user_areas = []
-
+            
             for ep in user.employee_programs:
                 program = Program.query.get(ep.programID)
                 if program:
@@ -837,7 +964,7 @@ def register_routes(app):
                         'programName': program.programName,
                         'programCode': program.programCode
                     })
-
+            
             for ea in user.employee_areas:
                 area = Area.query.get(ea.areaID)
                 if area:
@@ -858,10 +985,10 @@ def register_routes(app):
                 'profilePic': user.profilePic,
                 'isAdmin': user.isAdmin,
                 'role': 'admin' if user.isAdmin else 'user',
-                
+            
                 'programs': user_programs,
                 'areas': user_areas,
-
+  
                 'programName': user_programs[0]['programName'] if user_programs else 'Not Assigned',
                 'programCode': user_programs[0]['programCode'] if user_programs else 'N/A', 
                 'areaName': user_areas[0]['areaName'] if user_areas else 'Not Assigned',
@@ -992,37 +1119,51 @@ def register_routes(app):
     @app.route('/api/users', methods=["GET"])
     @jwt_required()
     def get_users():
-
         users = Employee.query.all()
-
-         # Get user's programs and areas from junction tables
-        user_programs = []
-        user_areas = []
-
-        for ep in user.employee_programs:
-            program = Program.query.get(ep.programID)
-            if program:
-                user_programs.append(program.programName)
-
-        for ea in user.employee_areas:
-            area = Area.query.get(ea.areaID)
-            if area:
-                user_areas.append(f"{area.areaNum}: {area.areaName}")
         
         user_list = []
         for user in users:
+            # Get user's programs and areas from junction tables
+            user_programs = []
+            user_areas = []
+            
+            for ep in user.employee_programs:
+                program = Program.query.get(ep.programID)
+                if program:
+                    user_programs.append(program.programName)
+            
+            for ea in user.employee_areas:
+                area = Area.query.get(ea.areaID)
+                if area:
+                    user_areas.append(f"{area.areaNum}: {area.areaName}")
+            
+            # Get user's folder permissions
+            user_folders = []
+            for ef in user.employee_folders:
+                user_folders.append(ef.folderPath)
+            
             user_data = {
                 'employeeID': user.employeeID,
+                'fName': user.fName,
+                'lName': user.lName,
+                'suffix': user.suffix,
                 'programs': user_programs,
                 'areas': user_areas,
+                'folders': user_folders,
                 'programName': ', '.join(user_programs) if user_programs else 'Not Assigned',
                 'areaName': ', '.join(user_areas) if user_areas else 'Not Assigned',
-                'areaNum': user_areas[0].split(':')[0] if user_areas else 'N/A',                
+                'areaNum': user_areas[0].split(':')[0] if user_areas else 'N/A',
                 'name': f"{user.fName} {user.lName} {user.suffix or ''}",
                 'email': user.email,
                 'contactNum': user.contactNum,
                 'profilePic': f"/api/user/profile-pic/{user.employeeID}" if user.profilePic else None,
                 'isAdmin': user.isAdmin,
+                'isCoAdmin': user.isCoAdmin,
+                'isRating': user.isRating,
+                'isEdit': user.isEdit,
+                'crudFormsEnable': user.crudFormsEnable,
+                'crudProgramEnable': user.crudProgramEnable,
+                'crudInstituteEnable': user.crudInstituteEnable,
                 'isOnline': user.isOnline
             } 
         
@@ -1291,27 +1432,52 @@ def register_routes(app):
 
     #Get the institute
     @app.route('/api/institute', methods=["GET"])
+    @jwt_required()
     def get_institute():
-        institutes = Institute.query.all()
+        try:
+            current_user_id = get_jwt_identity()
+            current_user = Employee.query.filter_by(employeeID=current_user_id).first()
+            
+            if not current_user:
+                return jsonify({'success': False, 'message': 'User not found'}), 404
+            
+            # All users can see all institutes
+            institutes = Institute.query.all()
                     
-        institute_list = []
+            institute_list = []
 
-        for institute in institutes:
+            for institute in institutes:
+                dean = institute.dean
+                
+                # Get program count for this institute
+                program_count = Program.query.filter_by(instID=institute.instID).count()
 
-            dean = institute.dean
-
-            institute_data = {
-                'instID': institute.instID,
-
-                'instDean': f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A",
-
-                'instCode': institute.instCode,
-                'instName': institute.instName,
-                'instPic': institute.instPic,
-                'employeeID': institute.employeeID  # Include the foreign key ID
-            } 
-            institute_list.append(institute_data)
-        return jsonify({"institutes": institute_list}), 200
+                institute_data = {
+                    'instID': institute.instID,
+                    'instDean': f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A",
+                    'instCode': institute.instCode,
+                    'instName': institute.instName,
+                    'instPic': institute.instPic,
+                    'employeeID': institute.employeeID,
+                    'programCount': program_count
+                } 
+                institute_list.append(institute_data)
+                
+            return jsonify({
+                'success': True,
+                'institutes': institute_list,
+                'accessLevel': 'full',
+                'userPermissions': {
+                    'isAdmin': current_user.isAdmin,
+                    'isCoAdmin': current_user.isCoAdmin,
+                    'crudInstituteEnable': current_user.crudInstituteEnable,
+                    'assignedProgramCount': len(current_user.employee_programs)
+                }
+            }), 200
+            
+        except Exception as e:
+            current_app.logger.error(f"Get institutes error: {e}")
+            return jsonify({'success': False, 'message': 'Failed to fetch institutes'}), 500
     
 
     @app.route('/api/institute/logos/<string:instCode>', methods=["GET"])
@@ -1319,7 +1485,7 @@ def register_routes(app):
         institute = Institute.query.filter_by(instCode=instCode).first()
         if not institute or not institute.instPic:
             return jsonify({"success": False, "message": "Institute logo not found"}), 404
-            
+
         # Validate Nextcloud configuration
         NEXTCLOUD_URL = os.getenv("NEXTCLOUD_URL")
         NEXTCLOUD_USER = os.getenv("NEXTCLOUD_USER")
@@ -1528,7 +1694,7 @@ def register_routes(app):
                 return jsonify({'error': 'Program not found'}), 404
             
             updated_counts = {}
-
+            
             # Delete employee-program relationships instead of updating Employee table
             employees_updated = EmployeeProgram.query.filter_by(programID=programID).delete()
             updated_counts['employees'] = employees_updated
@@ -1555,15 +1721,17 @@ def register_routes(app):
                 'deletedID': programID,
                 'updated_counts': updated_counts
             }), 200
-            
+                
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Delete program error: {str(e)}")
             return jsonify({'error': 'Database error occurred'}), 500
-
-    @app.route('/api/program', methods=['GET'])
+        
+    @app.route('/api/program', methods=['GET', 'OPTIONS'])
     @jwt_required()
     def get_user_program():
+        if request.method == 'OPTIONS':
+            return ('', 204)
         try:
             current_user_id = get_jwt_identity()
             current_user = Employee.query.filter_by(employeeID=current_user_id).first()
@@ -1571,31 +1739,57 @@ def register_routes(app):
             if not current_user:
                 return jsonify({'success': False, 'message': 'User not found'}), 404
             
-            # If user is admin, return all programs
-            if current_user.isAdmin or current_user.crudProgramEnable:
+            # Determine user access level
+            is_admin = current_user.isAdmin
+            is_co_admin = current_user.isCoAdmin
+            has_program_crud = current_user.crudProgramEnable
+            
+            # Admin: Return all programs
+            # Co-Admin with crudProgramEnable: Return all programs
+            # Regular user with crudProgramEnable: Return all programs
+            # Co-Admin without crudProgramEnable: Return only assigned programs
+            # Regular user without crudProgramEnable: Return only assigned programs
+            
+            if is_admin or has_program_crud:
+                # Full access - return all programs
                 programs = Program.query.all()
+                access_level = 'full'
             else:
-                # If regular user, return only their assigned programs
+                # Limited access - return only assigned programs
                 user_program_ids = [ep.programID for ep in current_user.employee_programs]
-                programs = Program.query.filter(Program.programID.in_(user_program_ids)).all()
+                if user_program_ids:
+                    programs = Program.query.filter(Program.programID.in_(user_program_ids)).all()
+                else:
+                    programs = []  # No assigned programs
+                access_level = 'assigned'
                     
             program_list = []
             for program in programs:
                 dean = program.dean
+                institute = program.institute
                 program_data = {
                     'programID': program.programID,
                     'programDean': f"{dean.fName} {dean.lName} {dean.suffix or ''}" if dean else "N/A",
                     'programCode': program.programCode,
                     'programName': program.programName,
                     'programColor': program.programColor,
-                    'employeeID': program.employeeID
+                    'employeeID': program.employeeID,
+                    'instID': program.instID,
+                    'instituteName': institute.instName if institute else "N/A",
+                    'instituteCode': institute.instCode if institute else "N/A"
                 }
                 program_list.append(program_data)
 
             return jsonify({
                 'success': True,
                 'programs': program_list,
-                'isAdmin': current_user.isAdmin
+                'accessLevel': access_level,
+                'userPermissions': {
+                    'isAdmin': is_admin,
+                    'isCoAdmin': is_co_admin,
+                    'crudProgramEnable': has_program_crud,
+                    'assignedProgramCount': len(current_user.employee_programs)
+                }
             }), 200
             
         except Exception as e:
@@ -1641,6 +1835,23 @@ def register_routes(app):
         db.session.commit()
 
         return jsonify({'success': True, 'message': 'Area progress saved!'}), 200
+
+    @app.route('/api/area/option', methods=["GET"])
+    def get_area_option():
+
+        area_options = AreaReference.query.all()
+
+        option_list = []
+
+        for opt in area_options:
+            area_data = {
+                'areaName': opt.areaName,
+                'areaNum': opt.areaNum,
+                'title': f'{opt.areaName}: {opt.areaNum}'
+            }
+
+            option_list.append(area_data)
+        return jsonify(option_list), 200
 
 
     # ============================================ Notifications ============================================
@@ -1902,8 +2113,10 @@ def register_routes(app):
 
 
     #Get the area for displaying in tasks
-    @app.route('/api/area', methods=["GET"])
+    @app.route('/api/area', methods=["GET", "OPTIONS"])
     def get_area():
+        if request.method == 'OPTIONS':
+            return ('', 204)
         areas = (Area.query
                  .join(Program, Area.programID == Program.programID)
                  .order_by(Area.areaID.asc())               
@@ -1934,8 +2147,8 @@ def register_routes(app):
                 'areaNum': area.areaNum,
                 'areaName': f"{area.areaNum}: {area.areaName}",
                 'progress': area.progress,
-                'subareaName': area.subareaName,  
-                'archived': area.archived              
+                'subareaName': area.subareaName,                
+                'archived': area.archived,                
             }
             area_list.append(area_data)
         
@@ -2051,7 +2264,7 @@ def register_routes(app):
         program_code = request.args.get('programCode')
 
         data = (
-        db.session.query(
+            db.session.query(
                 Area.areaID,
                 Program.programCode,
                 Area.areaName,
@@ -2070,14 +2283,14 @@ def register_routes(app):
                 Document.isApproved,
                 Document.predicted_rating
             )
-        .outerjoin(Program, Area.programID == Program.programID)
+            .outerjoin(Program, Area.programID == Program.programID)
         .outerjoin(Subarea, (Area.areaID == Subarea.areaID) & (Subarea.archived == False))
         .outerjoin(Criteria, (Subarea.subareaID == Criteria.subareaID) & (Criteria.archived == False))
-        .outerjoin(Document, Criteria.docID == Document.docID)
+            .outerjoin(Document, Criteria.docID == Document.docID)       
         .filter(Program.programCode == program_code, Area.archived == False)
-        .order_by(Area.areaID.asc(), Subarea.subareaID.asc(), Criteria.criteriaID.asc())
-        .all()
-    )
+            .order_by(Area.areaID.asc(), Subarea.subareaID.asc(), Criteria.criteriaID.asc())
+            .all() 
+        )
 
 
         result = {}
@@ -2269,7 +2482,7 @@ def register_routes(app):
                 doc.docName = file_name
                 doc.content = extracted_text
                 doc.tags = list(tags)
-                doc.embedding = embedding
+                doc.embedding = embedding            
 
                 # Audit updated doc
                 new_log = AuditLog(
@@ -2407,13 +2620,94 @@ def register_routes(app):
 
        
     # ============================================ Documents Routes ============================================
+    
+    def filter_folders_by_access(tree, allowed_programs):
+        """
+        Filter the folder tree to only show folders that the user has access to.
+        Returns only the Programs folder contents as root, filtered by allowed program codes.
+        """
+        import copy
+        
+        # Navigate to Accreditation/Programs if it exists
+        if 'folders' in tree and 'Accreditation' in tree['folders']:
+            accreditation = tree['folders']['Accreditation']
+            
+            if 'folders' in accreditation and 'Programs' in accreditation['folders']:
+                programs_folder = copy.deepcopy(accreditation['folders']['Programs'])
+                
+                # Filter program folders based on allowed_programs
+                if 'folders' in programs_folder:
+                    filtered_programs = {
+                        program_code: program_data
+                        for program_code, program_data in programs_folder['folders'].items()
+                        if program_code in allowed_programs
+                    }
+                    programs_folder['folders'] = filtered_programs
+                
+                # Return only the Programs folder as root
+                return programs_folder
+        
+        # If Programs folder not found, return empty structure
+        return {"files": [], "folders": {}}
 
     # display all the documents inside nextcloud repo
     @app.route('/api/documents', methods=["GET"])
+    @jwt_required()
     def list_files():
         try:
+            current_user_id = get_jwt_identity()
+            user = Employee.query.filter_by(employeeID=current_user_id).first()
+            
+            if not user:
+                return jsonify({"error": "User not found"}), 404
+            
+            # Get full folder tree from Nextcloud
             tree = list_files_from_nextcloud()
-            return jsonify(tree)
+            
+            # If admin, return everything starting from Programs folder
+            if user.isAdmin:
+                if 'folders' in tree and 'Accreditation' in tree['folders']:
+                    accreditation = tree['folders']['Accreditation']
+                    if 'folders' in accreditation and 'Programs' in accreditation['folders']:
+                        return jsonify(accreditation['folders']['Programs'])
+                return jsonify(tree)
+            
+            # Get user's program codes (not names - folder names match program codes like BSIT, BSED)
+            user_program_ids = [ep.programID for ep in user.employee_programs]
+            user_programs = Program.query.filter(Program.programID.in_(user_program_ids)).all()
+            user_program_codes = [p.programCode for p in user_programs]
+            
+            # Get user's optional folder access
+            optional_folder_paths = [ef.folderPath for ef in user.employee_folders]
+            
+            # Extract program codes from optional folder paths
+            # Support both formats: 
+            # - UDMS_Repository/Accreditation/Programs/{ProgramCode}
+            # - UDMS_Repository/Programs/{ProgramCode}
+            optional_program_codes = []
+            for path in optional_folder_paths:
+                parts = path.split('/')
+                if len(parts) >= 3 and parts[0] == 'UDMS_Repository':
+                    if len(parts) >= 4 and parts[1] == 'Accreditation' and parts[2] == 'Programs':
+                        # Format: UDMS_Repository/Accreditation/Programs/{ProgramCode}
+                        optional_program_codes.append(parts[3])
+                    elif len(parts) >= 3 and parts[1] == 'Programs':
+                        # Format: UDMS_Repository/Programs/{ProgramCode}
+                        optional_program_codes.append(parts[2])
+            
+            # Combine all allowed program codes
+            allowed_programs = set(user_program_codes + optional_program_codes)
+            
+            # Debug logging
+            print(f"User {user.employeeID} - Program codes: {user_program_codes}")
+            print(f"User {user.employeeID} - Optional folder paths: {optional_folder_paths}")
+            print(f"User {user.employeeID} - Optional program codes: {optional_program_codes}")
+            print(f"User {user.employeeID} - Allowed programs: {allowed_programs}")
+            
+            # Filter the folder tree
+            filtered_tree = filter_folders_by_access(tree, allowed_programs)
+            
+            return jsonify(filtered_tree)
             
         except Exception as e:
             return jsonify({"Error": str(e)}), 500
@@ -3642,7 +3936,7 @@ def register_routes(app):
                 })
             
             db.session.commit()
-
+            
             return jsonify({
                 "success": True,
                 "message": "Template saved successfully!",
@@ -3657,7 +3951,7 @@ def register_routes(app):
                 }
             }), 201
         
-
+            
         except Exception as e:
             db.session.rollback()
             print("Save template error:", str(e))

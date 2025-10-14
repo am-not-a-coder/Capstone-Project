@@ -7,11 +7,11 @@ import CollegeInfoModal from "../components/modals/CollegeInfoModal";
 import { apiGet, apiPut, apiDelete, apiPostForm, apiGetBlob, apiPutForm, API_URL } from "../utils/api_utils";
 import StatusModal from "../components/modals/StatusModal";
 import { CardSkeleton } from "../components/Skeletons";
-import { adminHelper } from "../utils/auth_utils";
+import { PermissionGate } from "../utils/auth_utils";
 
 const Institutes = () => {
 
-        const isAdmin = adminHelper()
+
 
         // State for institutes data
         const [institutes, setInstitutes] = useState([]);
@@ -321,9 +321,9 @@ const Institutes = () => {
              
                 {/* Main Content */}
               <div className="flex flex-wrap gap-5 mt-20 mb-8 lg:mt-8" >
-                {isAdmin && (
-                  <CreateCard setShowForm={setShowForm} title="Institute"/>
-                )}
+                  <PermissionGate requires='crudInstituteEnable'>
+                    <CreateCard setShowForm={setShowForm} title="Institute"/>
+                  </PermissionGate>
                 {/* Loading  */}
                  {loading ? (
                     <>
@@ -348,22 +348,24 @@ const Institutes = () => {
               
               
               {/*Form*/}
-              {isAdmin && showForm && 
-              <CreateForm 
-                title="Institute"
-                data={institutes}
-                onSubmit={handleSubmit}
-                onClose={() => setShowForm(false)}
-                onEditSelect={handleEditSelect}
-                onDeleteSelect={handleDeleteSelect}
-                onDelete={handleDelete}
-                activeModify={activeModify}
-                editIndex={editIndex}
-                form={form}
-                handleChange={handleChange}
-                handleModify={handleModify}
-                employees={employees}
-              />}
+              <PermissionGate requires='crudInstituteEnable'>
+                { showForm && 
+                <CreateForm 
+                  title="Institute"
+                  data={institutes}
+                  onSubmit={handleSubmit}
+                  onClose={() => setShowForm(false)}
+                  onEditSelect={handleEditSelect}
+                  onDeleteSelect={handleDeleteSelect}
+                  onDelete={handleDelete}
+                  activeModify={activeModify}
+                  editIndex={editIndex}
+                  form={form}
+                  handleChange={handleChange}
+                  handleModify={handleModify}
+                  employees={employees}
+                />}
+              </PermissionGate>
 
               <CollegeInfoModal
                 college={selectedCollege}

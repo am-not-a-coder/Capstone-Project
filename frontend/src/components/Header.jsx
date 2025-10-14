@@ -14,7 +14,7 @@ import avatar3 from '../assets/avatar3.png';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentUser } from '../utils/auth_utils';
-import { apiGet, apiPut } from '../utils/api_utils';
+import { apiGet, apiPut, apiDelete } from '../utils/api_utils';
 import { getSocket } from '../utils/websocket_utils';
 import NotifItem from './NotifItem';
 import notificationSound from '../utils/notificationSound';
@@ -125,6 +125,21 @@ const Header = ({title}) => {
           setUnreadCount(0);
         }
       };
+
+    // Delete a single notification from header list
+    const handleDeleteNotification = async (notificationId, isRead) => {
+        try {
+            const res = await apiDelete(`/api/notifications/${notificationId}`)
+            if (res && res.success) {
+                setNotifications(prev => prev.filter(n => n.notificationID !== notificationId))
+                if (!isRead) {
+                    setUnreadCount((c) => Math.max(0, (c || 0) - 1))
+                }
+            }
+        } catch (e) {
+            console.error('Failed to delete notification from header', e)
+        }
+    }
 
     //closes tab when scrolling /notif header
     useEffect(() => {
@@ -386,6 +401,8 @@ const Header = ({title}) => {
                                         date={new Date(notification.createdAt).toLocaleDateString()} 
                                         alert={!notification.isRead} 
                                         link={notification.link} 
+                                        type={notification.type}
+                                        onDelete={() => handleDeleteNotification(notification.notificationID, notification.isRead)}
                                         onClose={() => setShowNotification(false)}
                                     />
                                 )) 

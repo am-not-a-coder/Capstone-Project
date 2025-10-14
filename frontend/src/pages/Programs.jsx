@@ -20,16 +20,18 @@ import CreateModal from '../components/modals/CreateModal';
 import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer";
 import "@cyntler/react-doc-viewer/dist/index.css";
 import "../../index.css"
-import { adminHelper } from '../utils/auth_utils';
+import { adminHelper, getCurrentUser } from '../utils/auth_utils';
 import { CardSkeleton } from '../components/Skeletons';
 import StatusModal from "../components/modals/StatusModal";
 import { ApplyTempModal } from '../components/modals/TemplateModal';
 import toast, { Toaster } from 'react-hot-toast'
 import ArchiveModal from '../components/modals/ArchiveModal';
 
+
   const Programs = () => {
     //admin
     const isAdmin = adminHelper()
+    const user = getCurrentUser()
     // use state function
   const [institutes, setInstitutes] = useState([]);
   const [programs, setPrograms] = useState([]);
@@ -75,8 +77,27 @@ import ArchiveModal from '../components/modals/ArchiveModal';
 
       if (response?.success || response?.data?.success) {
         const programsArr = response.data?.programs ?? response.programs ?? [];
+        const accessLevel = response.data?.accessLevel ?? response.accessLevel;
+        const userPermissions = response.data?.userPermissions ?? response.userPermissions;
 
         Array.isArray(programsArr) ? setPrograms(programsArr) : setPrograms([]);
+        
+        // Log user access information for debugging
+        console.log('Program Access Info:', {
+          accessLevel,
+          userPermissions,
+          programCount: programsArr.length
+        });
+
+        // Show user-friendly message based on access level
+        if (accessLevel === 'assigned' && programsArr.length === 0) {
+          console.log('User has no assigned programs');
+        } else if (accessLevel === 'full') {
+          console.log('User has full program access');
+        } else {
+          console.log(`User has access to ${programsArr.length} assigned programs`);
+        }
+
       } else {
         console.error('Failed to fetch the programs:', response.error || response);
         setPrograms([]);
@@ -101,10 +122,27 @@ import ArchiveModal from '../components/modals/ArchiveModal';
         try {
           const response = await apiGet('/api/institute');
           
-          Array.isArray(response.data.institutes) ? setInstitutes(response.data.institutes) : setInstitutes([]);
+          if (response?.success || response?.data?.success) {
+            const institutesArr = response.data?.institutes ?? response.institutes ?? [];
+            const accessLevel = response.data?.accessLevel ?? response.accessLevel;
+            const userPermissions = response.data?.userPermissions ?? response.userPermissions;
+
+            Array.isArray(institutesArr) ? setInstitutes(institutesArr) : setInstitutes([]);
+            
+            // Log user access information for debugging
+            console.log('Institute Access Info:', {
+              accessLevel,
+              userPermissions,
+              instituteCount: institutesArr.length
+            });
+          } else {
+            console.error('Failed to fetch institutes:', response.error || response);
+            setInstitutes([]);
+          }
           
         } catch (err) {
           console.error("Unexpected error fetching institutes", err);
+          setInstitutes([]);
         }
       }
       fetchInstitutes();
@@ -874,8 +912,9 @@ import ArchiveModal from '../components/modals/ArchiveModal';
                     
                     {/* Program Cards Section */}
                     <div className={`${visible == "programs" ? 'block' : 'hidden'} flex flex-wrap gap-4`}>
-
-                { isAdmin && editMode && (
+                
+                { isAdmin || user.crudProgramEnable && (
+                  
                   <CreateCard form={form} handleChange={handleChange} setShowForm={setShowForm} title="Program" />)}
                   {programLoading ? (
                     <>
@@ -1067,6 +1106,7 @@ import ArchiveModal from '../components/modals/ArchiveModal';
                 </div>
 
                 {/*Form Modal*/}
+                
                 {showForm && 
                 <CreateForm 
                   title="Program"
@@ -1084,6 +1124,7 @@ import ArchiveModal from '../components/modals/ArchiveModal';
                   handleChange={handleChange}
                   handleModify={handleModify}
                 />}
+               
             </div>
       </>
     );

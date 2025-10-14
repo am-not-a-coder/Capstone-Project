@@ -11,7 +11,7 @@
   import SubContForm from '../components/SubContForm';
   
   import { apiGet, apiGetBlob } from '../utils/api_utils';
-  import { adminHelper } from '../utils/auth_utils';
+  import { adminHelper, canRate } from '../utils/auth_utils';
   import ProgramCard from '../components/ProgramCard';
   import { CardSkeleton } from '../components/Skeletons';
   import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer";
@@ -42,12 +42,13 @@
     const [programLoading, setProgramLoading] = useState(false);
     const [areaRatings, setAreaRatings] = useState({});
     const isAdmin = adminHelper()
+    const canRatePermission = canRate()
 
-    if (!isAdmin) return <Navigate to="/Dashboard" replace />
+    if (!canRatePermission) return <Navigate to="/Dashboard" replace />
     
     useEffect(() => {
       const fetchProgram = async () => {
-        if (!isAdmin) return
+        if (!canRatePermission) return
         setProgramLoading(true);
 
         try {

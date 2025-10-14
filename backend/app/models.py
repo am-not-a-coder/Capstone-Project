@@ -23,7 +23,7 @@ class Vector(UserDefinedType):
 class Employee(db.Model):
     __tablename__ = 'employee'
 
-    employeeID = db.Column(db.String(10), primary_key=True, nullable=False)        
+    employeeID = db.Column(db.String(10), primary_key=True, nullable=False)
     fName = db.Column(db.String(50), nullable=False)
     lName = db.Column(db.String(50))
     suffix = db.Column(db.String(10))
@@ -39,6 +39,7 @@ class Employee(db.Model):
     crudInstituteEnable = db.Column(db.Boolean, default=False)
     isOnline = db.Column(db.Boolean, default=False)
     experiences = db.Column(db.Text)
+    isCoAdmin = db.Column(db.Boolean, default=False)
 
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     
@@ -46,7 +47,6 @@ class Employee(db.Model):
     otpcode = db.Column(db.String(6))
     otpexpiry = db.Column(db.DateTime(timezone=True))
     otpverified = db.Column(db.Boolean, default=False)
-    
     
     # Relationships to junction tables
     employee_programs = db.relationship("EmployeeProgram", backref="employee")
@@ -72,8 +72,16 @@ class EmployeeFolder(db.Model):
     __tablename__ = 'employee_folder'
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    employeeID = db.Column(db.String(10), db.ForeignKey('employee.employeeID', ondelete='CASCADE'), nullable=False)
-    folderPath = db.Column(db.String(500), nullable=False)
+    employeeID = db.Column('employeeid', db.String(10), db.ForeignKey('employee.employeeID', ondelete='CASCADE'), nullable=False)
+    folderPath = db.Column('folderPath', db.String(500), nullable=False)
+
+class AreaReference(db.Model):
+    _tablename_ = 'area_reference'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    areaName = db.Column(db.String(120), nullable=False) 
+    areaNum = db.Column(db.String(25), nullable=False)
+
     # ============================ 
 
 # class AccreditationCycle(db.Model):
