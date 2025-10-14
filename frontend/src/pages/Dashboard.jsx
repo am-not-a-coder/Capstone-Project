@@ -6,7 +6,8 @@ import{
     faPlus,
     faGears,
     faHourglassHalf,
-    faCalendarDays 
+    faCalendarDays,
+    faTrash
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {useNavigate} from 'react-router-dom';
@@ -23,6 +24,8 @@ const Dashboard = () => {
     const [showStatusModal, setShowStatusModal] = useState(false);
     const [statusMessage, setStatusMessage] = useState("");
     const [statusType, setStatusType] = useState("success");
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
 
     const [showAnnounceModal, setShowAnnounceModal] = useState(false);
     const [announcements, setAnnouncements] = useState([]);
@@ -130,25 +133,25 @@ const Dashboard = () => {
         if (!isAdmin) {
             toast.error('Only admins can delete announcements');
             return;
-        }
-
-        if (window.confirm('Are you sure you want to delete this announcement?')) {
-            try {
-                console.log('🗑️ Deleting announcement:', announcementId);
-                const response = await apiDelete(`/api/announcement/delete/${announcementId}`);
-                console.log('🗑️ Delete response:', response);
-                
-                if (response.success) {
-                    toast.success('Announcement deleted successfully');
-                    fetchAnnouncements(); // Refresh the list
-                } else {
-                    toast.error(response.error || 'Failed to delete announcement');
-                }
-            } catch (error) {
-                console.error('Error deleting announcement:', error);
-                toast.error('Failed to delete announcement');
+        }        
+    
+        try {
+            console.log('🗑️ Deleting announcement:', announcementId);
+            const response = await apiDelete(`/api/announcement/delete/${announcementId}`);
+            console.log('🗑️ Delete response:', response);
+            
+            if (response.success) {
+                toast.success('Announcement deleted successfully');
+                setShowDeleteConfirm(false);
+                fetchAnnouncements(); // Refresh the list
+            } else {
+                toast.error(response.error || 'Failed to delete announcement');
             }
+        } catch (error) {
+            console.error('Error deleting announcement:', error);
+            toast.error('Failed to delete announcement');
         }
+        
     };
 
     // Fetch logs
@@ -165,7 +168,7 @@ const Dashboard = () => {
             }
         } 
         fetchLogs()
-    }, [])
+    }, [logs])
 
     // Fetch pending documents
     const [pendingDocs, setPendingDocs] = useState([])
@@ -223,7 +226,7 @@ const Dashboard = () => {
                     ) : announcements && announcements.length > 0 ? (
                         <div className="space-y-3 max-h-[400px] overflow-y-auto">
                             {announcements.map((announcement, index) => (
-                                <div key={index} className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm dark:bg-gray-800 dark:border-gray-700">
+                                <div key={index} className="p-4 bg-gray-100 border border-gray-200 rounded-lg shadow-sm dark:bg-gray-800 dark:border-gray-700">
                                     <div className="flex items-start justify-between mb-2">
                                         <h3 className="font-semibold text-gray-800 dark:text-white">{announcement.announceTitle}</h3>
                                         <div className="flex items-center gap-2">
@@ -232,7 +235,10 @@ const Dashboard = () => {
                                             </span>
                                             {isAdmin && (
                                                 <button
-                                                    onClick={() => handleDeleteAnnouncement(announcement.announceID)}
+                                                    onClick={() => {
+                                                        setShowDeleteConfirm(true);
+                                                        setSelectedAnnouncement(announcement);
+                                                    }}
                                                     className="px-2 py-1 text-xs text-red-600 transition-colors rounded hover:bg-red-100 dark:hover:bg-red-900"
                                                 >
                                                     Delete
@@ -251,6 +257,41 @@ const Dashboard = () => {
                 </div>
             </section>
 
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"> 
+                    <div className='absolute flex flex-col items-center justify-center p-4 border border-gray-200 shadow-lg bg-red-50 w-100 rounded-xl dark:bg-gray-700 dark:border-gray-600 fade-in'>
+                        <div className='flex items-center justify-center mb-4 bg-red-200 rounded-full inset-shadow-sm w-18 h-18 inset-shadow-red-300'>
+                            <FontAwesomeIcon icon={faTrash} className="m-auto text-4xl text-red-500"/>
+                        </div>
+                        
+                        <h3 className='mb-2 text-xl font-bold text-gray-900 dark:text-white'>
+                            Delete Announcement
+                        </h3>
+                        <span className='mb-6 text-center text-gray-600 break-words dark:text-gray-300'>
+                        Are you sure you want to delete "<strong>{selectedAnnouncement.announceTitle}</strong>"? 
+                        </span>
+
+                        <div className='flex gap-4'>
+                            <button 
+                                className='px-4 py-2 text-white bg-red-500 rounded-lg hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700' 
+                                onClick={() => handleDeleteAnnouncement(selectedAnnouncement.announceID)}
+                            >
+                                Yes
+                            </button>
+                            <button 
+                                className='px-4 py-2 text-gray-800 bg-gray-200 rounded-lg hover:bg-gray-300 dark:text-white dark:bg-gray-600 dark:hover:bg-gray-700' 
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowDeleteConfirm(false);
+                                }}
+                            >
+                                No
+                            </button>
+                        </div>                                    
+                    </div>
+                </div>
+                )}
+
             {showAnnounceModal && (
                 <AnnouncementModal setShowModal={setShowAnnounceModal} onCreate={handleCreateAnnouncement}/>
             )}
@@ -264,9 +305,14 @@ const Dashboard = () => {
                         <FontAwesomeIcon icon={faHourglassHalf}  className="p-2 transition-all duration-500 dark:text-white" />
                         <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Pending Documents</h2>
                     </div>
-                    <div className="flex flex-col gap-1 p-1 transition-all duration-500 rounded-lg h-60 bg-neutral-300 dark:bg-gray-950/50">
+                    <div className="flex flex-col gap-1 p-3 overflow-y-auto transition-all duration-500 rounded-lg h-60 bg-neutral-300 dark:bg-gray-950/50">
                         {pendingDocs.map((pendingDoc)=> (
-                            <p key={pendingDoc.pendingDocID} className="text-gray-700 transition-all duration-500 hover:bg-gray-400 dark:text-white">{pendingDoc.pendingDocName}</p>
+                            <div 
+                                key={pendingDoc.pendingDocID}
+                                className='p-3 mb-1 transition-all duration-500 bg-gray-100 rounded-lg shadow-xl cursor-pointer hover:bg-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700'
+                            >
+                                <p  className="text-gray-700 dark:text-white">{pendingDoc.pendingDocName}</p>
+                            </div>
                         ))}
                     </div>
                 </div>
@@ -298,6 +344,9 @@ const Dashboard = () => {
                                         const isCreate = log.action.includes('CREATED');
                                         const isUpload = log.action.includes('UPLOADED');
                                         const isLoggedOut = log.action.includes('LOGGED OUT');
+                                        const isEdit = log.action.includes('EDITED');
+                                        const isDownload = log.action.includes('DOWNLOADED');
+                                        const isUpdate = log.action.includes('UPDATED');
 
                                         return (
                                             <tr 
@@ -336,13 +385,28 @@ const Dashboard = () => {
                                                                 Logout
                                                             </span>
                                                         )}
+                                                        {isEdit && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-teal-200 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300">
+                                                                Edit
+                                                            </span>
+                                                        )}
+                                                        {isUpdate && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-teal-200 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300">
+                                                                Update
+                                                            </span>
+                                                        )}
+                                                        {isDownload && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-200 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                                                Download
+                                                            </span>
+                                                        )}
                                                         <span className="text-sm text-gray-700 transition-all duration-500 dark:text-white">
                                                             {log.action}
                                                         </span>
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-right text-gray-700 transition-all duration-500 dark:text-white">
-                                                    {log.createdAt}
+                                                    {new Date(log.createdAt).toLocaleString()}
                                                 </td>
                                             </tr>
                                         );

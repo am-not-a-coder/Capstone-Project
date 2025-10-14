@@ -315,7 +315,8 @@ const Tasks = () => {
     <section className="grid grid-cols-2 grid-rows-[auto_1fr] relative p-3 gap-5 text-neutral-800 border-1 border-neutral-300 rounded-lg shadow-xl transition-all duration-500 dark:shadow-sm dark:shadow-zuccini-800">
     {/* Create Deadlines */} {/* admin */}
     
-    { (isAdmin || user.isCoAdmin) &&(<div className="col-span-2 transition-all duration-500 dark:text-white">
+    { (isAdmin || user.isCoAdmin) &&(
+        <div className="col-span-2 transition-all duration-500 dark:text-white">
         
             <div className="relative col-span-2 pt-3 px-3 min-h-[100px] border border-neutral-300 rounded-md transition-all duration-500 inset-shadow-sm inset-shadow-gray-400 dark:shadow-sm dark:shadow-zuccini-900 dark:bg-gray-900">
                 <h1 className="mx-3 my-1 font-medium text-md">
@@ -369,7 +370,7 @@ const Tasks = () => {
                     </div>
 
                     {/* Select Criteria */}
-                    <div className="min-h-[100px] p-3 flex flex-col justify-center">
+                    {/* <div className="min-h-[100px] p-3 flex flex-col justify-center">
                         <label htmlFor="criteria"
                             className='mb-1 text-lg font-extralight'>Criteria</label>
                         <select name="criteria" id="criteria"
@@ -384,7 +385,7 @@ const Tasks = () => {
                                 </option>
                             ))}
                         </select>
-                    </div>
+                    </div> */}
 
 
                     {/* Select Criteria */}
@@ -403,7 +404,7 @@ const Tasks = () => {
                     <input 
                     type="submit" 
                     value="Create Deadline"
-                    className='absolute px-6 py-2 font-semibold text-gray-600 transition-all duration-500 border-gray-500 shadow-xl cursor-pointer from-gray-300/50 via-gray-200 to-gray-400/50 dark:text-gray-200 hover:text-gray-200 top-3 right-3 place-self-center rounded-xl bg-gradient-to-br hover:from-zuccini-400 hover:via-zuccini-500 hover:to-zuccini-700'
+                    className='px-6 py-2 font-semibold text-gray-600 transition-colors duration-500 border-gray-500 shadow-xl cursor-pointer from-gray-300/50 via-gray-200 to-gray-400/50 dark:text-gray-200 hover:text-gray-200 place-self-center rounded-xl bg-gradient-to-br hover:from-zuccini-400 hover:via-zuccini-500 hover:to-zuccini-700 dark:from-gray-800/50 dark:via-gray-700 dark:to-gray-900/50'
                     />
                     <div className='flex flex-col col-span-4 px-3 py-3 '>
                         <label htmlFor="content"

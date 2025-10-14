@@ -1170,23 +1170,6 @@ def register_routes(app):
             user_list.append(user_data)
         return jsonify({"users" : user_list}), 200
 
-    @app.route('/api/area/option', methods=["GET"])
-    def get_area_option():
-
-        area_options = AreaReference.query.all()
-
-        option_list = []
-
-        for opt in area_options:
-            area_data = {
-                'areaName': opt.areaName,
-                'areaNum': opt.areaNum,
-                'title': f'{opt.areaName}: {opt.areaNum}'
-            }
-
-            option_list.append(area_data)
-        return jsonify(option_list), 200
-
     # ============================================ INSTITUTES PAGE ROUTES ============================================
     
     #edit institute base on institute 
