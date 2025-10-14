@@ -84,20 +84,19 @@ function App() {
 
 
 
-  console.log('🚀 App component rendering...')
 
   const [authReady, setAuthReady] = useState(false)
   const [authTick, setAuthTick] = useState(0)
   const isAdmin = adminHelper()
   
-  console.log('🔍 Current state - authReady:', authReady, 'authTick:', authTick)
+
   const awayTimeRef = useRef(null)
   const lastStatusRef = useRef('active')
   const mouseMoveThrottleRef = useRef(false)
 
   // Monitor authReady changes
   useEffect(() => {
-    console.log('🔄 authReady changed to:', authReady)
+ 
   }, [authReady])
 
   
@@ -110,7 +109,7 @@ function App() {
         const user = JSON.parse(localStorage.getItem('user'))
 
         if (existingSessionId) {
-          console.log('Validating existing session:', existingSessionId)
+         
           
           // Validate existing session
           const validationResponse = await apiPost('/api/validate-session', { 
@@ -118,7 +117,7 @@ function App() {
           })
 
           if (!validationResponse.success) {
-            console.log('Session Expired! Logging out...')
+            
 
             // Audit session expiration BEFORE clearing storage
             if (user) {
@@ -161,10 +160,8 @@ function App() {
 let isComponentMounted = true
 
 const loadUser = async () => {
-  console.log('🔄 loadUser called, isComponentMounted:', isComponentMounted)
   try {
     if (localStorage.getItem('session_id')) {
-      console.log('Found session_id, validating with backend...')
 
       try {
         await fetchCurrentUser() 
@@ -172,7 +169,6 @@ const loadUser = async () => {
         for (const k of Object.keys(sessionStorage)) {
           if (k.startsWith('welcomeShown:')) sessionStorage.removeItem(k)
         }
-        console.log('Session valid, initializing WebSocket...')
         initPresenceListeners()
         const socket = getSocket()
         if (socket.connected) {
@@ -183,7 +179,6 @@ const loadUser = async () => {
           })
         }
       } catch (error) {
-        console.log('Session invalid, clearing storage...')
         // Session is invalid, clear everything
         localStorage.removeItem('session_id')
         localStorage.removeItem('user')
@@ -196,21 +191,17 @@ const loadUser = async () => {
         }
       }
     } else {
-      console.log('No session_id found, user not logged in')
     }
   } catch (error) {
     console.error('Error loading user:', error)
   } finally {
-    console.log('🔓 Setting authReady to true...')
     setAuthReady(true)
-    console.log('✅ authReady set to true')
   }
 }
 
 const startInactivityTimer = () => {
   try {
     const socket = getSocket()
-    console.log('[timer] got socket. connected?', socket.connected)
 
     if (lastStatusRef.current === 'away') return
 
@@ -218,11 +209,8 @@ const startInactivityTimer = () => {
 
     awayTimeRef.current = setTimeout(() => {
       try {
-        console.log('[timer] emitting check_status (ack)')
         socket.emit('check_status', (res) => {
-          console.log('[timer] ack:', res)
           if (res && res.user_status === 'active') {
-            console.log('[timer] emitting status_change: away')
             socket.emit('status_change', 'away', (ack) => {
               if (ack && ack.updated) {
                 lastStatusRef.current = 'away'
@@ -262,7 +250,6 @@ const stopInactivityTimer = () => {
 }
 
 useEffect(() => {
-  console.log('mount on appjsxs')
   
     // Check if we're on the login page and clear session_id
     if (window.location.pathname === '/login') {
@@ -292,7 +279,6 @@ useEffect(() => {
   ch.onmessage = async (e) => {
     const { type } = e.data || {};
     if (type === 'login') {
-      console.log('login')
       // Clear any stale welcome flags before showing dashboard
       sessionStorage.removeItem('welcomeShown')
       for (const k of Object.keys(sessionStorage)) {
@@ -330,7 +316,6 @@ useEffect(() => {
   
   // Fallback timeout to ensure authReady gets set
   const fallbackTimeout = setTimeout(() => {
-    console.log('⏰ Fallback timeout - setting authReady to true')
     setAuthReady(true)
   }, 3000) // 3 second timeout
 
