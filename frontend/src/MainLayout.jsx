@@ -17,7 +17,8 @@ import{
     faFileAlt, 
     faMoon,
     faIdCardClip,
-    faArrowRightFromBracket
+    faArrowRightFromBracket,
+    faPenFancy
 } from '@fortawesome/free-solid-svg-icons';
 import { getCurrentUser, adminHelper } from './utils/auth_utils';
 import { apiPost } from './utils/api_utils';
@@ -29,6 +30,7 @@ const MainLayout = () => {
   const location = useLocation();
   const activePage = location.pathname.replace('/','') || 'Dashboard';
   const isAdmin = adminHelper()
+  const user = getCurrentUser()
 
   //toggles Dark Mode
   const [darkMode, setDarkMode] = useState(() =>{
@@ -74,17 +76,23 @@ const MainLayout = () => {
                   active={activePage === 'Programs'}
                   onClick={() => navigate('/Programs')}
                 />
-                { isAdmin && (<SidebarLinks
+                { (isAdmin || user.isRating) && (<SidebarLinks
                   icon={faIdCardClip}
                   text="Accreditation"
                   active={activePage === 'Accreditation'}
                   onClick={() => navigate('/Accreditation')}
                 />)}
-                { isAdmin && (<SidebarLinks
+                { (isAdmin || user.isEdit) && (<SidebarLinks
                   icon={faUsers}
                   text="Users"
                   active={activePage === 'Users'}
                   onClick={() => navigate('/Users')}
+                />)}
+                { isAdmin && (<SidebarLinks
+                  icon={faPenFancy}
+                  text="Templates"
+                  active={activePage === 'Templates'}
+                  onClick={() => navigate('/Templates')}
                 />)}
                 <SidebarLinks
                   icon={faCircleCheck}
@@ -132,14 +140,14 @@ const MainLayout = () => {
             <div className="flex justify-center space-x-[50px]">
                              <button onClick={ async () => {
                  const sessionId = localStorage.getItem('session_id')
-                 const currentUser = getCurrentUser()
+                 
                  // Close logout modal first
                  setShowLogout(false)
                  
                  // Send session ID to backend (employeeID is optional now)
                  await apiPost('/api/logout', { 
                    session_id: sessionId, 
-                   employeeID: currentUser?.employeeID || null
+                   employeeID: user?.employeeID || null
                  })
                  
                  // Clear frontend storage

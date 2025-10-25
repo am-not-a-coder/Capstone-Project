@@ -207,7 +207,7 @@ export const SidebarContext = createContext();
                 
             </aside>
 
-            <button onClick={() => setExpanded(current => !current)} className={`${expanded ? 'left-65 lg:left-67 lg:top-8 z-50 ' : 'left-2 lg:top-8 lg:left-8 z-10 hover:left-12'} top-4 absolute p-2 px-4 transition-none lg:transition-all duration-500 rounded-lg bg-zuccini-900`}>
+            <button onClick={() => setExpanded(current => !current)} className={`${expanded ? 'left-65 lg:left-67 lg:top-8 z-50 ' : 'left-2 lg:top-8 lg:left-8 z-60 lg:hover:left-12 '} top-4 absolute p-2 px-4 transition-none lg:transition-all duration-500 rounded-lg bg-zuccini-900`}>
                 { expanded ? <FontAwesomeIcon icon={faAngleLeft} /> : <FontAwesomeIcon icon={faAngleRight} /> }
             </button>
         </>

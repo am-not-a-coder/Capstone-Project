@@ -85,7 +85,7 @@ const SubContForm = ({title,  selfRateMode, onClick, onFilePreview, subareaID, p
         {/* CriteriaGroup div */}
         <div 
         onClick={() => {setCriteriaExpand(isOpen ? null : index)}}
-        className={`flex flex-row items-center justify-between p-3 ${selfRateMode ? '' : 'py-5' } mb-2 ml-5 transition-all duration-300 border shadow-md cursor-pointer rounded-2xl border-neutral-400 text-neutral-800 hover:scale-101 dark:text-white hover:border-neutral-500 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 `}>
+        className={`flex flex-row items-center justify-between p-2 md:p-3 ${selfRateMode ? '' : 'md:py-5' } mb-2 ml-5 transition-all duration-300 border shadow-md cursor-pointer rounded-2xl border-neutral-400 text-neutral-800 hover:scale-101 dark:text-white hover:border-neutral-500 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 `}>
             <h2 className='font-semibold'>{groupName}</h2>
              <div className='flex flex-row items-center justify-center mr-3'>                
                        {selfRateMode && (
@@ -171,7 +171,7 @@ const SubContForm = ({title,  selfRateMode, onClick, onFilePreview, subareaID, p
         <li className='flex flex-col list-inside'>
             <button 
                 onClick={() => {setExpanded(prev => !prev); if (onClick) onClick();}}
-                className={`flex flex-row items-center justify-between p-3 py-5 mb-2 ml-5 transition-all duration-300 border shadow-md cursor-pointer rounded-2xl border-neutral-400 text-neutral-800 hover:scale-101 dark:text-white hover:border-neutral-500 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 `}>   
+                className={`flex flex-row items-center justify-between p-2 md:p-3 md:py-5 mb-2 ml-0 md:ml-5 transition-all duration-300 border shadow-md cursor-pointer rounded-2xl border-neutral-400 text-neutral-800 hover:scale-101 dark:text-white hover:border-neutral-500 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 `}>   
                 <h1 className='font-semibold text-md'>{title}</h1>
                 <div className='flex flex-row items-center justify-center mr-3'>
                      {selfRateMode && (
@@ -186,13 +186,13 @@ const SubContForm = ({title,  selfRateMode, onClick, onFilePreview, subareaID, p
                     <FontAwesomeIcon 
                         icon={expanded ? faChevronUp : faChevronDown} 
                         onClick={() => setExpanded(prev => !prev)}
-                        className="ml-3"
+                        className="ml-2 -mr-2 md:-mr-0"
                     />
                 </div>
             </button>
 
             
-            <div className={`flex flex-col ml-5 transition-all duration-400 ease-in-out ${
+            <div className={`flex flex-col ml-0 md:ml-5 transition-all duration-400 ease-in-out ${
                 expanded ? 'max-h-[2000px] opacity-100 overflow-visible' : 'overflow-hidden max-h-0 opacity-0' }`}>    
                         {renderCriteriaGroup(`Inputs ${selfRateMode ? '(20%)' : ''}`, criteriaState.inputs, 0)}
                         {renderCriteriaGroup(`Processes  ${selfRateMode ? '(30%)' : ''}`, criteriaState.processes, 1)}

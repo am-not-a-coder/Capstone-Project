@@ -20,7 +20,7 @@ const StatusModal = ({message, onClick, showModal, type = "success"}) =>{
                 <h1 className={`mb-2 text-5xl drop-shadow-2xl ${isError ? 'text-red-500' : 'text-zuccini-600'}`}>{isError ? "Error" : "Success"}</h1>
             </div>
 
-            <h1 className='mb-3 text-3xl text-neutral-800 text-shadow-lg dark:text-white'>{message}</h1>
+            <h1 className='mb-3 text-3xl text-center text-neutral-800 text-shadow-lg dark:text-white'>{message}</h1>
             
             <button className={`transition duration-300 w-[150px] rounded-lg p-4 mt-5 font-semibold text-white cursor-pointer ${isError ? 'bg-red-500 hover:bg-red-400 ' : 'bg-zuccini-600 hover:bg-zuccini-500'}`} onClick={onClick}>Go Back</button>
                 

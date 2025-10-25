@@ -180,7 +180,7 @@ const SubCont = ({title, subareaID, criteria, programCode, areaName, subareaName
                 return (
                 <div 
                  key={itemIndex} 
-                 className='relative flex flex-row justify-between gap-3 p-3 py-10 mb-2 ml-5 transition-all duration-300 border shadow-md cursor-default rounded-2xl border-neutral-400 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600'>
+                 className='relative flex flex-col md:flex-row justify-between gap-3 p-3 py-10 mb-2 ml-0 md:ml-5 transition-all duration-300 border shadow-md cursor-default rounded-2xl border-neutral-400 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600'>
                     {editMode && isEditingCriteria ? (
                         <div className='flex flex-col w-full gap-2' onClick={(e) => e.stopPropagation()}>
                         <textarea
@@ -211,11 +211,11 @@ const SubCont = ({title, subareaID, criteria, programCode, areaName, subareaName
                         </div>
                     ) : (
                         <>
-                        <span className='break-words align-middle text-[15px] max-w-[65%] whitespace-pre-wrap'>
+                        <span className='break-words md:align-middle text-[15px] w-full md:max-w-[65%] whitespace-pre-wrap'>
                             {item.content}
                         </span>
 
-                        <div className='flex flex-col items-center justify-center'>
+                        <div className='flex flex-col items-center justify-center'><br />
                             <h2 className='font-semibold'>Attached File</h2>
                             {item.docName ? (
                             <button
@@ -229,10 +229,10 @@ const SubCont = ({title, subareaID, criteria, programCode, areaName, subareaName
                             )}
                         </div>
 
-                        <span className='absolute text-sm italic text-gray-500 bottom-2 left-3 dark:text-gray-300'>
+                        <span className='absolute text-xs md:text-sm italic text-gray-500 bottom-2 left-3 dark:text-gray-300'>
                             Area ID: {item.criteriaID}
                         </span>
-                        <h1 className='absolute text-sm italic text-gray-500 bottom-2 right-5 dark:text-gray-300'>
+                        <h1 className='absolute text-xs md:text-sm italic text-gray-500 bottom-2 right-5 dark:text-gray-300'>
                             Predicted rating: {item.predicted_rating?.toFixed(1)}
                         </h1>
 
@@ -263,7 +263,7 @@ const SubCont = ({title, subareaID, criteria, programCode, areaName, subareaName
                             </button>
                             </>
                            ) : (
-                            <div className='relative flex items-center justify-between gap-5 mr-3'>
+                            <div className='relative flex items-center justify-between gap-5 ml-14 md:ml-0'>
                                 {isAdmin ? (
                                 <>
                                         <FontAwesomeIcon                     
@@ -364,7 +364,7 @@ const SubCont = ({title, subareaID, criteria, programCode, areaName, subareaName
         <li className='flex flex-col list-inside'>
             <div
              onClick={() => {setExpanded(prev => !prev); if (onClick) onClick();}}  
-             className='flex flex-row justify-between p-3 py-5 mb-2 ml-5 transition-all duration-300 border shadow-md cursor-pointer rounded-2xl border-neutral-400 text-neutral-800 hover:scale-101 dark:text-white hover:border-neutral-500 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900'>
+             className='flex flex-row justify-between p-2 md:p-3 md:py-5 mb-2 md:ml-5 transition-all duration-300 border shadow-md cursor-pointer rounded-2xl border-neutral-400 text-neutral-800 hover:scale-101 dark:text-white hover:border-neutral-500 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900'>
                 {editMode && isEditing ? (
                     <div className='flex flex-col w-full gap-2' onClick={(e) => e.stopPropagation()}>
                         <input 
@@ -427,7 +427,7 @@ const SubCont = ({title, subareaID, criteria, programCode, areaName, subareaName
                             e.stopPropagation();
                             setExpanded(!expanded);
                             }}
-                            className='cursor-pointer'
+                            className='cursor-pointer -mr-1'
                         />
                         </div>
                     </>
@@ -435,7 +435,7 @@ const SubCont = ({title, subareaID, criteria, programCode, areaName, subareaName
                 </div>
 
             
-            <div className={`flex flex-col ml-5 transition-all duration-400 ease-in-out ${
+            <div className={`flex flex-col ml-0 md:ml-5 transition-all duration-400 ease-in-out ${
                 expanded ? 'max-h-[2000px] opacity-100 overflow-visible' : 'overflow-hidden max-h-0 opacity-0' }`}>    
                         {renderCriteriaGroup("Inputs", criteria.inputs, 0)}
                         {renderCriteriaGroup("Processes", criteria.processes, 1)}

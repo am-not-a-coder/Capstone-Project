@@ -6,14 +6,15 @@ import{
     faPlus,
     faGears,
     faHourglassHalf,
-    faCalendarDays 
+    faCalendarDays,
+    faTrash
 } from '@fortawesome/free-solid-svg-icons';
 import {Link, Navigate, Route, useNavigate} from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useState } from 'react';
 import { apiGet, apiPost, apiDelete, API_URL } from '../utils/api_utils';
 import toast from 'react-hot-toast';
-import { Toaster } from 'react-hot-toast'
+import { Toaster } from 'react-hot-toast';
 import { getCurrentUser, adminHelper } from '../utils/auth_utils';
 import AnnouncementModal from '../components/modals/AnnouncementModal';
 import StatusModal from '../components/modals/StatusModal';
@@ -23,6 +24,8 @@ const Dashboard = () => {
     const [showStatusModal, setShowStatusModal] = useState(false);
     const [statusMessage, setStatusMessage] = useState("");
     const [statusType, setStatusType] = useState("success");
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
 
     const [showAnnounceModal, setShowAnnounceModal] = useState(false);
     const [announcements, setAnnouncements] = useState([]);
@@ -130,25 +133,25 @@ const Dashboard = () => {
         if (!isAdmin) {
             toast.error('Only admins can delete announcements');
             return;
-        }
-
-        if (window.confirm('Are you sure you want to delete this announcement?')) {
-            try {
-                console.log('🗑️ Deleting announcement:', announcementId);
-                const response = await apiDelete(`/api/announcement/delete/${announcementId}`);
-                console.log('🗑️ Delete response:', response);
-                
-                if (response.success) {
-                    toast.success('Announcement deleted successfully');
-                    fetchAnnouncements(); // Refresh the list
-                } else {
-                    toast.error(response.error || 'Failed to delete announcement');
-                }
-            } catch (error) {
-                console.error('Error deleting announcement:', error);
-                toast.error('Failed to delete announcement');
+        }        
+    
+        try {
+            console.log('🗑️ Deleting announcement:', announcementId);
+            const response = await apiDelete(`/api/announcement/delete/${announcementId}`);
+            console.log('🗑️ Delete response:', response);
+            
+            if (response.success) {
+                toast.success('Announcement deleted successfully');
+                setShowDeleteConfirm(false);
+                fetchAnnouncements(); // Refresh the list
+            } else {
+                toast.error(response.error || 'Failed to delete announcement');
             }
+        } catch (error) {
+            console.error('Error deleting announcement:', error);
+            toast.error('Failed to delete announcement');
         }
+        
     };
 
     // Fetch logs
@@ -182,29 +185,36 @@ const Dashboard = () => {
         } 
         fetchPendingDocs()
     }, [])
+    console.log(pendingDocs)
 
     function parseDocumentPath(pendingDoc) {
-        const pathParts = pendingDoc.pendingDocPath.split('/')
-        const programIndex = pathParts.findIndex(part => part === 'Programs')
-        const programCode = pathParts[programIndex + 1]
-        const areaName = pathParts[programIndex + 2]
-        const subareaName = pathParts[programIndex + 3]
-        const criteria = pathParts[programIndex + 4]
-        const criteriaNum = pathParts[programIndex + 5]
-        const documentName = pathParts[programIndex + 6]
+        if (!pendingDoc?.pendingDocPath || typeof pendingDoc.pendingDocPath !== 'string') {
+            console.warn('⚠️ Invalid pendingDocPath:', pendingDoc);
+            return {
+            programCode: '',
+            areaName: '',
+            subareaName: '',
+            criteria: '',
+            criteriaNum: '',
+            documentName: ''
+            };
+        }
+        const pathParts = pendingDoc.pendingDocPath.split('/');
+        const programIndex = pathParts.findIndex(part => part === 'Programs');
         return {
-            programCode,
-            areaName,
-            subareaName,
-            criteria,
-            criteriaNum,
-            documentName
+            programCode: pathParts[programIndex + 1] || '',
+            areaName: pathParts[programIndex + 2] || '',
+            subareaName: pathParts[programIndex + 3] || '',
+            criteria: pathParts[programIndex + 4] || '',
+            criteriaNum: pathParts[programIndex + 5] || '',
+            documentName: pathParts[programIndex + 6] || ''
         };
     }
 
     // Navigate to accreditation with parsed path information
     const navigate = useNavigate()
     function handlePendingDocClick(pathInfo) {
+        parseDocumentPath(pathInfo)
         navigate('/Accreditation', {
             state: {
                 programCode: pathInfo.programCode,
@@ -239,7 +249,7 @@ const Dashboard = () => {
             <section className={` relative mt-4 mb-8 p-5 text-neutral-800 border-1 dark:border-gray-700 border-gray-300 rounded-3xl shadow-xl transition-all duration-500 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-900`}>
                 <div className='flex flex-row items-center'>
                     <FontAwesomeIcon icon={faBullhorn} className="p-2 dark:text-white" />
-                    <h2 className="mb-4 text-xl font-semibold text-neutral-800 dark:text-white">Announcements</h2>
+                    <h2 className="mb-1 lg:mb-4 text-md lg:text-xl font-semibold text-neutral-800 dark:text-white">Announcements</h2>
                 </div>
 
                 { isAdmin &&(<div 
@@ -247,7 +257,7 @@ const Dashboard = () => {
                     if (!isAdmin) { toast.error('Admins only'); return }
                     setShowAnnounceModal(true)
                 }}
-                className="absolute flex flex-row items-center justify-around px-5 py-1 transition-all duration-500 cursor-pointer top-5 right-5 rounded-3xl hover:bg-zuccini-600 active:bg-zuccini-500" >
+                className="absolute flex flex-row items-center justify-around px-2 md:px-5 py-0 md:py-1 transition-all duration-500 cursor-pointer top-4 md:top-5 right-5 rounded-3xl hover:bg-zuccini-600 active:bg-zuccini-500" >
                     <FontAwesomeIcon icon={faPlus} className="mr-2 dark:text-white" />
                     <h1 className="text-lg dark:text-white">New</h1>
                 </div>)}
@@ -259,8 +269,8 @@ const Dashboard = () => {
                     ) : announcements && announcements.length > 0 ? (
                         <div className="space-y-3 max-h-[400px] overflow-y-auto">
                             {announcements.map((announcement, index) => (
-                                <div key={index} className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                                    <div className="flex justify-between items-start mb-2">
+                                <div key={index} className="p-2 md:p-4 bg-gray-100 border border-gray-300 rounded-lg shadow-sm dark:bg-gray-800 dark:border-gray-700">
+                                    <div className="flex flex-col md:flex-row items-start justify-between mb-2">
                                         <h3 className="font-semibold text-gray-800 dark:text-white">{announcement.announceTitle}</h3>
                                         <div className="flex items-center gap-2">
                                             <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -268,15 +278,18 @@ const Dashboard = () => {
                                             </span>
                                             {isAdmin && (
                                                 <button
-                                                    onClick={() => handleDeleteAnnouncement(announcement.announceID)}
-                                                    className="px-2 py-1 text-xs text-red-600 hover:bg-red-100 dark:hover:bg-red-900 rounded transition-colors"
+                                                    onClick={() => {
+                                                        setShowDeleteConfirm(true);
+                                                        setSelectedAnnouncement(announcement);
+                                                    }}
+                                                    className="px-2 py-1 text-xs text-red-600 transition-colors rounded hover:bg-red-100 dark:hover:bg-red-900"
                                                 >
                                                     Delete
                                                 </button>
                                             )}
                                         </div>
                                     </div>
-                                    <p className="text-gray-600 dark:text-gray-300 text-sm mb-2">{announcement.announceText}</p>
+                                    <p className="mb-2 text-sm text-gray-600 dark:text-gray-300">{announcement.announceText}</p>
                                     <p className="text-xs text-gray-500 dark:text-gray-400">By: {announcement.author}</p>
                                 </div>
                             ))}
@@ -287,12 +300,47 @@ const Dashboard = () => {
                 </div>
             </section>
 
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"> 
+                    <div className='absolute flex flex-col items-center justify-center p-4 border border-gray-200 shadow-lg bg-red-50 w-100 rounded-xl dark:bg-gray-700 dark:border-gray-600 fade-in'>
+                        <div className='flex items-center justify-center mb-4 bg-red-200 rounded-full inset-shadow-sm w-18 h-18 inset-shadow-red-300'>
+                            <FontAwesomeIcon icon={faTrash} className="m-auto text-4xl text-red-500"/>
+                        </div>
+                        
+                        <h3 className='mb-2 text-xl font-bold text-gray-900 dark:text-white'>
+                            Delete Announcement
+                        </h3>
+                        <span className='mb-6 text-center text-gray-600 break-words dark:text-gray-300'>
+                        Are you sure you want to delete "<strong>{selectedAnnouncement.announceTitle}</strong>"? 
+                        </span>
+
+                        <div className='flex gap-4'>
+                            <button 
+                                className='px-4 py-2 text-white bg-red-500 rounded-lg hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700' 
+                                onClick={() => handleDeleteAnnouncement(selectedAnnouncement.announceID)}
+                            >
+                                Yes
+                            </button>
+                            <button 
+                                className='px-4 py-2 text-gray-800 bg-gray-200 rounded-lg hover:bg-gray-300 dark:text-white dark:bg-gray-600 dark:hover:bg-gray-700' 
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowDeleteConfirm(false);
+                                }}
+                            >
+                                No
+                            </button>
+                        </div>                                    
+                    </div>
+                </div>
+                )}
+
             {showAnnounceModal && (
                 <AnnouncementModal setShowModal={setShowAnnounceModal} onCreate={handleCreateAnnouncement}/>
             )}
 
             { isAdmin && (
-                <section className='grid grid-rows-2 gap-4 mt-4 lg:grid-cols-2 lg:grid-rows-1'>
+                <section className='grid gap-4 mt-4 grid-cols-1 md:grid-cols-2 grid-rows-2 lg:grid-rows-1'>
 
                 {/* Pending Documents */}
                 <div className="p-5 mb-8 transition-all duration-500 shadow-xl text-neutral-800 border-1 border-neutral-300 rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:border-gray-900 dark:bg-gray-900" >
@@ -301,43 +349,112 @@ const Dashboard = () => {
                         <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Pending Documents</h2>
                     </div>
                     <div className="overflow-auto gap-1 relative whitespace-nowrap flex flex-col p-2 rounded-lg h-60 bg-neutral-300 dark:border-gray-900 dark:bg-gray-950/50" >
-                        {pendingDocs.map((pendingDoc)=> {
+                        {pendingDocs.filter(doc => doc.pendingDocPath && typeof doc.pendingDocPath === 'string').map((pendingDoc)=> {
                         const pathInfo = parseDocumentPath(pendingDoc)
                         return (
                             <p onClick={()=> handlePendingDocClick(pathInfo)} key={pendingDoc.pendingDocID} className=" text-gray-800 w-fit border-b border-gray-400 cursor-pointer hover:bg-gray-400 dark:text-white"><span className='font-semibold'>{pendingDoc.pendingDocName}</span><br/>{pathInfo.programCode}/{pathInfo.areaName}/{pathInfo.subareaName}/{pathInfo.criteria}/{pathInfo.criteriaNum}</p>
                         )})}
                     </div>
                 </div>
-                {/* Audit Logs */}
-                
-                <div className="p-5 mb-10 transition-all duration-500 shadow-xl text-neutral-800 border-1 dark:border-gray-900 border-neutral-300 rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-900">
-                    <div className='flex flex-row'>
-                        <FontAwesomeIcon icon={faGears}  className="p-2 transition-all duration-500 dark:text-white" />
-                        <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Audit Logs</h2>
-                    </div>
+                 {/* Audit Logs */}                
+                    <div className="p-5 mb-10 transition-all duration-500 shadow-xl text-neutral-800 border-1 dark:border-gray-900 border-neutral-300 rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-900">
+                        <div className='flex flex-row'>
+                            <FontAwesomeIcon icon={faGears} className="p-2 transition-all duration-500 dark:text-white" />
+                            <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Audit Logs</h2>
+                        </div>
 
-                    {/* Display logs */}
-                    <div className="overflow-auto rounded-lg h-60 bg-neutral-300 dark:border-gray-900 dark:bg-gray-950/50">
-                        <table className="min-w-full text-left">
-                            <thead>
-                                <tr>
-                                    <th className="px-3 py-2">Action</th>
-                                    <th className="px-3 py-2">Date & Time</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {(Array.isArray(logs) ? logs : []).map((log) => (
-                                    <tr key={log.logID} className='hover:bg-gray-400'>
-                                        <td className="px-3 py-2 text-gray-700 transition-all duration-500 dark:text-white">{log.action}</td>
-                                        <td className="px-3 py-2 text-gray-700 transition-all duration-500 dark:text-white">{log.createdAt}</td>
+                    {/* Display logs */}                    
+                        <div className="overflow-auto rounded-lg h-60 bg-neutral-300 dark:bg-gray-950/50">
+                            <table className="w-full">
+                                <thead className="sticky top-0 border-b border-gray-400 bg-neutral-400 dark:bg-gray-900 dark:border-gray-800">
+                                    <tr>
+                                        <th className="px-4 py-2 text-xs font-semibold tracking-wider text-left text-gray-700 uppercase dark:text-gray-300">
+                                            Action
+                                        </th>
+                                        <th className="px-4 py-2 text-xs font-semibold tracking-wider text-right text-gray-700 uppercase dark:text-gray-300">
+                                            Date & Time
+                                        </th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-gray-400 dark:divide-gray-800">
+                                    {logs.map((log) => {
+                                        const isLogin = log.action.includes('LOGGED IN');
+                                        const isDelete = log.action.includes('DELETED');
+                                        const isRate = log.action.includes('RATED');
+                                        const isCreate = log.action.includes('CREATED');
+                                        const isUpload = log.action.includes('UPLOADED');
+                                        const isLoggedOut = log.action.includes('LOGGED OUT');
+                                        const isEdit = log.action.includes('EDITED');
+                                        const isDownload = log.action.includes('DOWNLOADED');
+                                        const isUpdate = log.action.includes('UPDATED');
+
+                                        return (
+                                            <tr 
+                                                key={log.logID} 
+                                                className="transition-colors duration-150 hover:bg-gray-400 dark:hover:bg-gray-800/70"
+                                            >
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center gap-2">
+                                                        {isLogin && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-blue-200 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
+                                                                Login
+                                                            </span>
+                                                        )}
+                                                        {isDelete && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-red-200 text-red-800 dark:bg-red-900/40 dark:text-red-300">
+                                                                Delete
+                                                            </span>
+                                                        )}
+                                                        {isRate && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-orange-200 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300">
+                                                                Rate
+                                                            </span>
+                                                        )}
+                                                        {isCreate && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-200 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                                                Create
+                                                            </span>
+                                                        )}
+                                                        {isUpload && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-purple-200 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
+                                                                Upload
+                                                            </span>
+                                                        )}
+                                                        {isLoggedOut && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-amber-200 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                                                                Logout
+                                                            </span>
+                                                        )}
+                                                        {isEdit && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-teal-200 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300">
+                                                                Edit
+                                                            </span>
+                                                        )}
+                                                        {isUpdate && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-teal-200 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300">
+                                                                Update
+                                                            </span>
+                                                        )}
+                                                        {isDownload && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-200 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                                                Download
+                                                            </span>
+                                                        )}
+                                                        <span className="text-sm text-gray-700 transition-all duration-500 dark:text-white">
+                                                            {log.action}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-right text-gray-700 transition-all duration-500 dark:text-white">
+                                                    {new Date(log.createdAt).toLocaleString()}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                    
-                     
-                </div>
                 </section>
             )}
 

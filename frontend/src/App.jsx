@@ -14,15 +14,25 @@ import Profile from './pages/Profile';
 import Notification from './pages/Notification';
 import Messages from './pages/Messages';
 import AreaProgress from './pages/AreaProgress';
-import { fetchCurrentUser, getCurrentUser } from './utils/auth_utils';
+import Templates from './pages/Templates';
+import { fetchCurrentUser } from './utils/auth_utils';
 import { useEffect, useRef, useState } from 'react';
-import { logoutAcc, adminHelper } from './utils/auth_utils';
+import { 
+  logoutAcc, 
+  adminHelper, 
+  coAdminHelper,
+  canRate,
+  canEditUsers,
+  canManageForms,
+  hasAdminPrivileges 
+} from './utils/auth_utils';
 import { apiPost } from './utils/api_utils';
 import { initPresenceListeners, getSocket } from './utils/websocket_utils';
 import toast, { Toaster } from 'react-hot-toast'
 
 function App() {
   
+  // Admin only route
   const AdminRoute = ({ children }) => {
     const allowed = adminHelper()
     useEffect(() => {
@@ -32,20 +42,61 @@ function App() {
     return allowed ? children : <Navigate to="/Dashboard" replace />
   }
 
-  console.log('🚀 App component rendering...')
+  // Dynamic permission route - can check any permission
+  const PermissionRoute = ({ permission, children, fallbackPath = "/Dashboard" }) => {
+    const allowed = permission()
+    useEffect(() => {
+      if (authReady && !allowed) toast.error('You have no permission to access this page.')
+    }, [authReady, allowed])
+    if (!authReady) return <div>Loading...</div>
+    return allowed ? children : <Navigate to={fallbackPath} replace />
+  }
+
+  // Admin or Co-Admin route
+  const AdminOrCoAdminRoute = ({ children }) => {
+    const allowed = hasAdminPrivileges()
+    useEffect(() => {
+      if (authReady && !allowed) toast.error('You have no permission to access this page.')
+    }, [authReady, allowed])
+    if (!authReady) return <div>Loading...</div>
+    return allowed ? children : <Navigate to="/Dashboard" replace />
+  }
+
+  // Rating permission route
+  const RatingRoute = ({ children }) => {
+    const allowed = canRate()
+    useEffect(() => {
+      if (authReady && !allowed) toast.error('You have no permission to access this page.')
+    }, [authReady, allowed])
+    if (!authReady) return <div>Loading...</div>
+    return allowed ? children : <Navigate to="/Dashboard" replace />
+  }
+
+  // User edit permission route
+  const UserEditRoute = ({ children }) => {
+    const allowed = canEditUsers()
+    useEffect(() => {
+      if (authReady && !allowed) toast.error('You have no permission to access this page.')
+    }, [authReady, allowed])
+    if (!authReady) return <div>Loading...</div>
+    return allowed ? children : <Navigate to="/Dashboard" replace />
+  }
+
+
+
 
   const [authReady, setAuthReady] = useState(false)
   const [authTick, setAuthTick] = useState(0)
   const isAdmin = adminHelper()
   
-  console.log('🔍 Current state - authReady:', authReady, 'authTick:', authTick)
+
   const awayTimeRef = useRef(null)
   const lastStatusRef = useRef('active')
   const mouseMoveThrottleRef = useRef(false)
 
   // Monitor authReady changes
   useEffect(() => {
-    console.log('🔄 authReady changed to:', authReady)
+ 
   }, [authReady])
 
   
@@ -58,7 +109,7 @@ function App() {
         const user = JSON.parse(localStorage.getItem('user'))
 
         if (existingSessionId) {
-          console.log('Validating existing session:', existingSessionId)
+         
           
           // Validate existing session
           const validationResponse = await apiPost('/api/validate-session', { 
@@ -66,7 +117,7 @@ function App() {
           })
 
           if (!validationResponse.success) {
-            console.log('Session Expired! Logging out...')
+            
 
             // Audit session expiration BEFORE clearing storage
             if (user) {
@@ -109,10 +160,8 @@ function App() {
 let isComponentMounted = true
 
 const loadUser = async () => {
-  console.log('🔄 loadUser called, isComponentMounted:', isComponentMounted)
   try {
     if (localStorage.getItem('session_id')) {
-      console.log('Found session_id, validating with backend...')
 
       try {
         await fetchCurrentUser() 
@@ -120,7 +169,6 @@ const loadUser = async () => {
         for (const k of Object.keys(sessionStorage)) {
           if (k.startsWith('welcomeShown:')) sessionStorage.removeItem(k)
         }
-        console.log('Session valid, initializing WebSocket...')
         initPresenceListeners()
         const socket = getSocket()
         if (socket.connected) {
@@ -131,7 +179,6 @@ const loadUser = async () => {
           })
         }
       } catch (error) {
-        console.log('Session invalid, clearing storage...')
         // Session is invalid, clear everything
         localStorage.removeItem('session_id')
         localStorage.removeItem('user')
@@ -144,21 +191,17 @@ const loadUser = async () => {
         }
       }
     } else {
-      console.log('No session_id found, user not logged in')
     }
   } catch (error) {
     console.error('Error loading user:', error)
   } finally {
-    console.log('🔓 Setting authReady to true...')
     setAuthReady(true)
-    console.log('✅ authReady set to true')
   }
 }
 
 const startInactivityTimer = () => {
   try {
     const socket = getSocket()
-    console.log('[timer] got socket. connected?', socket.connected)
 
     if (lastStatusRef.current === 'away') return
 
@@ -166,11 +209,8 @@ const startInactivityTimer = () => {
 
     awayTimeRef.current = setTimeout(() => {
       try {
-        console.log('[timer] emitting check_status (ack)')
         socket.emit('check_status', (res) => {
-          console.log('[timer] ack:', res)
           if (res && res.user_status === 'active') {
-            console.log('[timer] emitting status_change: away')
             socket.emit('status_change', 'away', (ack) => {
               if (ack && ack.updated) {
                 lastStatusRef.current = 'away'
@@ -210,7 +250,6 @@ const stopInactivityTimer = () => {
 }
 
 useEffect(() => {
-  console.log('mount on appjsxs')
   
     // Check if we're on the login page and clear session_id
     if (window.location.pathname === '/login') {
@@ -240,7 +279,6 @@ useEffect(() => {
   ch.onmessage = async (e) => {
     const { type } = e.data || {};
     if (type === 'login') {
-      console.log('login')
       // Clear any stale welcome flags before showing dashboard
       sessionStorage.removeItem('welcomeShown')
       for (const k of Object.keys(sessionStorage)) {
@@ -278,7 +316,6 @@ useEffect(() => {
   
   // Fallback timeout to ensure authReady gets set
   const fallbackTimeout = setTimeout(() => {
-    console.log('⏰ Fallback timeout - setting authReady to true')
     setAuthReady(true)
   }, 3000) // 3 second timeout
 
@@ -308,13 +345,13 @@ useEffect(() => {
 
 // If the user is not logged in it will redirect to login page
 const ProtectedRoute = ({children}) => {
-  console.log('🔒 ProtectedRoute - authReady:', authReady, 'isLoggedIn:', isLoggedIn())
+  
   if (!authReady) {
-    console.log('⏳ Auth not ready, showing loading...')
+    
     return <div style={{padding: '20px', fontSize: '18px', color: 'blue'}}>Loading... Please wait</div>
   } else {
     const loggedIn = isLoggedIn()
-    console.log('🔐 Auth ready, logged in:', loggedIn)
+    
     return loggedIn ? children : <Navigate to="/login" />
   }
 }
@@ -352,19 +389,24 @@ const PublicOnlyRoute = ({ children }) => {
           <Route path="/Institutes" element={<Institutes />} />
           <Route path="/Programs" element={<Programs />} />
           <Route path="/Accreditation" element={
-            <AdminRoute>
+            <RatingRoute>
               <Accreditation isAdmin={isAdmin}/>
-            </AdminRoute>} />
+            </RatingRoute>} />
           <Route path="/Users" element={
-            <AdminRoute>
+            <UserEditRoute>
               <Users isAdmin={isAdmin}/>
+            </UserEditRoute>
+            } />
+          <Route path="/Templates" element={
+            <AdminRoute>
+              <Templates isAdmin={isAdmin}/>
             </AdminRoute>
             } />
           <Route path="/Tasks" element={<Tasks />} />
           <Route path="/Progress" element={<AreaProgress />} />
           <Route path="/Documents" element={<Documents />} />
 
-          {/* Profile page */}
+        {/* Profile page */}
          <Route path='/Profile' element={<Profile />}/>
          <Route path='/Notification' element={<Notification />}/>
          <Route path='/Messages' element={<Messages />} />

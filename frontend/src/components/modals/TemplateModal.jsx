@@ -13,19 +13,7 @@ export const ApplyTempModal = ({programCode, onClick, onApply, loading, createTe
     const [selectedTemplate, setSelectedTemplate] = useState(null);
     
 
-    useEffect(() => {        
-        const fetchTemplates = async () => {
-            try{
-                const res = await apiGet(`/api/templates`)
-
-                Array.isArray(res.data) ? setTemplates(res.data) : setTemplates([]);
-            } catch(err){
-                console.error("Failed to fetch templates", err)
-            }
-
-        }
-        if (programCode) fetchTemplates();
-    }, [programCode])
+    
 
      const handleApplyTemplate = async (templateID) => {
         await onApply(templateID);
