@@ -14,6 +14,7 @@ import { apiGet, apiPut, apiDelete, apiPost } from "../utils/api_utils";
 import TemplateBuilder from "../components/TemplateBuilder";
 import Select from 'react-select';
 import StatusModal from "../components/modals/StatusModal";
+import TemplateCardSkeleton from "../components/Skeletons";
 
 export default function Templates() {
 
@@ -56,11 +57,15 @@ export default function Templates() {
 
     const fetchTemplates = async () => {
             try{
+                setLoading(true);
                 const res = await apiGet(`/api/templates`)
 
-                Array.isArray(res.data) ? setTemplates(res.data) : setTemplates([]);             
+                Array.isArray(res.data) ? setTemplates(res.data) : setTemplates([]);
             } catch(err){
                 console.error("Failed to fetch templates", err)
+                setTemplates([]);
+            } finally {
+                setLoading(false);
             }
 
         }
@@ -83,6 +88,13 @@ export default function Templates() {
         fetchPrograms();
     }, []);    
 
+
+    // Debug: log selectedTemplate when details modal is opened to inspect duplicate ids
+    useEffect(() => {
+        if (showTemplateDetails && selectedTemplate) {
+            console.log("Selected Template (debug):", selectedTemplate);
+        }
+    }, [showTemplateDetails, selectedTemplate]);
 
     const handleApplyTemplate = async (templateID) => {
         if (selectedProgram.length === 0) {
@@ -136,10 +148,10 @@ export default function Templates() {
             const res = await apiDelete(`/api/templates/delete/${templateID}`);
             setShowStatusModal(true);
             setStatusMessage(res.data.message);
-            setStatusType("success");           
+            setStatusType("success");
             fetchTemplates();
         }catch(err){
-            console.log("Failed to delete template", err)
+            console.log("Failed to delete template", err);
             setShowStatusModal(true);
             setStatusMessage(res.data.message);
             setStatusType("error");  
@@ -172,41 +184,49 @@ export default function Templates() {
                     </div>
 
                     <div className='relative grid w-full h-full grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3'>
-                        {templates.length > 0 ? (templates.map((temp) => (
-                            <TemplateCard
-                                key={temp.templateID}
-                                onClick={() => {
-                                    setSelectedTemplate(temp);
-                                    setShowTemplateDetails(true);
-                                }}
-                                title={temp.templateName}
-                                status={temp.isApplied}
-                                description={temp.description}
-                                createdBy={temp.createdBy}                        
-                                editTemplate={(e) => {
-                                    e.stopPropagation();    
-                                    setSelectedTemplate(temp);
-                                    setShowTemplateDetails(false);
-                                    setVisible("edit");                            
-                                }}
-                                createdAt={new Date(temp.createdAt)
-                                    .toLocaleDateString("en-US", {
-                                        year: "numeric",
-                                        month: "long",
-                                        day: "numeric"
-                                    })}
-                            />
-                    ))
-                    ) : (
-                        <div className="flex flex-col items-center justify-center w-full h-full col-span-4">
-                            <h1 className="text-2xl font-semibold text-gray-500">No Templates Found</h1>
-                            <span className="mb-2 text-gray-500 text-md">Want to create a new one?</span>
-                            <button 
-                            onClick={handleCreateTemplate}
-                            className="px-5 py-3 rounded-[20px] hover:text-white text-gray-500/70 cursor-pointer font-semibold transition-all duration-300 bg-gray-400/50 hover:bg-zuccini-600">Create</button>
-                        </div>
-                    )}
-                </div>
+                        {loading ? (
+                            // Render a few skeletons while loading
+                            Array.from({ length: 6 }).map((_, i) => (
+                                <div key={i} className="p-2">
+                                    <TemplateCardSkeleton />
+                                </div>
+                            ))
+                        ) : templates.length > 0 ? (
+                            templates.map((temp) => (
+                                <TemplateCard
+                                    key={temp.templateID}
+                                    onClick={() => {
+                                        setSelectedTemplate(temp);
+                                        setShowTemplateDetails(true);
+                                    }}
+                                    title={temp.templateName}
+                                    status={temp.isApplied}
+                                    description={temp.description}
+                                    createdBy={temp.createdBy}                        
+                                    editTemplate={(e) => {
+                                        e.stopPropagation();    
+                                        setSelectedTemplate(temp);
+                                        setShowTemplateDetails(false);
+                                        setVisible("edit");                            
+                                    }}
+                                    createdAt={new Date(temp.createdAt)
+                                        .toLocaleDateString("en-US", {
+                                            year: "numeric",
+                                            month: "long",
+                                            day: "numeric"
+                                        })}
+                                />
+                            ))
+                        ) : (
+                            <div className="flex flex-col items-center justify-center w-full h-full col-span-4">
+                                <h1 className="text-2xl font-semibold text-gray-500">No Templates Found</h1>
+                                <span className="mb-2 text-gray-500 text-md">Want to create a new one?</span>
+                                <button 
+                                onClick={handleCreateTemplate}
+                                className="px-5 py-3 rounded-[20px] hover:text-white text-gray-500/70 cursor-pointer font-semibold transition-all duration-300 bg-gray-400/50 hover:bg-zuccini-600">Create</button>
+                            </div>
+                        )}
+                    </div>
             </div>
             )}
 
@@ -324,7 +344,7 @@ export default function Templates() {
                             <h1 className="mb-2 text-sm font-medium text-gray-800 dark:text-gray-100">Programs Applied:</h1>
                             <div className="flex flex-row gap-1">
                             {selectedTemplate.programs?.map((program) => (
-                                <div key={program.programID}
+                                <div key={`program-${program.programID}`}
                                     className="mb-2"
                                 >
                                     <span className="px-3 py-1 text-xs font-medium rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-800 dark:text-emerald-50">
@@ -337,22 +357,22 @@ export default function Templates() {
 
 
                             {/* Areas */}
-                            {selectedTemplate.areas?.map((area) => (
-                                <div key={area.areaID} className="mb-3">
+                            {selectedTemplate.areas?.map((area, areaIdx) => (
+                                <div key={`area-${area.areaID ?? area.areaBlueprintID ?? areaIdx}`} className="mb-3">
                                     <h2 className="px-3 py-2 text-lg font-semibold rounded-md bg-zuccini-500">
                                         {area.areaNum}: {area.areaName}
                                     </h2>
 
                                     {/* Subareas */}
                                     <div className="mt-2 ml-4 space-y-2">
-                                        {area.subareas?.map((sub) => (
-                                            <div key={sub.subareaID} className="pl-3 border-l-2 border-gray-300">
+                                        {area.subareas?.map((sub, subIdx) => (
+                                            <div key={`sub-${area.areaID ?? area.areaBlueprintID ?? areaIdx}-${sub.subareaID ?? sub.subareaBlueprintID ?? subIdx}`} className="pl-3 border-l-2 border-gray-300">
                                                 <h3 className="font-medium text-gray-700 dark:text-gray-100">{sub.subareaName}</h3>
 
                                                 {/* Criteria */}
                                                 <ul className="ml-4 text-sm text-gray-600 list-disc dark:text-gray-100">
-                                                    {sub.criteria && Object.values(sub.criteria).flat().map((crit) => (
-                                                        <li key={crit.criteriaID}>
+                                                    {sub.criteria && Object.values(sub.criteria).flat().map((crit, critIdx) => (
+                                                        <li key={`crit-${sub.subareaID ?? sub.subareaBlueprintID ?? (areaIdx + '-' + subIdx)}-${crit.criteriaID ?? crit.criteriaBlueprintID ?? critIdx}`}>
                                                             {crit.criteriaContent}
                                                         </li>
                                                         ))}

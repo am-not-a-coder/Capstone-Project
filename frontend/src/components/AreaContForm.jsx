@@ -8,11 +8,12 @@ import {
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { apiGet, apiPost } from '../utils/api_utils';
 import { useEffect, useState } from 'react';
+import StatusModal from './modals/StatusModal';
 
 
 //Area container div
 
-export default function AreaCont({title, onClick, isExpanded, onIconClick, selfRateMode, areaID, areaRating, onSaveAreaRating}) {
+export default function AreaContForm({title, onClick, isExpanded, onIconClick, selfRateMode, areaID, areaRating, onSaveAreaRating, programCode}) {
     const [hoveredArea, setHoveredArea] = useState(null);
     const [showModal, setShowModal] = useState(false);
     

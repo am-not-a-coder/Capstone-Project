@@ -162,11 +162,15 @@ const Tasks = () => {
     // Creates the deadline
     const handleCreateDeadline = async (e) => {
             e.preventDefault()
-            if (!isAdmin || !user.isCoAdmin) return 
+             if (!isAdmin && !(user && user.isCoAdmin)) {
+                setStatusMessage("Only Admins or Co-Admins can create deadlines")
+                setStatusType("error")
+                setShowStatusModal(true)
+                return
+            }            
             const formData = new FormData()
                 formData.append("program", program)
-                formData.append("area", selectedArea)
-                formData.append("criteriaID", criteria) // Add this line to include criteria ID
+                formData.append("area", selectedArea)                
                 formData.append("due_date", dueDate)
                 formData.append("content", content)
 
@@ -174,7 +178,7 @@ const Tasks = () => {
                 //create deadline api
                 const res = await apiPost('/api/deadline', formData, 
                 {withCredentials: true}) 
-
+                    console.log(program, selectedArea, dueDate, content)
                     setStatusMessage(res.data.message);
                     setShowStatusModal(true);
                     setStatusType("success");
@@ -186,7 +190,7 @@ const Tasks = () => {
                     setDueDate("");
 
                 // refetch deadline data
-                const deadlineRes = await apiGet("api/deadlines", {withCredentials: true})
+                const deadlineRes = await apiGet("/api/deadlines", {withCredentials: true});
 
                     Array.isArray(deadlineRes.data.deadline) ? setDeadLines(deadlineRes.data.deadline) : setDeadLines([]);   
                 
@@ -197,10 +201,11 @@ const Tasks = () => {
                     Array.isArray(eventRes.data) ? setEvent(eventRes.data) : setEvent([]);   
 
             }catch(err){
-                setStatusMessage("Server error. Please try again");
+                setStatusMessage("Failed to create deadline");
                 setShowStatusModal(true);
                 setStatusType("error")
                 console.log(err.res?.data || err.message)
+                
             }
         } 
     
@@ -315,7 +320,7 @@ const Tasks = () => {
     <section className="grid grid-cols-2 grid-rows-[auto_1fr] relative p-3 gap-5 text-neutral-800 border-1 border-neutral-300 rounded-lg shadow-xl transition-all duration-500 dark:shadow-sm dark:shadow-zuccini-800">
     {/* Create Deadlines */} {/* admin */}
     
-    { (isAdmin || user.isCoAdmin) &&(
+    { (isAdmin || user.isCoAdmin) && (
         <div className="col-span-2 transition-all duration-500 dark:text-white">
         
             <div className="relative col-span-2 pt-3 px-3 min-h-[100px] border border-neutral-300 rounded-md transition-all duration-500 inset-shadow-sm inset-shadow-gray-400 dark:shadow-sm dark:shadow-zuccini-900 dark:bg-gray-900">

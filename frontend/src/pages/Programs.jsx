@@ -4,8 +4,8 @@ import {
   faCircleXmark,
   faPlus,
   faPen,
-  faFolderOpen,
-  faBoxArchive
+  // faFolderOpen,
+  // faBoxArchive
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import ProgramCard from "../components/ProgramCard";
@@ -20,12 +20,12 @@ import CreateModal from '../components/modals/CreateModal';
 import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer";
 import "@cyntler/react-doc-viewer/dist/index.css";
 import "../../index.css"
-import { adminHelper, getCurrentUser } from '../utils/auth_utils';
+import { PermissionGate, adminHelper, getCurrentUser } from '../utils/auth_utils';
 import { CardSkeleton } from '../components/Skeletons';
 import StatusModal from "../components/modals/StatusModal";
 import { ApplyTempModal } from '../components/modals/TemplateModal';
 import toast, { Toaster } from 'react-hot-toast'
-import ArchiveModal from '../components/modals/ArchiveModal';
+// import ArchiveModal from '../components/modals/ArchiveModal';
 
 
   const Programs = () => {
@@ -913,9 +913,9 @@ import ArchiveModal from '../components/modals/ArchiveModal';
                     {/* Program Cards Section */}
                     <div className={`${visible == "programs" ? 'block' : 'hidden'} flex flex-wrap gap-4`}>
                 
-                { isAdmin || user.crudProgramEnable && (
-                  
-                  <CreateCard form={form} handleChange={handleChange} setShowForm={setShowForm} title="Program" />)}
+                 <PermissionGate requires={'crudProgramEnable'}>
+                    <CreateCard form={form} handleChange={handleChange} setShowForm={setShowForm} title="Program" />
+                  </PermissionGate>
                   {programLoading ? (
                     <>
                       <CardSkeleton />
@@ -1106,7 +1106,7 @@ import ArchiveModal from '../components/modals/ArchiveModal';
                 </div>
 
                 {/*Form Modal*/}
-                
+                <PermissionGate requires={'crudProgramEnable'}>
                 {showForm && 
                 <CreateForm 
                   title="Program"
@@ -1124,7 +1124,7 @@ import ArchiveModal from '../components/modals/ArchiveModal';
                   handleChange={handleChange}
                   handleModify={handleModify}
                 />}
-               
+               </PermissionGate>
             </div>
       </>
     );

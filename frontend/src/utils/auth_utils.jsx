@@ -131,7 +131,12 @@ export const hasAdminPrivileges = () => {
 
 export const PermissionGate = ({ requires, children }) => {
     const user = getCurrentUser() 
-    if (!user) return null 
+    if (!user) return null  
+
+    if (user.isAdmin === true) {
+        return children
+    }
+
     if (user[requires]) {   
         return children  
     }

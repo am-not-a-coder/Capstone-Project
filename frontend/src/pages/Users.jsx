@@ -1132,7 +1132,7 @@ useEffect(() => {
             className={`px-8 py-3 text-lg font-semibold text-white transition-all duration-300 transform shadow-lg bg-gradient-to-r ${loading ? 'from-gray-500 to-gray-600': ' from-green-500 to-green-600'} rounded-xl hover:shadow-xl hover:scale-105`}
           >
             <FontAwesomeIcon icon={faPlus} className="mr-2"/>
-            {employeeID ? 'Update User' : 'Create User'}
+            Create User
             {loading && (
               <FontAwesomeIcon icon={faSpinner} className="ml-3 animate-spin"/>
             )}

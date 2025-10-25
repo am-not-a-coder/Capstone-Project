@@ -167,10 +167,10 @@ export default function AreaCont({
             </div>
             
             <h3 className='mb-2 text-xl font-bold text-gray-900 dark:text-white'>
-                Delete User
+                Delete Area
             </h3>
             <span className='mb-6 text-center text-gray-600 break-words dark:text-gray-300'>
-               Are you sure you want to delete "<strong>{title}</strong>"? This will delete all criteria within it.
+               Are you sure you want to delete "<strong>{title}</strong>"? This will delete all subarea and criteria within it.
             </span>
 
             <div className='flex gap-4'>

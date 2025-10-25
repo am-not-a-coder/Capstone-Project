@@ -229,8 +229,10 @@ class Criteria(db.Model):
     archived = db.Column(db.Boolean, default=False)
 
     subarea = db.relationship("Subarea", back_populates="criteria")    
-
     document = db.relationship("Document", back_populates="criteria")
+    
+    # Relationship to deadlines
+    deadlines = db.relationship('Deadline', secondary='deadline_criteria', back_populates='criteria')
 
 class Document(db.Model):
     __tablename__ = 'document'
@@ -274,6 +276,17 @@ class Deadline(db.Model):
     areaID = db.Column(db.Integer, nullable=False)
     content = db.Column(db.Text, nullable=False)
     due_date = db.Column(db.Date, nullable=False)       
+
+    # Relationship to criteria via junction table
+    criteria = db.relationship('Criteria', secondary='deadline_criteria', back_populates='deadlines')
+
+
+class DeadlineCriteria(db.Model):
+    __tablename__ = 'deadline_criteria'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    deadlineID = db.Column(db.Integer, db.ForeignKey('deadline.deadlineID', ondelete="CASCADE"))
+    criteriaID = db.Column(db.Integer, db.ForeignKey('criteria.criteriaID', ondelete="CASCADE"))
 
 class AuditLog(db.Model):
     __tablename__ = 'audit_log'

@@ -309,7 +309,7 @@ const Dashboard = () => {
                         {pendingDocs.map((pendingDoc)=> (
                             <div 
                                 key={pendingDoc.pendingDocID}
-                                className='p-3 mb-1 transition-all duration-500 bg-gray-100 rounded-lg shadow-xl cursor-pointer hover:bg-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700'
+                                className='p-3 mb-1 transition-all duration-500 bg-gray-100 rounded-lg shadow-xl cursor-pointer hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700'
                             >
                                 <p  className="text-gray-700 dark:text-white">{pendingDoc.pendingDocName}</p>
                             </div>
@@ -338,15 +338,16 @@ const Dashboard = () => {
                                 </thead>
                                 <tbody className="divide-y divide-gray-400 dark:divide-gray-800">
                                     {logs.map((log) => {
-                                        const isLogin = log.action.includes('LOGGED IN');
-                                        const isDelete = log.action.includes('DELETED');
-                                        const isRate = log.action.includes('RATED');
-                                        const isCreate = log.action.includes('CREATED');
-                                        const isUpload = log.action.includes('UPLOADED');
+                                        const isLogin = log.action.includes('LOGGED IN') || log.action.includes('Logged in');
+                                        const isDelete = log.action.includes('DELETED') || log.action.includes('Deleted');
+                                        const isRate = log.action.includes('RATED') || log.action.includes( 'Rated');
+                                        const isCreate = log.action.includes('CREATED') || log.action.includes('Created');
+                                        const isUpload = log.action.includes('UPLOADED') || log.action.includes('Uploaded');
                                         const isLoggedOut = log.action.includes('LOGGED OUT');
-                                        const isEdit = log.action.includes('EDITED');
-                                        const isDownload = log.action.includes('DOWNLOADED');
-                                        const isUpdate = log.action.includes('UPDATED');
+                                        const isEdit = log.action.includes('EDITED') || log.action.includes('Edited');
+                                        const isDownload = log.action.includes('DOWNLOADED') || log.action.includes('Downloaded');
+                                        const isUpdate = log.action.includes( 'UPDATED') || log.action.includes('Updated');
+                                        const isApply = log.action.includes('APPLIED') || log.action.includes('Applied');
 
                                         return (
                                             <tr 
@@ -393,6 +394,11 @@ const Dashboard = () => {
                                                         {isUpdate && (
                                                             <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-teal-200 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300">
                                                                 Update
+                                                            </span>
+                                                        )}
+                                                        {isApply && (
+                                                            <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-purple-200 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300">
+                                                                Apply
                                                             </span>
                                                         )}
                                                         {isDownload && (

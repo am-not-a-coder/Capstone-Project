@@ -1,3 +1,9 @@
+import {
+    faPenToSquare,    
+} from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+
+
 
 export const DocumentSkeleton = () => {
 
@@ -93,3 +99,52 @@ export const CardSkeleton = () => {
     </div>
   );
  }
+
+export default function TemplateCardSkeleton() {
+  return (
+    <div 
+      className="relative min-w-[200px] min-h-lg h-full p-6 bg-gray-100 border border-gray-100 shadow-sm rounded-xl dark:border-gray-800 dark:bg-gray-800/80 animate-pulse"
+    >
+      {/* Preview Section */}
+      <div className="relative p-6 mb-4 rounded-lg bg-gradient-to-br from-gray-300 to-gray-400 dark:from-gray-950/70 dark:to-gray-900">
+        {/* Edit Button Skeleton */}
+        <div 
+          className="absolute flex items-center justify-center w-12 h-12 bg-gray-400 rounded-full shadow-lg -right-2 -bottom-1 dark:bg-gray-600"
+        >
+          <FontAwesomeIcon icon={faPenToSquare} className="text-xl text-gray-300 dark:text-gray-500"/>
+        </div>
+        
+        {/* Template Preview Skeleton */}
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <div className="w-16 h-16 rounded shadow-sm bg-gray-400/50 dark:bg-gray-600/50" />
+            <div className="w-16 h-16 rounded shadow-sm bg-gray-400/50 dark:bg-gray-600/50" />
+          </div>
+          <div className="space-y-2">
+            <div className="w-full h-2 rounded shadow-sm bg-gray-400/50 dark:bg-gray-600/50" />
+            <div className="w-3/5 h-2 rounded shadow-sm bg-gray-400/50 dark:bg-gray-600/50" />
+          </div>
+          <div className="w-4/5 h-2 rounded shadow-sm bg-gray-400/50 dark:bg-gray-600/50" />
+        </div>
+      </div>
+
+      {/* Card Content Skeleton */}
+      <div className="space-y-3">
+        <div className="flex items-start justify-between">
+          {/* Title Skeleton */}
+          <div className="w-48 h-6 bg-gray-300 rounded dark:bg-gray-700" />
+          
+          {/* Status Badge Skeleton */}
+          <div className="w-16 h-6 bg-gray-300 rounded-full dark:bg-gray-700" />
+        </div>
+        
+        {/* Details Skeleton */}
+        <div className="space-y-2">
+          <div className="w-full h-4 bg-gray-300 rounded dark:bg-gray-700" />
+          <div className="w-3/4 h-4 bg-gray-300 rounded dark:bg-gray-700" />
+          <div className="w-5/6 h-4 bg-gray-300 rounded dark:bg-gray-700" />
+        </div>
+      </div>
+    </div>
+  );
+}

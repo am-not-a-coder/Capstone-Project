@@ -80,16 +80,39 @@ def ensure_directories(path: str):
 def upload_to_nextcloud(file, path):    
     filename = secure_filename(file.filename)  # normalized filename
     target_url = build_nextcloud_url(f"{path}/{filename}")
+    
+    print(f"Uploading to Nextcloud URL: {target_url}")
+    print(f"Using credentials - User: {NEXTCLOUD_USER}, Password: {'*' * len(NEXTCLOUD_PASSWORD)}")
 
-
-    file_bytes = file.read()
-    file.seek(0)
-    response = requests.put(
-        target_url,
-        auth=HTTPBasicAuth(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD),
-        data=file_bytes
-    )
-    return response
+    try:
+        file_bytes = file.read()
+        file.seek(0)  # Reset file pointer after reading
+        
+        response = requests.put(
+            target_url,
+            auth=HTTPBasicAuth(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD),
+            data=file_bytes,
+            headers={
+                'Content-Type': file.content_type if hasattr(file, 'content_type') else 'application/octet-stream'
+            },
+            timeout=30  # Add timeout to prevent hanging
+        )
+        
+        print(f"Upload response status: {response.status_code}")
+        print(f"Upload response headers: {dict(response.headers)}")
+        if response.status_code not in (200, 201, 204):
+            print(f"Upload failed with response text: {response.text}")
+            
+        return response
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Network error during upload: {str(e)}")
+        # Create a mock response for network errors
+        class MockResponse:
+            status_code = 500
+            text = str(e)
+            headers = {}
+        return MockResponse()
 
 
 
@@ -205,7 +228,7 @@ def delete_from_nextcloud(doc_path):
         return MockResponse()
 
 
-    # Fetch all files & folders from Nextcloud and return as a nested dict (tree).
+# Fetch all files & folders from Nextcloud and return as a nested dict (tree).
 def list_files_from_nextcloud():
     UDMS_URL = f"{NEXTCLOUD_URL.rstrip('/')}/UDMS_Repository/"
 
@@ -264,11 +287,14 @@ def list_files_from_nextcloud():
             mime = props.find("d:getcontenttype", ns)
             modified = props.find("d:getlastmodified", ns)
 
+            print(f"Database paths: {list(db_docs.keys())}")
+
             if is_last:
                 ext = os.path.splitext(part)[1].lower().lstrip(".")
                 if ext in file_ext:
-                    # Add UDMS_Repository to match DB docPath
-                    db_doc = db_docs.get(f"UDMS_Repository/{path}")
+                    # Add UDMS_Repository to match DB docPath                    
+                    db_doc = db_docs.get(f"UDMS_Repository/{path}")     
+                    print(f"Looking for: UDMS_Repository/{path}")                    
 
                     file_obj = {
                         "name": unquote(part),
