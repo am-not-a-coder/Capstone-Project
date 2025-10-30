@@ -803,6 +803,11 @@ def register_routes(app):
         )
         db.session.add(new_log)
         db.session.commit()
+        # Invalidate cached users list
+        try:
+            redis_client.delete('users:list')
+        except Exception:
+            pass
 
         message = 'Employee updated successfully!' if is_update else 'Employee created successfully!'
         return jsonify({
@@ -866,6 +871,10 @@ def register_routes(app):
         )
         db.session.add(new_log)
         db.session.commit()
+        try:
+            redis_client.delete('users:list')
+        except Exception:
+            pass
 
         return jsonify({"success": True, "message":"Employee has been deleted successfully!"}), 200
 
@@ -1149,8 +1158,15 @@ def register_routes(app):
     @app.route('/api/users', methods=["GET"])
     @jwt_required()
     def get_users():
+        # Try cache first for 60s shared list
+        try:
+            cached = redis_client.get('users:list')
+            if cached:
+                return jsonify({"users": json.loads(cached.decode())}), 200
+        except Exception:
+            pass
+
         users = Employee.query.all()
-        
         user_list = []
         for user in users:
             # Get user's programs and areas from junction tables
@@ -1198,6 +1214,11 @@ def register_routes(app):
             } 
         
             user_list.append(user_data)
+        # Save to cache
+        try:
+            redis_client.setex('users:list', 60, json.dumps(user_list))
+        except Exception:
+            pass
         return jsonify({"users" : user_list}), 200
 
     # ============================================ INSTITUTES PAGE ROUTES ============================================
@@ -1558,17 +1579,30 @@ def register_routes(app):
     @app.route('/api/institute/programs', methods=["GET"])
     def get_program_for_inst():
         instID = request.args.get('instID', type=int)
+        if not instID:
+            return jsonify({'programs': []}), 200
+
+        # Try cache first
+        cache_key = f'programs:inst:{instID}'
+        cached = redis_client.get(cache_key)
+        if cached:
+            try:
+                return jsonify({'programs': json.loads(cached.decode())}), 200
+            except Exception:
+                pass
 
         programs = Program.query.filter_by(instID=instID).all()
+        program_list = [{
+            'programID': p.programID,
+            'programCode': p.programCode,
+            'programName': p.programName,
+        } for p in programs]
 
-        program_list = [
-            {
-                'programID': p.programID,
-                'programCode': p.programCode,
-                'programName': p.programName,
-            }
-            for p in programs
-        ]
+        # Save to cache for 30 minutes (programs rarely change)
+        try:
+            redis_client.setex(cache_key, 1800, json.dumps(program_list))
+        except Exception:
+            pass
 
         return jsonify({'programs': program_list}), 200
 
@@ -1592,6 +1626,7 @@ def register_routes(app):
             if not program:
                 return jsonify({'success': False, 'message': 'Program not found'}), 404
 
+            old_inst_id = program.instID
             # Update the database fields with new values
             program.programCode = data.get('programCode', program.programCode)      # Update program code (e.g., "BSIT")
             program.programName = data.get('programName', program.programName)      # Update program name
@@ -1606,6 +1641,15 @@ def register_routes(app):
             )
             db.session.add(new_log)
             db.session.commit() # Save changes to database
+
+            # Invalidate program caches for affected institutes
+            try:
+                if old_inst_id:
+                    redis_client.delete(f'programs:inst:{old_inst_id}')
+                if program.instID and program.instID != old_inst_id:
+                    redis_client.delete(f'programs:inst:{program.instID}')
+            except Exception:
+                pass
 
             return jsonify({        
                 'success': True,
@@ -1669,6 +1713,13 @@ def register_routes(app):
             )
             db.session.add(new_log)
             db.session.commit()  # Save changes
+
+            # Invalidate cache for this institute's programs
+            try:
+                if new_program.instID:
+                    redis_client.delete(f'programs:inst:{new_program.instID}')
+            except Exception:
+                pass
             
             # Get the dean info for response (same as edit route)
             dean = new_program.dean
@@ -1727,6 +1778,13 @@ def register_routes(app):
             )
             db.session.add(new_log)
             db.session.commit()
+
+            # Invalidate cache for this institute's programs
+            try:
+                if programs.instID:
+                    redis_client.delete(f'programs:inst:{programs.instID}')
+            except Exception:
+                pass
             
             return jsonify({
                 'success': True,
@@ -1752,6 +1810,16 @@ def register_routes(app):
             if not current_user:
                 return jsonify({'success': False, 'message': 'User not found'}), 404
             
+            # Serve from cache if available (short TTL as data is not static)
+            cache_key = f'programs:user:{current_user_id}'
+            cached = redis_client.get(cache_key)
+            if cached:
+                try:
+                    payload = json.loads(cached.decode())
+                    return jsonify({'success': True, **payload}), 200
+                except Exception:
+                    pass
+
             # Determine user access level
             is_admin = current_user.isAdmin
             is_co_admin = current_user.isCoAdmin
@@ -1793,8 +1861,7 @@ def register_routes(app):
                 }
                 program_list.append(program_data)
 
-            return jsonify({
-                'success': True,
+            payload = {
                 'programs': program_list,
                 'accessLevel': access_level,
                 'userPermissions': {
@@ -1803,7 +1870,12 @@ def register_routes(app):
                     'crudProgramEnable': has_program_crud,
                     'assignedProgramCount': len(current_user.employee_programs)
                 }
-            }), 200
+            }
+            try:
+                redis_client.setex(cache_key, 60, json.dumps(payload))
+            except Exception:
+                pass
+            return jsonify({'success': True, **payload}), 200
             
         except Exception as e:
             current_app.logger.error(f"Get user program error: {e}")
