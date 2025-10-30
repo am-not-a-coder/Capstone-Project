@@ -11,7 +11,7 @@ from app.utils.normalize_path import normalize_path
 from app.utils.file_extractor import extract_pdf, extract_docs, extract_excel, extract_image
 from app.utils.tagging_utils import rule_based_tag, extract_global_tfid_tags
 from app.utils.helper_functions import reapply_template
-from app.nextcloud_service import upload_to_nextcloud, preview_from_nextcloud, delete_from_nextcloud, ensure_directories, safe_path, list_files_from_nextcloud, preview_file_nextcloud, download_file_nextcloud, rename_file_nextcloud, edit_file_nextcloud
+from app.nextcloud_service import upload_to_nextcloud, preview_from_nextcloud, delete_from_nextcloud, ensure_directories, safe_path, list_files_from_nextcloud, preview_file_nextcloud, download_file_nextcloud, rename_file_nextcloud, edit_file_nextcloud, upload_to_nextcloud_chunked
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import pandas as pd
@@ -2399,6 +2399,16 @@ def register_routes(app):
     def get_areas():
         program_code = request.args.get('programCode')
 
+        # Try Redis cache first for the heavy structure
+        try:
+            if program_code:
+                cache_key = f"accr:program:{program_code}"
+                cached = redis_client.get(cache_key)
+                if cached:
+                    return jsonify(json.loads(cached.decode()))
+        except Exception:
+            pass
+
         data = (
             db.session.query(
                 Area.areaID,
@@ -2480,7 +2490,15 @@ def register_routes(app):
             area['subareas'] = list(area['subareas'].values())
 
 
-        return jsonify(list(result.values())) 
+        payload = list(result.values())
+        # Cache for 5 minutes to speed up UI loads
+        try:
+            if program_code:
+                cache_key = f"accr:program:{program_code}"
+                redis_client.setex(cache_key, 300, json.dumps(payload))
+        except Exception:
+            pass
+        return jsonify(payload) 
     
     
     
@@ -2724,25 +2742,48 @@ def register_routes(app):
     @app.route('/api/accreditation/preview/<filename>', methods=["GET"])   
     @jwt_required()   
     def preview_file(filename):                       
-        
         doc = Document.query.filter_by(docName=filename).first()
-        if doc:
-            print("DB docPath:", doc.docPath)
-        else:
-            print("No document found with this name")
-
         if not doc:
             return jsonify({'success': False, 'message': 'File not found.'}), 404    
 
-        # Get the file
+        # Small-object cache in Redis (<=5MB)
+        cache_key = f"preview_cache:{doc.docPath}"
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return Response(cached, content_type="application/pdf", headers={
+                    "Content-Disposition": f'inline; filename="{filename}"',
+                    "Cache-Control": "public, max-age=300"
+                })
+        except Exception:
+            pass
+
+        # Fetch from Nextcloud
         response = preview_from_nextcloud(doc.docPath)
-        
         if response.status_code == 200:
+            # Try to cache small files
+            try:
+                length = response.headers.get("Content-Length")
+                content_bytes = response.content if response.content else None
+                if content_bytes is not None:
+                    if not length:
+                        length = len(content_bytes)
+                    if int(length) <= 5_000_000:  # 5 MB
+                        redis_client.setex(cache_key, 300, content_bytes)
+                        return Response(content_bytes, content_type=response.headers.get("Content-Type", "application/pdf"), headers={
+                            "Content-Disposition": f'inline; filename="{filename}"',
+                            "Cache-Control": "public, max-age=300"
+                        })
+            except Exception:
+                pass
+
+            # Fallback: stream without caching
             return Response(
                 response.iter_content(chunk_size=8192),
                 content_type = response.headers.get("Content-Type", "application/octet-stream"),
                 headers={
-                    "Content-Disposition": f'inline; filename="{filename}"'
+                    "Content-Disposition": f'inline; filename="{filename}"',
+                    "Cache-Control": "public, max-age=120"
                 }
             ) 
         else:
@@ -4453,5 +4494,110 @@ def register_routes(app):
                 'message': 'Failed to unblock IP'
             }), 500
 
+    @app.route('/api/upload/chunked', methods=['POST'])
+    @jwt_required()
+    def upload_chunked():
+        empID = get_jwt_identity()
+        from app.models import Employee
+        user = Employee.query.filter_by(employeeID=empID).first()
+
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'message': 'No file part in request'}), 400
+        file = request.files['file']
+        final_path = request.form.get('final_path')
+        if not final_path:
+            return jsonify({'success': False, 'message': 'Missing final_path'}), 400
+
+        try:
+            move_resp = upload_to_nextcloud_chunked(
+                file,
+                final_path,
+                empID=empID,
+                redis_client=redis_client
+            )
+
+            # Minimal metadata save to DB to enable links in accreditation view
+            try:
+                from app.models import Document, Criteria, Program
+                file_name = request.form.get('fileName') or file.filename
+                file_type = request.form.get('fileType') or 'application/pdf'
+                criteria_id = request.form.get('criteriaID')
+
+                # Fallback: extract criteriaID from final_path (…/<criteriaID>/<filename>)
+                if not criteria_id:
+                    try:
+                        import re
+                        m = re.search(r"/(\d+)/[^/]+$", final_path)
+                        if m:
+                            criteria_id = m.group(1)
+                    except Exception:
+                        pass
+
+                # Normalize stored path identical to final_path
+                doc_path = final_path
+
+                # Always create a new Document record for chunked uploads
+                doc = Document(
+                    docName=file_name,
+                    docType=file_type,
+                    docPath=doc_path,
+                    employeeID=empID
+                )
+                db.session.add(doc)
+                db.session.flush()
+
+                # Link to criteria if provided
+                affected_program_code = None
+                if criteria_id:
+                    crit = Criteria.query.get(int(criteria_id))
+                    if crit:
+                        crit.docID = doc.docID
+                        try:
+                            # Join to get program code for cache invalidation
+                            from app.models import Subarea, Area, Program
+                            sub = Subarea.query.get(crit.subareaID)
+                            if sub:
+                                area = Area.query.get(sub.areaID)
+                                if area and area.programID:
+                                    prog = Program.query.get(area.programID)
+                                    if prog:
+                                        affected_program_code = prog.programCode
+                        except Exception:
+                            pass
+                db.session.commit()
+
+                # Invalidate accreditation cache for this program and preview cache for file
+                try:
+                    if affected_program_code:
+                        redis_client.delete(f"accr:program:{affected_program_code}")
+                    redis_client.delete(f"preview_cache:{doc.docPath}")
+                except Exception:
+                    pass
+            except Exception as meta_err:
+                current_app.logger.error(f"Post-upload metadata save failed: {meta_err}")
+
+            return jsonify({
+                'success': True,
+                'message': 'Upload complete',
+                'progress_key': f'upload_status:{empID}:{file.filename}',
+                'result': move_resp.status_code
+            }), 200
+        except Exception as e:
+            return jsonify({'success': False, 'message': 'Upload failed', 'details': str(e)}), 500
+
+    @app.route('/api/upload/progress', methods=['GET'])
+    @jwt_required()
+    def upload_progress():
+        empID = get_jwt_identity()
+        filename = request.args.get('filename')
+        key = f'upload_status:{empID}:{filename}'
+        prog = redis_client.get(key)
+        if prog is None:
+            return jsonify({'progress': None}), 200
+        try:
+            value = int(prog)
+            return jsonify({'progress': value}), 200
+        except Exception:
+            return jsonify({'progress': prog.decode()}), 200
 
     
