@@ -26,10 +26,10 @@ from flask_mail import Message as MailMessage
 from app.login_handlers import complete_user_login
 from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message, MessageDeletion, Template, AreaBlueprint, SubareaBlueprint, CriteriaBlueprint, AppliedTemplate, Notification, EmployeeProgram, EmployeeArea, EmployeeFolder, AreaReference, EmployeeProgram, EmployeeArea, EmployeeFolder, AreaReference
 from sqlalchemy import cast, String, func, text
-
+from app.security.anti_brute_force import get_client_ip, is_ip_blocked, track_failed_login, block_ip, clear_failed_attempts
 
 def register_routes(app):
-    # ============================================ AUTHENTICATION(LOGIN/LOGOUT) PAGE ROUTES ============================================
+    # =================================w=========== AUTHENTICATION(LOGIN/LOGOUT) PAGE ROUTES ============================================
     
     # JWT Exception Handler
     @app.errorhandler(JWTExtendedException)
@@ -38,11 +38,20 @@ def register_routes(app):
     
     #LOGIN API
     @app.route('/api/login', methods=["POST"])
+    
     def login():
         try:
             #Get the JSON from the request
             data = request.get_json()
             empID = data.get("employeeID")
+            user_ip = get_client_ip()
+
+            if is_ip_blocked(user_ip):
+                return jsonify({
+                    'success': False,
+                    'message': 'Too many login attempts. IP has temporarily blocked.'
+                }), 429
+
             password = data.get("password")
 
             #Fetches the user from the db using the employeeID
@@ -62,7 +71,10 @@ def register_routes(app):
                 current_app.logger.error(f"Invalid password hash for user {empID}: {hash_error}")
                 return jsonify({'success': False, 'message': 'User account has invalid password format. Contact administrator.'}), 400
                 
-            if is_valid_password: 
+            if is_valid_password:
+                # Clear failed login attempts on successful login
+                clear_failed_attempts(user_ip)
+                
                 # audit successful login
                 new_log = AuditLog(
                     employeeID = user.employeeID,
@@ -97,6 +109,13 @@ def register_routes(app):
 
                     return jsonify({'success': True, 'message': 'OTP email sent succesfully'})
             else:
+                attempts = track_failed_login(user_ip)
+                if attempts >= 5:
+                    block_ip(user_ip, employee_id=empID)
+                    return jsonify({
+                        'success': False,
+                        'message': 'Too many failed attempts. IP has been temporarily blocked.'
+                    }), 429
                 return jsonify({'success': False, 'message': 'Invalid password'}), 401
         except Exception as e:
             current_app.logger.error(f"Login error: {e}")
@@ -4204,6 +4223,101 @@ def register_routes(app):
         except Exception as e:
             db.session.rollback()
             return jsonify({'success': False, 'message': f'Failed to delete template: {str(e)}'}), 400
+
+    # =================================== SECURITY DASHBOARD ROUTES ===================================
+    
+    @app.route('/api/security/dashboard', methods=['GET'])
+    @jwt_required()
+    def security_dashboard():
+        """Get security dashboard data - Admin only"""
+        try:
+            from app.security.security_monitor import SecurityMonitor
+            
+            # Get current user
+            emp_id = get_jwt_identity()
+            user = Employee.query.filter_by(employeeID=emp_id).first()
+            
+            if not user or not user.isAdmin:
+                return jsonify({
+                    'success': False,
+                    'message': 'Unauthorized. Admin access required.'
+                }), 403
+            
+            # Get security statistics
+            threat_level = SecurityMonitor.check_threat_level()
+            recent_events = SecurityMonitor.get_recent_events(limit=50)
+            blocked_ips = SecurityMonitor.get_blocked_ips()
+            
+            return jsonify({
+                'success': True,
+                'data': {
+                    'threat_level': threat_level,
+                    'recent_events': recent_events,
+                    'blocked_ips': blocked_ips,
+                    'total_blocked_ips': len(blocked_ips)
+                }
+            }), 200
+            
+        except Exception as e:
+            current_app.logger.error(f"Security dashboard error: {e}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to load security dashboard'
+            }), 500
+    
+    @app.route('/api/security/unblock-ip', methods=['POST'])
+    @jwt_required()
+    def unblock_ip():
+        """Manually unblock an IP address - Admin only"""
+        try:
+            # Get current user
+            emp_id = get_jwt_identity()
+            user = Employee.query.filter_by(employeeID=emp_id).first()
+            
+            if not user or not user.isAdmin:
+                return jsonify({
+                    'success': False,
+                    'message': 'Unauthorized. Admin access required.'
+                }), 403
+            
+            data = request.get_json()
+            ip_to_unblock = data.get('ip_address')
+            
+            if not ip_to_unblock:
+                return jsonify({
+                    'success': False,
+                    'message': 'IP address is required'
+                }), 400
+            
+            # Remove the block
+            block_key = f"ip_blocked:{ip_to_unblock}"
+            result = redis_client.delete(block_key)
+            
+            if result > 0:
+                # Log the action
+                new_log = AuditLog(
+                    employeeID=user.employeeID,
+                    action=f"Admin {user.lName}, {user.fName} manually unblocked IP: {ip_to_unblock}"
+                )
+                db.session.add(new_log)
+                db.session.commit()
+                
+                return jsonify({
+                    'success': True,
+                    'message': f'IP {ip_to_unblock} has been unblocked'
+                }), 200
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': 'IP was not blocked or already expired'
+                }), 404
+                
+        except Exception as e:
+            current_app.logger.error(f"Unblock IP error: {e}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to unblock IP'
+            }), 500
 
 
     
