@@ -1881,9 +1881,21 @@ def register_routes(app):
             page = request.args.get('page', 1, type=int)
             per_page = request.args.get('per_page', 20, type=int)
 
-            notifications = Notification.query.filter_by(recipientID=current_user_id)\
-            .order_by(Notification.createdAt.desc())\
-            .paginate(page=page, per_page=per_page, error_out=False)
+            # Cache only first page for 60s
+            if page == 1:
+                cache_key = f'notif_list:{current_user_id}:1'
+                cached = redis_client.get(cache_key)
+                if cached:
+                    try:
+                        data = json.loads(cached.decode())
+                        return jsonify({'success': True, **data}), 200
+                    except Exception:
+                        pass
+
+            notifications = (Notification.query
+                              .filter_by(recipientID=current_user_id)
+                              .order_by(Notification.createdAt.desc())
+                              .paginate(page=page, per_page=per_page, error_out=False))
 
             notification_list = []
             for notif in notifications.items:
@@ -1906,13 +1918,20 @@ def register_routes(app):
                     'link': notif.link,
                     'sender': sender_info
                 })
-            return jsonify({
-                'success': True,
+            payload = {
                 'notifications': notification_list,
                 'total': notifications.total,
                 'pages': notifications.pages,
                 'current_page': page
-            }), 200
+            }
+
+            if page == 1:
+                try:
+                    redis_client.setex(cache_key, 60, json.dumps(payload))
+                except Exception:
+                    pass
+
+            return jsonify({'success': True, **payload}), 200
         except Exception as e:
             return jsonify({'success': False, 'message': f'Failed to fetch notifications: {e}'}), 500
     
@@ -1937,6 +1956,12 @@ def register_routes(app):
             
             notification.isRead = True
             db.session.commit()
+            # Invalidate caches
+            try:
+                redis_client.delete(f'notif_unread:{current_user_id}')
+                redis_client.delete(f'notif_list:{current_user_id}:1')
+            except Exception:
+                pass
             
             return jsonify({'success': True, 'message': 'Notification marked as read'}), 200
             
@@ -1964,6 +1989,11 @@ def register_routes(app):
             
             db.session.delete(notification)
             db.session.commit()
+            try:
+                redis_client.delete(f'notif_unread:{current_user_id}')
+                redis_client.delete(f'notif_list:{current_user_id}:1')
+            except Exception:
+                pass
             
             return jsonify({'success': True, 'message': 'Notification deleted'}), 200
             
@@ -1983,6 +2013,11 @@ def register_routes(app):
             current_user_id = get_jwt_identity()
             Notification.query.filter_by(recipientID=current_user_id).delete()
             db.session.commit()
+            try:
+                redis_client.delete(f'notif_unread:{current_user_id}')
+                redis_client.delete(f'notif_list:{current_user_id}:1')
+            except Exception:
+                pass
             
             return jsonify({'success': True, 'message': 'All notifications deleted'}), 200
             
@@ -2005,6 +2040,11 @@ def register_routes(app):
                 isRead=False
             ).update({'isRead': True})
             db.session.commit()
+            try:
+                redis_client.delete(f'notif_unread:{current_user_id}')
+                redis_client.delete(f'notif_list:{current_user_id}:1')
+            except Exception:
+                pass
             
             return jsonify({'success': True, 'message': 'All notifications marked as read'}), 200
             
@@ -2022,11 +2062,22 @@ def register_routes(app):
     def get_unread_count_impl():
         try:
             current_user_id = get_jwt_identity()
+            cache_key = f'notif_unread:{current_user_id}'
+            cached = redis_client.get(cache_key)
+            if cached:
+                try:
+                    return jsonify({'success': True, 'count': int(cached.decode())}), 200
+                except Exception:
+                    pass
+
             count = Notification.query.filter_by(
                 recipientID=current_user_id,
                 isRead=False
             ).count()
-            
+            try:
+                redis_client.setex(cache_key, 60, str(count))
+            except Exception:
+                pass
             return jsonify({'success': True, 'count': count}), 200
             
         except Exception as e:
