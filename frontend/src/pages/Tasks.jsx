@@ -197,7 +197,6 @@ const Tasks = () => {
                 setStatusMessage("Server error. Please try again");
                 setShowStatusModal(true);
                 setStatusType("error")
-                console.log(err.res?.data || err.message)
             }
         } 
     

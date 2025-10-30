@@ -83,22 +83,7 @@ import ArchiveModal from '../components/modals/ArchiveModal';
         const userPermissions = response.data?.userPermissions ?? response.userPermissions;
 
         Array.isArray(programsArr) ? setPrograms(programsArr) : setPrograms([]);
-        
-        // Log user access information for debugging
-        console.log('Program Access Info:', {
-          accessLevel,
-          userPermissions,
-          programCount: programsArr.length
-        });
 
-        // Show user-friendly message based on access level
-        if (accessLevel === 'assigned' && programsArr.length === 0) {
-          console.log('User has no assigned programs');
-        } else if (accessLevel === 'full') {
-          console.log('User has full program access');
-        } else {
-          console.log(`User has access to ${programsArr.length} assigned programs`);
-        }
 
       } else {
         console.error('Failed to fetch the programs:', response.error || response);
@@ -130,13 +115,7 @@ import ArchiveModal from '../components/modals/ArchiveModal';
             const userPermissions = response.data?.userPermissions ?? response.userPermissions;
 
             Array.isArray(institutesArr) ? setInstitutes(institutesArr) : setInstitutes([]);
-            
-            // Log user access information for debugging
-            console.log('Institute Access Info:', {
-              accessLevel,
-              userPermissions,
-              instituteCount: institutesArr.length
-            });
+          
           } else {
             console.error('Failed to fetch institutes:', response.error || response);
             setInstitutes([]);
@@ -180,7 +159,7 @@ import ArchiveModal from '../components/modals/ArchiveModal';
           
           if (response.success) {
           Array.isArray(response.data.institutes) ? setInstituteOption(response.data.institutes) : setInstituteOption([]);
-          console.log(response.data)
+          
           } else {
             console.error("Error fetching institutes:", response.error);
             setInstituteOption([]);
@@ -227,7 +206,6 @@ import ArchiveModal from '../components/modals/ArchiveModal';
               setAreas([])
             };
           } catch(err){
-            console.log(err.response?.data || err.message);
             setAreas([]);
           }
         }

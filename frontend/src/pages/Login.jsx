@@ -128,7 +128,20 @@ const Login = () => {
         } catch (err) {
             // Handle unexpected errors (network issues, etc.)
             console.error('Login error:', err);
-            setError('Server error. Please try again.');
+            
+            // Check if it's an IP block error (429 status)
+            if (err.response && err.response.status === 429) {
+                const blockMessage = err.response.data?.message || 'Too many failed login attempts. Your IP has been temporarily blocked.';
+                setError(blockMessage);
+                toast.error('IP Blocked', {
+                    duration: 6000,
+                    icon: '🚫',
+                });
+            } else {
+                setError('Server error. Please try again.');
+                toast.error('Login Failed');
+            }
+            
             setLoading(false)
             toast.dismiss(toastId)
         }
@@ -263,7 +276,28 @@ const Login = () => {
                             <FontAwesomeIcon icon={showPassword ? faEye : faEyeSlash} 
                             onClick={() => {setShowPassword((current) => !current)}}
                             className='absolute cursor-pointer top-9 right-3 text-neutral-400'/>
-                            {error && <span className='text-[11px] text-red-600'>{error}</span>}
+                            {error && (
+                                <div className={`mt-2 p-3 rounded-md ${
+                                    error.includes('blocked') || error.includes('IP') 
+                                    ? 'bg-red-100 border border-red-400' 
+                                    : ''
+                                }`}>
+                                    <span className={`text-[11px] ${
+                                        error.includes('blocked') || error.includes('IP')
+                                        ? 'text-red-700 font-semibold'
+                                        : 'text-red-600'
+                                    }`}>
+                                        {error.includes('blocked') || error.includes('IP') ? '🚫 ' : ''}
+                                        {error}
+                                    </span>
+                                    {(error.includes('blocked') || error.includes('IP')) && (
+                                        <div className="mt-2 text-[10px] text-red-600">
+                                            Your IP has been temporarily blocked due to multiple failed login attempts. 
+                                            Please try again in 30 minutes or contact an administrator.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div><br />
                     
                     <a href='#' className='mb-2 font-light text-blue-600'>Forgot your password?</a>

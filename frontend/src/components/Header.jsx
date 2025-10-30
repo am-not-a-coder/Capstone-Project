@@ -71,13 +71,13 @@ const Header = ({title}) => {
     const fetchNotifications = async () => {
         try {
             setNotificationsLoading(true);
-            console.log('🔔 Fetching notifications...');
+
             const response = await apiGet('/api/notifications?page=1&per_page=5');
-            console.log('🔔 Notifications response:', response);
+
             if (response && response.success && response.data) {
                 const notifications = response.data.notifications || [];
                 setNotifications(notifications);
-                console.log('🔔 Notifications set:', notifications);
+
             } else {
                 console.error('Failed to fetch notifications:', response);
                 setNotifications([]);
@@ -93,12 +93,9 @@ const Header = ({title}) => {
     // Mark all notifications as read
     const markAllNotificationsAsRead = async () => {
         try {
-            console.log('🔔 Marking all notifications as read...');
             const response = await apiPut('/api/notifications/mark-all-read');
-            console.log('🔔 Mark as read response:', response);
             if (response && response.success) {
                 setUnreadCount(0);
-                console.log('🔔 All notifications marked as read - unread count set to 0');
             } else {
                 console.error('🔔 Failed to mark notifications as read:', response);
             }
@@ -110,13 +107,10 @@ const Header = ({title}) => {
     // Fetch unread count
     const fetchUnreadCount = async () => {
         try {
-          console.log('🔔 Fetching unread count...');
           const response = await apiGet('/api/notifications/unread-count');
-          console.log('🔔 Unread count response:', response);
           if (response && response.success && response.data) {
             const count = response.data.count || 0;
             setUnreadCount(count);
-            console.log('🔔 Unread count set:', count);
           } else {
             setUnreadCount(0);
           }
@@ -151,13 +145,10 @@ const Header = ({title}) => {
           const socket = getSocket();
           if (socket) {
             // Join notification room
-            console.log('🔔 Joining notification room...');
             socket.emit('join_notifications', (response) => {
-              console.log('🔔 Join notifications response:', response);
             });
             
             socket.on('new_notification', (notification) => {
-              console.log('🔔 New notification received:', notification);
               // Play notification sound
               notificationSound.playNotification();
               fetchUnreadCount();
@@ -298,9 +289,7 @@ const Header = ({title}) => {
                                 const next = !current;
                                 if (next) {
                                     // Immediately clear the unread count when opening dropdown
-                                    setUnreadCount(0);
-                                    console.log('🔔 Notification dropdown opened - unread count set to 0');
-                                    // Refresh notifications when opening dropdown
+                                    setUnreadCount(0);                                    // Refresh notifications when opening dropdown
                                     fetchNotifications();
                                     // Mark all notifications as read when opening dropdown
                                     markAllNotificationsAsRead();

@@ -139,7 +139,6 @@ export default function Templates() {
             setStatusType("success");           
             fetchTemplates();
         }catch(err){
-            console.log("Failed to delete template", err)
             setShowStatusModal(true);
             setStatusMessage(res.data.message);
             setStatusType("error");  
