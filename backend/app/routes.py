@@ -85,13 +85,19 @@ def register_routes(app):
 
                 bypass = redis_client.get(f'otp_bypass:{empID}')
                 if bypass:
+                    print(f"DEBUG: Skipping OTP generate for {empID} due to otp_bypass.")
                     return complete_user_login(user, empID)
                 else:
+                    # Defensive: ensure empID is string
+                    if not empID or not isinstance(empID, str):
+                        print(f"ERROR: empID for OTP is not a valid string! empID={empID}")
+        
                     otp_code = generate_random()
-                    otp_expiry = datetime.now(timezone.utc) + timedelta(minutes=2)
-                    user.otpcode = otp_code
-                    user.otpexpiry = otp_expiry
-                    db.session.commit()
+                    # Store OTP in Redis with TTL (3 minutes)
+                    redis_key = f'otp:{empID}'
+                    redis_client.setex(redis_key, 180, str(otp_code))
+                    print(f"DEBUG: Stored OTP in Redis as {redis_key} = {otp_code}")
+
 
                     html_body = render_template(
                         'email/otp.html',
@@ -140,41 +146,42 @@ def register_routes(app):
         user = Employee.query.filter_by(employeeID=employeeID).first()
         if not user:
             return jsonify({'success': False, 'message': 'User not found in database.'}), 400
-        current_time = datetime.now(timezone.utc)
-        otp_expiry = user.otpexpiry
-        if otp_expiry is None:
-            return jsonify({'success': False, 'message': 'No OTP expiry set. Please request a new OTP.'}), 400
-        if otp_expiry.tzinfo is None:
-            otp_expiry = otp_expiry.replace(tzinfo=timezone.utc)
-        if current_time > otp_expiry:
-            return jsonify({'success': False, 'message': 'OTP has expired'}), 400
-            #main check
-        if not str(otp) == str(user.otpcode):
+        # Validate OTP from Redis
+        otp_key = f"otp:{employeeID}"
+        stored_code = redis_client.get(otp_key)
+        if not stored_code:
+            return jsonify({'success': False, 'message': 'OTP has expired or is invalid. Please request a new OTP.'}), 400
+        if str(otp) != stored_code.decode():
             return jsonify({'success': False, 'message': "OTP Doesn't match!"}), 400
-        else:
-            #clean up redis otp:
-            redis_client.hdel('pending_otps', employeeID)
-            #set otp_bypass for 24hrs
-            redis_client.setex(f'otp_bypass:{employeeID}', 24*60*60, '1')
-            #clean otp storage
-            user.otpcode = None
-            user.otpexpiry = None
-            db.session.commit()
-            return complete_user_login(user, employeeID)
+        # Success: invalidate OTP and allow login
+        redis_client.delete(otp_key)
+        redis_client.hdel('pending_otps', employeeID)
+        # set otp_bypass for 24hrs
+        redis_client.setex(f'otp_bypass:{employeeID}', 24*60*60, '1')
+        return complete_user_login(user, employeeID)
 
         
     @app.route('/api/me', methods=['GET'])
     @jwt_required()
     def me():
         emp_id = get_jwt_identity()
+        # 1) Try Redis cache first
+        cache_key = f'user_profile:{emp_id}'
+        cached = redis_client.get(cache_key)
+        if cached:
+            try:
+                return jsonify({'success': True, 'user': json.loads(cached.decode())}), 200
+            except Exception:
+                pass
+
+        # 2) Fallback to DB and rebuild cache
         user = Employee.query.filter_by(employeeID=emp_id).first()
         if not user:
             return jsonify({'success': False, 'message': 'User not found'})
-        
-        # Get user's programs and areas from junction tables
+
         user_programs = []
         user_areas = []
-        
+
         for ep in user.employee_programs:
             program = Program.query.get(ep.programID)
             if program:
@@ -183,7 +190,7 @@ def register_routes(app):
                     'programCode': program.programCode,
                     'programName': program.programName
                 })
-        
+
         for ea in user.employee_areas:
             area = Area.query.get(ea.areaID)
             if area:
@@ -192,29 +199,33 @@ def register_routes(app):
                     'areaName': area.areaName,
                     'areaNum': area.areaNum
                 })
-        
-        return jsonify({
-            'success': True,
-            'user': {
-                'employeeID': user.employeeID,
-                'firstName': user.fName,
-                'lastName': user.lName,
-                'programs': user_programs,
-                'areas': user_areas,
-                'suffix' : user.suffix,
-                'email': user.email,
-                'contactNum': user.contactNum,
-                'profilePic': user.profilePic,
-                'isAdmin': user.isAdmin,
-                'isRating': user.isRating,
-                'isEdit': user.isEdit,
-                'crudFormsEnable': user.crudFormsEnable,
-                'crudProgramEnable': user.crudProgramEnable,
-                'crudInstituteEnable': user.crudInstituteEnable,
-                'role': 'admin' if user.isAdmin else 'user',
-                'isCoAdmin': user.isCoAdmin
-            }
-        }), 200
+
+        profile = {
+            'employeeID': user.employeeID,
+            'firstName': user.fName,
+            'lastName': user.lName,
+            'programs': user_programs,
+            'areas': user_areas,
+            'suffix': user.suffix,
+            'email': user.email,
+            'contactNum': user.contactNum,
+            'profilePic': user.profilePic,
+            'isAdmin': user.isAdmin,
+            'isRating': user.isRating,
+            'isEdit': user.isEdit,
+            'crudFormsEnable': user.crudFormsEnable,
+            'crudProgramEnable': user.crudProgramEnable,
+            'crudInstituteEnable': user.crudInstituteEnable,
+            'role': 'admin' if user.isAdmin else 'user',
+            'isCoAdmin': user.isCoAdmin
+        }
+
+        try:
+            redis_client.setex(cache_key, 300, json.dumps(profile))
+        except Exception:
+            pass
+
+        return jsonify({'success': True, 'user': profile}), 200
     
     @app.route('/api/validate-session', methods=['POST'])
     def validate_session():

@@ -3,6 +3,8 @@ from flask import jsonify, current_app
 from flask_jwt_extended import set_access_cookies, set_refresh_cookies
 from datetime import datetime, timedelta
 from flask_jwt_extended import create_access_token, create_refresh_token
+import uuid
+import json
 
 
 def complete_user_login(user, empID, set_otp_verified=False):
@@ -29,7 +31,17 @@ def complete_user_login(user, empID, set_otp_verified=False):
             identity=empID,
             expires_delta=timedelta(days=7)
         )
-        
+        # Create a Redis-backed session (24 hours TTL)
+        session_id = str(uuid.uuid4())
+        session_payload = {
+            'employeeID': user.employeeID,
+            'isAdmin': bool(user.isAdmin),
+            'firstName': user.fName,
+            'lastName': user.lName,
+            'createdAt': datetime.utcnow().isoformat() + 'Z'
+        }
+        redis_client.setex(f'session:{session_id}', 24 * 60 * 60, json.dumps(session_payload))
+
         user_data = {
             'employeeID': user.employeeID,
             'name': f"{user.fName} {user.lName}{user.suffix or ''}",
@@ -42,14 +54,30 @@ def complete_user_login(user, empID, set_otp_verified=False):
             'isAdmin': user.isAdmin,
             'role': 'admin' if user.isAdmin else 'user'
         }
+        # Warm user profile cache for faster subsequent loads
+        try:
+            redis_client.setex(f'user_profile:{empID}', 300, json.dumps(user_data))
+        except Exception as cache_err:
+            current_app.logger.error(f'Failed to cache user profile: {cache_err}')
         
         resp = jsonify({
             'success': True,
             'message': f"Welcome!, {user_data['lastName']}",
-            'user': user_data
+            'user': user_data,
+            'session_id': session_id
         })
         set_access_cookies(resp, access_token)
         set_refresh_cookies(resp, refresh_token)
+        try:
+            resp.set_cookie(
+                'session_id', session_id,
+                max_age=24 * 60 * 60,
+                httponly=True,
+                samesite='Lax',
+                secure=False
+            )
+        except Exception as cookie_err:
+            current_app.logger.error(f'Failed to set session cookie: {cookie_err}')
         return resp
     except Exception as jwt_error:
         current_app.logger.error(f"JWT Error: {jwt_error}")
