@@ -3,7 +3,7 @@ export default function CreateCard({ setShowForm, title, className = "" }) {
   return (
     <button 
       onClick={() => setShowForm(true)}  
-      className={`${className} group relative flex flex-col items-center justify-center cursor-pointer h-56 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-100 shadow-sm transition-all duration-300 hover:shadow-xl hover:scale-105 hover:border-blue-400 hover:bg-blue-50 dark:bg-gray-800 dark:border-gray-600 dark:hover:border-blue-500 dark:hover:bg-gray-700 sm:w-1/2 md:w-1/3 lg:w-1/5`}
+      className={`${className} group relative flex flex-col place-self-center items-center justify-center cursor-pointer h-56 overflow-hidden rounded-xl border-2 border-dashed border-gray-300 bg-gray-100 shadow-sm transition-all duration-300 hover:shadow-xl hover:scale-105 hover:border-blue-400 hover:bg-blue-50 dark:bg-gray-800 dark:border-gray-600 dark:hover:border-blue-500 dark:hover:bg-gray-700 w-full md:w-1/5`}
     >
       {/* Icon Section */}
       <div className="flex items-center justify-center w-16 h-16 mb-3 transition-colors duration-300 bg-gray-200 rounded-full group-hover:bg-blue-100 dark:bg-gray-700 dark:group-hover:bg-blue-900">

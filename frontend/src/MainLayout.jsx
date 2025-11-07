@@ -63,13 +63,7 @@ const MainLayout = () => {
                   text="Dashboard"
                   active={activePage === 'Dashboard'}
                   onClick={() => navigate('/Dashboard')}
-                />
-                <SidebarLinks
-                  icon={faSchool}
-                  text="Institutes"
-                  active={activePage === 'Institutes'}
-                  onClick={() => navigate('/Institutes')}
-                />
+                />               
                 <SidebarLinks
                   icon={faGraduationCap}
                   text="Programs"

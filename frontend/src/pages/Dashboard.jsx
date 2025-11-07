@@ -168,7 +168,7 @@ const Dashboard = () => {
             }
         } 
         fetchLogs()
-    }, [logs])
+    }, [])
 
     // Fetch pending documents
     const [pendingDocs, setPendingDocs] = useState([])
@@ -297,10 +297,10 @@ const Dashboard = () => {
             )}
 
             { isAdmin && (
-                <section className='grid grid-rows-2 gap-4 mt-4 lg:grid-cols-2 lg:grid-rows-1'>
+                <section className='relative grid grid-rows-2 gap-4 mt-4 lg:grid-cols-2 lg:grid-rows-1'>
 
                 {/* Pending Documents */}
-                <div className="p-5 mb-8 transition-all duration-500 shadow-xl text-neutral-800 border-1 border-neutral-300 rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:border-gray-900 dark:bg-gray-900" >
+                <div className="p-5 w-[53%] md:w-full mb-8 transition-all duration-500 shadow-xl text-neutral-800 border border-neutral-300 rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:border-gray-900 dark:bg-gray-900" >
                     <div className='flex flex-row'>
                         <FontAwesomeIcon icon={faHourglassHalf}  className="p-2 transition-all duration-500 dark:text-white" />
                         <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Pending Documents</h2>
@@ -317,7 +317,7 @@ const Dashboard = () => {
                     </div>
                 </div>
                  {/* Audit Logs */}                
-                    <div className="p-5 mb-10 transition-all duration-500 shadow-xl text-neutral-800 border-1 dark:border-gray-900 border-neutral-300 rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-900">
+                    <div className="p-5 w-[53%] md:w-full mb-10 transition-all duration-500 shadow-xl text-neutral-800 border dark:border-gray-900 border-neutral-300 rounded-3xl inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-900">
                         <div className='flex flex-row'>
                             <FontAwesomeIcon icon={faGears} className="p-2 transition-all duration-500 dark:text-white" />
                             <h2 className="mb-4 text-xl font-semibold transition-all duration-500 text-neutral-800 dark:text-white">Audit Logs</h2>

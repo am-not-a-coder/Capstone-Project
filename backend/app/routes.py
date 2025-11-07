@@ -10,9 +10,10 @@ from datetime import timedelta, datetime, timezone
 from app.utils.normalize_path import normalize_path
 from app.utils.file_extractor import extract_pdf, extract_docs, extract_excel, extract_image
 from app.utils.tagging_utils import rule_based_tag, extract_global_tfid_tags
-from app.utils.helper_functions import reapply_template
+from app.utils.helper_functions import reapply_template, compare_documents
 from app.nextcloud_service import upload_to_nextcloud, preview_from_nextcloud, delete_from_nextcloud, ensure_directories, safe_path, list_files_from_nextcloud, preview_file_nextcloud, download_file_nextcloud, rename_file_nextcloud, edit_file_nextcloud
 from sentence_transformers import SentenceTransformer
+from urllib.parse import quote, unquote
 import numpy as np
 import pandas as pd
 import joblib
@@ -2280,13 +2281,15 @@ def register_routes(app):
                 Document.docType,
                 Document.docPath,
                 Document.isApproved,
-                Document.predicted_rating
+                Document.predicted_rating,
+                Document.predicted_probability,
+                Document.similar_docs
             )
             .outerjoin(Program, Area.programID == Program.programID)
-        .outerjoin(Subarea, (Area.areaID == Subarea.areaID) & (Subarea.archived == False))
-        .outerjoin(Criteria, (Subarea.subareaID == Criteria.subareaID) & (Criteria.archived == False))
+            .outerjoin(Subarea, (Area.areaID == Subarea.areaID) & (Subarea.archived == False))
+            .outerjoin(Criteria, (Subarea.subareaID == Criteria.subareaID) & (Criteria.archived == False))
             .outerjoin(Document, Criteria.docID == Document.docID)
-        .filter(Program.programCode == program_code, Area.archived == False)
+            .filter(Program.programCode == program_code, Area.archived == False)
             .order_by(Area.areaID.asc(), Subarea.subareaID.asc(), Criteria.criteriaID.asc())
             .all() 
         )
@@ -2327,6 +2330,8 @@ def register_routes(app):
                     'docName': row.docName,
                     'docPath': row.docPath,
                     'predicted_rating': row.predicted_rating,
+                    'predicted_probability': row.predicted_probability,
+                    "similar_docs": row.similar_docs,
                     'isApproved': row.isApproved,
                     'rating': row.rating
                 }
@@ -2419,79 +2424,87 @@ def register_routes(app):
         if not filename:
             return jsonify({'success': False, 'message': 'Invalid filename'}), 400
                        
-        try:            
-             # === Ensures that the directory exists in Nextcloud ===
+        try:
+            # === Ensures that the directory exists in Nextcloud ===
+            print(f"[upload_file] ensure_directories for path: {path}")
             if not ensure_directories(path):
+                print("[upload_file] ensure_directories returned False")
                 return jsonify({
                     'success': False,
                     'message': 'Failed to create directory structure in Nextcloud'
                 }), 400
 
             # === Save file to Nextcloud ===
+            print(f"[upload_file] calling upload_to_nextcloud for: {filename} -> {path}")
             response = upload_to_nextcloud(file, path)
+            print(f"[upload_file] upload_to_nextcloud response: {getattr(response, 'status_code', None)}")
+            if hasattr(response, 'text'):
+                print(f"[upload_file] upload response text: {response.text}")
+
             if response.status_code not in (200, 201, 204):
+                print(f"[upload_file] Nextcloud responded with non-success: {response.status_code}")
                 return jsonify({
                     'success': False,
                     'message': 'Nextcloud upload failed.',
                     'status': response.status_code,
-                    'details': response.text
+                    'details': getattr(response, 'text', '')
                 }), 400
-                                    
+
             # === Extract the text from file ===
-
             temp_path = f"/tmp/{filename}"
-
-            file.save(temp_path) 
-                # Extract text then remove the file
+            print(f"[upload_file] saving temp file -> {temp_path}")
+            file.save(temp_path)
             try:
-                extracted_text = extract_pdf(temp_path) 
-                file_size = os.path.getsize(temp_path)                               
+                extracted_text = extract_pdf(temp_path)
+                file_size = os.path.getsize(temp_path)
+                print(f"[upload_file] extracted_text length: {len(extracted_text)} file_size: {file_size}")
             finally:
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
-            
-            # === Generate Tags === 
+
+            # === Generate Tags ===
+            print("[upload_file] generating rule-based tags")
             tags = set(rule_based_tag(extracted_text))
-            
+
             # Fetch all documents in the DB
             all_docs = [d.content for d in Document.query.with_entities(Document.content).all()]
             all_docs.append(extracted_text)
 
             tfidf_tags = extract_global_tfid_tags(all_docs, len(all_docs) - 1)
             if tfidf_tags:
-                # Flatten tfidf_tags if it's a list of lists
                 from itertools import chain
                 if any(isinstance(tag, list) for tag in tfidf_tags):
                     flat_tags = list(chain.from_iterable(tfidf_tags))
                     tags.update(flat_tags)
                 else:
                     tags.update(tfidf_tags)
+            print(f"[upload_file] total tags: {len(tags)}")
 
-           # === Generate Embedding ===
+            # === Generate Embedding ===
+            print("[upload_file] generating embedding")
             embedding = embedding_model.encode(extracted_text, normalize_embeddings=True)
             embedding = np.array(embedding, dtype=np.float32).tolist()
-            
-                                   
-           # ==== Create or update document record ====
+            print(f"[upload_file] embedding length: {len(embedding)}")
+
+            # ==== Create or update document record ====
+            print(f"[upload_file] looking for existing Document with docName={file_name}")
             doc = Document.query.filter_by(docName=file_name).first()
 
             if doc:
-                # Update existing doc
+                print(f"[upload_file] updating existing Document id={doc.docID}")
                 doc.docPath = f"{normalized_path}/{filename}"
                 doc.docName = file_name
                 doc.content = extracted_text
                 doc.tags = list(tags)
-                doc.embedding = embedding            
+                doc.embedding = embedding
 
-                # Audit updated doc
                 new_log = AuditLog(
                     employeeID = uploader.employeeID,
                     action = f"{uploader.lName}, {uploader.fName} {uploader.suffix} Updated a document: {filename}"
                 )
                 db.session.add(new_log)
-
             else:
-                # Create new doc
+                print("[upload_file] creating new Document record")
                 doc = Document(
                     docName=file_name,
                     docType=file_type,
@@ -2504,7 +2517,6 @@ def register_routes(app):
                 db.session.add(doc)
                 db.session.flush()  # Assign docID before linking
 
-                # Audit new doc
                 new_log = AuditLog(
                     employeeID = uploader.employeeID,
                     action = f"{uploader.lName}, {uploader.fName} {uploader.suffix} Uploaded a new document: {filename}"
@@ -2512,15 +2524,17 @@ def register_routes(app):
                 db.session.add(new_log)
 
             # ==== Link document to criteria ====
+            print(f"[upload_file] linking document to criteria id={criteria_id}")
             criteria = Criteria.query.get(criteria_id)
-
             if not criteria:
                 db.session.rollback()
+                print(f"[upload_file] criteria not found for id={criteria_id}")
                 return jsonify({'success': False, 'message': 'Criteria not found'}), 404
 
-            criteria.docID = doc.docID  # Always safe, since doc exists now
+            criteria.docID = doc.docID
 
             # ==== Update search vector ====
+            print(f"[upload_file] updating search vector for docID={doc.docID}")
             db.session.execute(
                 text("""
                     UPDATE document
@@ -2530,23 +2544,20 @@ def register_routes(app):
                 {"doc_id": doc.docID}
             )
 
-            # ==== Compute Days Until Deadline ====
+            # compute features and predict
+            print("[upload_file] computing features for rating prediction")
             if not hasattr(criteria, "deadlines") or not criteria.deadlines:
-                days_until_deadline = 0  # fallback if no deadlines linked
+                days_until_deadline = 0
             else:
                 nearest_deadline = min(dl.due_date for dl in criteria.deadlines)
                 days_until_deadline = (nearest_deadline - datetime.utcnow().date()).days
 
-            # ===== Compute Criteria Completion Score =====
             criteria_list = Criteria.query.filter_by(subareaID=criteria.subareaID).count()
             completed_criteria = Criteria.query.filter_by(subareaID=criteria.subareaID, isDone=True).count()
             criteria_completion_score = (completed_criteria / criteria_list) * 100 if criteria_list > 0 else 0
 
-            # ====== Get program ID ======
             program = Program.query.filter_by(programCode=program_code).first()
             programID = program.programID if program else None
-
-            # =========== Build Feature for Rating Prediction ===============
 
             df_input = pd.DataFrame([{
                 "file_size": file_size,
@@ -2554,33 +2565,101 @@ def register_routes(app):
                 "Days_Until_Deadline": days_until_deadline,
                 "isApproved": False,
                 "docType": "application/pdf",
-                "programID": programID     
+                "programID": programID
             }])
 
             emb = pd.DataFrame([embedding])
             emb.columns = [f"emb_{i}" for i in range(len(emb.columns))]
-
             X_new = pd.concat([df_input, emb], axis=1)
 
-            # Predit the rating
-            predicted_rating = float(xgb_model.predict(X_new)[0])
+            print(f"[upload_file] running model.predict with X_new shape: {X_new.shape}")
+            # Diagnostic logs: inspect the model object and its predict attribute
+            try:
+                print(f"[upload_file] xgb_model type: {type(xgb_model)}")
+                print(f"[upload_file] xgb_model has attribute 'predict'? {hasattr(xgb_model, 'predict')}")
+                if hasattr(xgb_model, 'predict'):
+                    print(f"[upload_file] xgb_model.predict type: {type(xgb_model.predict)}, callable: {callable(xgb_model.predict)}")
+                else:
+                    print("[upload_file] xgb_model.predict not found")
+            except Exception as _log_e:
+                print(f"[upload_file] Error inspecting xgb_model: {_log_e}")
 
-            doc.predicted_rating = predicted_rating
+            try:
+                predicted_rating = float(xgb_model.predict(X_new)[0])
+                doc.predicted_rating = predicted_rating
+            except Exception as pred_e:
+                # Log detailed info about the predict attribute to help debug 'bool' object is not callable
+                try:
+                    pred_attr = getattr(xgb_model, 'predict', None)
+                    print(f"[upload_file] Exception during model.predict: {pred_e}")
+                    print(f"[upload_file] type(pred_attr): {type(pred_attr)}")
+                    print(f"[upload_file] repr(pred_attr): {repr(pred_attr)}")
+                    print(f"[upload_file] callable(pred_attr): {callable(pred_attr)}")
+                except Exception as _inner:
+                    print(f"[upload_file] Error while logging predict attr: {_inner}")
+                # Print full traceback here to capture where the error occurred, then re-raise
+                try:
+                    import traceback as _tb
+                    _tb.print_exc()
+                except Exception:
+                    pass
+                # Re-raise to be handled by outer exception handler (so we still rollback and return 500)
+                raise
+
+            # ==== Compare past documents and Predict Probability ====
+            past_docs_query = Document.query.with_entities(
+                Document.docName, Document.embedding, Document.isApproved
+            ).filter(Document.embedding.isnot(None)).all()
+
+            past_docs = pd.DataFrame([
+                {"docName": d.docName, "embedding": d.embedding, "isApproved": d.isApproved}
+                for d in past_docs_query
+            ])
+
+            new_doc_data = {
+                "file_size": file_size,
+                "Criteria_Completion_Score": criteria_completion_score,
+                "Days_Until_Deadline": days_until_deadline,
+                "docType": "application/pdf",
+                "programID": programID,
+                "embedding": embedding
+            }
+
+            prob_approval, top_similar_docs = compare_documents(new_doc_data, past_docs, xgb_model)
             
+
+            if prob_approval is None:
+                prob_approval = 0.0  # default if not computed
+
+            doc.predicted_probability = float(prob_approval)
+            doc.similar_docs = (
+                top_similar_docs.to_dict(orient='records')
+                if hasattr(top_similar_docs, "to_dict")
+                else []
+            )
+
+            print(f"[DEBUG] Probability: {doc.predicted_probability}")
+            print(f"[DEBUG] Similar Docs count: {len(doc.similar_docs)}")
+
             # Final commit
             db.session.commit()
+            print(f"[upload_file] commit successful for docID={doc.docID}")
 
             return jsonify({
-                'success': True, 
-                'message': 'File uploaded successfully!', 
+                'success': True,
+                'message': 'File uploaded successfully!',
                 'filePath': f"{normalized_path}/{filename}",
                 'predict_rating': round(predicted_rating, 2),
-                'status': response.status_code 
+                'probability_of_approval': round(prob_approval, 4) if prob_approval is not None else None,
+                'status': response.status_code
             }), 200
-            
+
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             db.session.rollback()  # Rollback on error
-            return jsonify({'success': False, 'message': f'Failed to upload file: {str(e)}'}), 400
+            print(f"[upload_file] Exception: {str(e)}")
+            return jsonify({'success': False, 'message': f'Failed to upload file: {str(e)}'}), 500
         
 
     # Preview file
@@ -2911,6 +2990,7 @@ def register_routes(app):
         temp_path = f"/tmp/{filename}"
         try:
             file.save(temp_path) 
+            file.seek(0)
 
             file_extension = filename.rsplit('.', 1)[-1].lower()
             if file_extension == 'pdf':
@@ -3139,7 +3219,9 @@ def register_routes(app):
                 Document.docID,
                 Document.docName,
                 Document.docPath,
-                Document.predicted_rating
+                Document.predicted_rating,
+                Document.predicted_probability,
+                Document.similar_docs
             )
             .outerjoin(Document, Criteria.docID == Document.docID)
             .join(Subarea, Criteria.subareaID == Subarea.subareaID)
@@ -3163,6 +3245,8 @@ def register_routes(app):
                 "docName": c.docName,
                 "docPath": c.docPath,
                 'predicted_rating': c.predicted_rating,
+                "predicted_probability": c.predicted_probability,
+                "similar_docs": c.similar_docs,
                 "rating": c.rating
             }
 

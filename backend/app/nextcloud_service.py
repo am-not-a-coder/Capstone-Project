@@ -144,24 +144,49 @@ def preview_from_nextcloud(doc_path):
     
 
 def rename_file_nextcloud(old_path, new_path):
-    UDMS_URL = f"{NEXTCLOUD_URL}/UDMS_Repository/"
-   
-    old_url = UDMS_URL + '/'.join(quote(part) for part in old_path.split('/'))
-    new_url = UDMS_URL + '/'.join(quote(part) for part in new_path.split('/'))
+    UDMS_URL = f"{NEXTCLOUD_URL}/remote.php/dav/files/{NEXTCLOUD_USER}/"
+    
+    # Paths come URL-encoded from frontend, just append them
+    # If they already contain UDMS_Repository, use as-is
+    # If not, prepend it
+    
+    # Decode to check structure
+    old_path_decoded = unquote(old_path)
+    new_path_decoded = unquote(new_path)
+    
+    # Ensure UDMS_Repository prefix exists
+    if not old_path_decoded.startswith('UDMS_Repository'):
+        old_path_decoded = f"UDMS_Repository/{old_path_decoded}"
+    if not new_path_decoded.startswith('UDMS_Repository'):
+        new_path_decoded = f"UDMS_Repository/{new_path_decoded}"
+    
+    # Re-encode properly for URL
+    old_url = UDMS_URL + '/'.join(quote(part, safe='') for part in old_path_decoded.split('/'))
+    new_url = UDMS_URL + '/'.join(quote(part, safe='') for part in new_path_decoded.split('/'))
 
-    print(f"Renaming in Nextcloud: {old_url} -> {new_url}")
+    print(f"Renaming in Nextcloud:")
+    print(f"  Old: {old_url}")
+    print(f"  New: {new_url}")
 
     try:
         response = requests.request(
             "MOVE",
             old_url,
             auth=HTTPBasicAuth(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD),
-            headers = {"Destination": new_url},
+            headers={"Destination": new_url},
+            timeout=30  # Add timeout
         )
+        
+        print(f"Nextcloud rename response: {response.status_code}")
+        if response.status_code not in (200, 201, 204, 207):
+            print(f"Response body: {response.text}")
+        
         return response  
     
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except requests.exceptions.RequestException as e:
+        print(f"Nextcloud rename error: {str(e)}")
+        # Don't return jsonify here - this function should return response object
+        raise Exception(f"Nextcloud connection failed: {str(e)}")
 
 
 
@@ -285,9 +310,7 @@ def list_files_from_nextcloud():
 
             size = props.find("d:getcontentlength", ns)
             mime = props.find("d:getcontenttype", ns)
-            modified = props.find("d:getlastmodified", ns)
-
-            print(f"Database paths: {list(db_docs.keys())}")
+            modified = props.find("d:getlastmodified", ns)            
 
             if is_last:
                 ext = os.path.splitext(part)[1].lower().lstrip(".")

@@ -251,6 +251,8 @@ class Document(db.Model):
     tags = db.Column(ARRAY(db.String))
     embedding = db.Column(Vector(384)) 
     predicted_rating = db.Column(db.Float)
+    predicted_probability = db.Column(db.Float)
+    similar_docs = db.Column(db.JSON)
 
     criteria = db.relationship("Criteria", back_populates="document")
 
