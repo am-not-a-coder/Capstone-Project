@@ -1,29 +1,56 @@
 import requests
 import os
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 from requests.auth import HTTPBasicAuth
 from io import BytesIO
 from werkzeug.utils import secure_filename
 from flask import Response, stream_with_context, send_file, jsonify
 from app.models import Document
+import uuid
+from urllib.parse import urlparse
 
 
 NEXTCLOUD_URL = os.getenv('NEXTCLOUD_URL')
 NEXTCLOUD_USER = os.getenv('NEXTCLOUD_USER')
 NEXTCLOUD_PASSWORD = os.getenv('NEXTCLOUD_PASSWORD')
 
+# Reuse a single HTTP session for keep-alive/connection pooling
+_session = requests.Session()
+_session.auth = HTTPBasicAuth(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD)
+_session.headers.update({'Connection': 'keep-alive'})
+
 def safe_path(path :str):
     # Encode each segment separately to keep `/` intact
     return "/".join(quote(p.strip()) for p in path.split('/'))
 
 
+def _get_webdav_bases():
+    """Return (dav_base, files_base, uploads_base) built from NEXTCLOUD_URL root.
+    dav_base:  <origin>/remote.php/dav/
+    files:     dav_base + files/<username>/
+    uploads:   dav_base + uploads/<username>/
+    """
+    parsed = urlparse(NEXTCLOUD_URL)
+    # If NEXTCLOUD_URL already points to /remote.php/dav, keep only origin
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    dav_base = origin.rstrip('/') + '/remote.php/dav/'
+    files_base = dav_base + f'files/{NEXTCLOUD_USER}/'
+    uploads_base = dav_base + f'uploads/{NEXTCLOUD_USER}/'
+    # Debug print of bases for troubleshooting
+    try:
+        print(f"WEBDAV BASES -> dav: {dav_base} | files: {files_base} | uploads: {uploads_base}")
+    except Exception:
+        pass
+    return dav_base, files_base, uploads_base
+
 def build_nextcloud_url(doc_path: str):
-    # Ensure consistent encoding for directories & filename
+    # Build a URL inside the user's files namespace
+    _, files_base, _ = _get_webdav_bases()
     encoded_path = "/".join(quote(p) for p in doc_path.strip("/").split("/"))
-    return f"{NEXTCLOUD_URL.rstrip('/')}/{encoded_path}"
+    return f"{files_base}{encoded_path}"
 
 
-# Create folder if it doesn't exists
+# Create folder if it doesn't exists under files namespace
 created_dirs = set()
 def ensure_directories(path: str):   
     # Remove leading/trailing slashes and split into segments
@@ -45,7 +72,9 @@ def ensure_directories(path: str):
             continue
             
         # Construct the full URL for this directory
-        url = f"{NEXTCLOUD_URL.rstrip('/')}{current_path}"
+        # Create inside files namespace
+        _, files_base, _ = _get_webdav_bases()
+        url = f"{files_base}{current_path.strip('/')}"
         
         print(f"Creating directory: {url}")
         
@@ -78,41 +107,36 @@ def ensure_directories(path: str):
 
 
 def upload_to_nextcloud(file, path):    
-    filename = secure_filename(file.filename)  # normalized filename
+    
+    filename = secure_filename(file.filename)
     target_url = build_nextcloud_url(f"{path}/{filename}")
     
     print(f"Uploading to Nextcloud URL: {target_url}")
     print(f"Using credentials - User: {NEXTCLOUD_USER}, Password: {'*' * len(NEXTCLOUD_PASSWORD)}")
 
+    #idk what the f is this tbh
+    def _chunk_iter(stream, chunk_size=1024 * 1024):  # 1MB chunks
+        while True:
+            data = stream.read(chunk_size)
+            if not data:
+                break
+            yield data
+
+    # Use the underlying Werkzeug FileStorage stream
+    file.stream.seek(0)
     try:
-        file_bytes = file.read()
-        file.seek(0)  # Reset file pointer after reading
-        
-        response = requests.put(
+        response = _session.put(
             target_url,
-            auth=HTTPBasicAuth(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD),
-            data=file_bytes,
-            headers={
-                'Content-Type': file.content_type if hasattr(file, 'content_type') else 'application/octet-stream'
-            },
-            timeout=30  # Add timeout to prevent hanging
+            data=_chunk_iter(file.stream),
+            headers={'Content-Type': 'application/octet-stream'},
+            timeout=120
         )
-        
-        print(f"Upload response status: {response.status_code}")
-        print(f"Upload response headers: {dict(response.headers)}")
-        if response.status_code not in (200, 201, 204):
-            print(f"Upload failed with response text: {response.text}")
-            
         return response
-        
-    except requests.exceptions.RequestException as e:
-        print(f"Network error during upload: {str(e)}")
-        # Create a mock response for network errors
-        class MockResponse:
-            status_code = 500
-            text = str(e)
-            headers = {}
-        return MockResponse()
+    finally:
+        try:
+            file.stream.seek(0)
+        except Exception:
+            pass
 
 
 
@@ -120,9 +144,8 @@ def preview_from_nextcloud(doc_path):
     try:
         target_url = build_nextcloud_url(doc_path)
 
-        response = requests.get(
+        response = _session.get(
                 target_url, 
-                auth=HTTPBasicAuth(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD), 
                 timeout = 30, 
                 stream = True
             )
@@ -169,12 +192,10 @@ def rename_file_nextcloud(old_path, new_path):
     print(f"  New: {new_url}")
 
     try:
-        response = requests.request(
+        response = _session.request(
             "MOVE",
             old_url,
-            auth=HTTPBasicAuth(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD),
-            headers={"Destination": new_url},
-            timeout=30  # Add timeout
+            headers = {"Destination": new_url},
         )
         
         print(f"Nextcloud rename response: {response.status_code}")
@@ -193,18 +214,18 @@ def rename_file_nextcloud(old_path, new_path):
 # Upload or overwrite (edit) a file in Nextcloud
 def edit_file_nextcloud(file_path, file_content):
    
-    UDMS_URL = f"{NEXTCLOUD_URL.rstrip('/')}/UDMS_Repository/"
-    file_url = UDMS_URL + '/'.join(quote(part) for part in file_path.split('/'))
+    _, files_base, _ = _get_webdav_bases()
+    file_url = files_base + '/'.join(quote(part) for part in file_path.split('/'))
 
     try:
         # If file_content is string, encode to bytes
         if isinstance(file_content, str):
             file_content = file_content.encode("utf-8")
 
-        response = requests.put(
+        response = _session.put(
             file_url,
             data=file_content,
-            auth=HTTPBasicAuth(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD)
+            timeout=120
         )
 
         if response.status_code in [200, 201, 204]:
@@ -226,16 +247,14 @@ def edit_file_nextcloud(file_path, file_content):
 
 def delete_from_nextcloud(doc_path):
     try:
-        safe_path = doc_path.strip("/")
-        encoded_path = quote(safe_path)
-        
-        target_url = f"{NEXTCLOUD_URL.rstrip('/')}/UDMS_Repository/{encoded_path}"
+        _, files_base, _ = _get_webdav_bases()
+        encoded_path = quote(doc_path.strip('/'))
+        target_url = f"{files_base}{encoded_path}"
 
         print(f"Deleting at Nextcloud: {target_url}")
 
-        response = requests.delete(
+        response = _session.delete(
                 target_url, 
-                auth=HTTPBasicAuth(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD), 
                 timeout = 30
             )
 
@@ -255,12 +274,13 @@ def delete_from_nextcloud(doc_path):
 
 # Fetch all files & folders from Nextcloud and return as a nested dict (tree).
 def list_files_from_nextcloud():
-    UDMS_URL = f"{NEXTCLOUD_URL.rstrip('/')}/UDMS_Repository/"
+    # root of repository inside user's files namespace
+    _, files_base, _ = _get_webdav_bases()
+    UDMS_URL = f"{files_base}UDMS_Repository/"
 
-    response = requests.request(
+    response = _session.request(
         "PROPFIND",
         UDMS_URL,
-        auth=HTTPBasicAuth(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD),
         headers={"Depth": "infinity"}
     )
 
@@ -353,11 +373,11 @@ def list_files_from_nextcloud():
 
     # Preview file from Nextcloud
 def preview_file_nextcloud(file_path):
-    url = f"{NEXTCLOUD_URL.rstrip('/')}/UDMS_Repository/{safe_path(file_path)}"
+    _, files_base, _ = _get_webdav_bases()
+    url = f"{files_base}{safe_path(file_path)}"
 
-    response = requests.get(
+    response = _session.get(
         url,
-        auth=HTTPBasicAuth(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD),
         stream=True
     )
 
@@ -371,11 +391,11 @@ def preview_file_nextcloud(file_path):
         return Response(f"Error fetching file: {response.status_code} - {response.text}", status=response.status_code)
  
 def download_file_nextcloud(file_path):
-    url = f"{NEXTCLOUD_URL.rstrip('/')}/UDMS_Repository/{safe_path(file_path)}"
+    _, files_base, _ = _get_webdav_bases()
+    url = f"{files_base}{safe_path(file_path)}"
 
-    response = requests.get(
+    response = _session.get(
         url,
-        auth=HTTPBasicAuth(NEXTCLOUD_USER, NEXTCLOUD_PASSWORD),
         stream=True
     )
     print(f"Downloading: {file_path} -> Status {response.status_code}")
@@ -390,3 +410,84 @@ def download_file_nextcloud(file_path):
         )
     else:
         return jsonify({"error": f"Failed to download file: {response.status_code}"}), response.status_code
+
+#idk fk
+def upload_to_nextcloud_chunked(file, nextcloud_final_path, empID=None, redis_client=None):
+    print("DEBUG: Entered upload_to_nextcloud_chunked")
+    username = NEXTCLOUD_USER
+    print(f"DEBUG: User is {empID}, NEXTCLOUD_USER is {NEXTCLOUD_USER}")
+    # Derive correct WebDAV base: scheme://host/remote.php/dav/
+    # This avoids duplicating remote.php if NEXTCLOUD_URL already contains paths
+    parsed = urlparse(NEXTCLOUD_URL)
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    webdav_base = origin.rstrip('/') + '/remote.php/dav/'
+    upload_id = str(uuid.uuid4().hex)
+    chunk_size = 5 * 1024 * 1024  # 5MB
+
+    # Ensure the upload directory exists
+    upload_base_dir = f"{webdav_base}uploads/{username}/{upload_id}"
+    mkcol_resp = _session.request("MKCOL", upload_base_dir, timeout=60)
+    # 201 Created, 405 Method Not Allowed = already exists
+    if mkcol_resp.status_code not in [201, 405]:
+        raise Exception(f"Failed to initialize upload dir: {mkcol_resp.status_code} {mkcol_resp.text}")
+
+    # Nextcloud expects zero-padded 16-digit decimal chunk names
+    chunks = []
+    idx = 0
+    chunk_url = None  # initialize to avoid UnboundLocalError on early failures
+    file.stream.seek(0)
+    total_size = 0
+    while True:
+        data = file.stream.read(chunk_size)
+        if not data:
+            break
+        chunk_name = f"{idx:016d}"
+        chunk_url = f"{upload_base_dir}/{chunk_name}"
+        print(f"DEBUG CHUNK {idx} URL: {chunk_url}")
+        resp = _session.put(chunk_url, data=data, timeout=120)
+        if resp.status_code not in [201, 204]:
+            if redis_client and empID:
+                redis_client.setex(f"upload_status:{empID}:{file.filename}", 300, f"Failed at chunk {idx}")
+            raise Exception(f"Failed uploading chunk {idx} url={chunk_url}: {resp.status_code} {resp.text}")
+        total_size += len(data)
+        chunks.append(chunk_name)
+        percent = int((file.stream.tell() / file.content_length) * 100) if hasattr(file, 'content_length') and file.content_length else int(len(chunks) * chunk_size / (file.content_length or (len(chunks) * chunk_size)) * 100)
+        if redis_client and empID:
+            redis_client.setex(f"upload_status:{empID}:{file.filename}", 300, percent)
+        idx += 1
+    # Ensure destination directory exists under files namespace
+    try:
+        dest_dir = os.path.dirname(nextcloud_final_path.strip('/'))
+        if dest_dir:
+            print(f"DEBUG ENSURE DIRS -> {dest_dir}")
+            ensure_directories(dest_dir)
+    except Exception as e:
+        print(f"WARN ensure_directories failed: {e}")
+
+    # Finalize upload by MOVING the virtual `.file` resource (Nextcloud assembles on MOVE)
+    assembled_url = f"uploads/{username}/{upload_id}/.file"
+    final_url_path = nextcloud_final_path.lstrip('/')
+    src_url = f"{webdav_base}{assembled_url}"
+    dst_url = f"{webdav_base}files/{username}/{final_url_path}"
+
+    # MOVE (assemble) to final – no prior PUT required for .file
+    try:
+        print(f"DEBUG MOVE ASSEMBLE -> SRC: {src_url}  DST: {dst_url}")
+    except Exception:
+        pass
+    move_resp = _session.request(
+        "MOVE",
+        src_url,
+        headers={
+            "Destination": dst_url,
+            "Overwrite": "T"
+        },
+        timeout=180
+    )
+    if move_resp.status_code not in [201, 204]:
+        if redis_client and empID:
+            redis_client.setex(f"upload_status:{empID}:{file.filename}", 300, "Failed MOVE assemble")
+        raise Exception(f"Failed to finalize (MOVE) file: {move_resp.status_code} {move_resp.text}")
+    if redis_client and empID:
+        redis_client.setex(f"upload_status:{empID}:{file.filename}", 120, 100)
+    return move_resp

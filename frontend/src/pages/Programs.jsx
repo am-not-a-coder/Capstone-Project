@@ -20,7 +20,7 @@ import CreateModal from '../components/modals/CreateModal';
 import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer";
 import "@cyntler/react-doc-viewer/dist/index.css";
 import "../../index.css"
-import { PermissionGate, adminHelper, getCurrentUser } from '../utils/auth_utils';
+import { PermissionGate, adminHelper } from '../utils/auth_utils';
 import { CardSkeleton } from '../components/Skeletons';
 import StatusModal from "../components/modals/StatusModal";
 import { ApplyTempModal } from '../components/modals/TemplateModal';
@@ -28,10 +28,12 @@ import toast, { Toaster } from 'react-hot-toast'
 // import ArchiveModal from '../components/modals/ArchiveModal';
 
 
+
   const Programs = () => {
-    //admin
+
     const isAdmin = adminHelper()
-    const user = getCurrentUser()
+
+    
     // use state function
   const [institutes, setInstitutes] = useState([]);
   const [programs, setPrograms] = useState([]);
@@ -67,6 +69,61 @@ import toast, { Toaster } from 'react-hot-toast'
   const [error, setError] = useState(null);
   const [docViewerKey, setDocViewerKey] = useState(0); 
 
+  // Chunked upload progress (Nextcloud)
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Backend-powered chunked upload using /api/upload/chunked with progress polling
+  const uploadChunked = async (file, finalPath, onProgress) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('final_path', finalPath);
+
+    const res = await fetch('/api/upload/chunked', {
+      method: 'POST',
+      body: formData,
+      credentials: 'include'
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message || 'Upload failed');
+
+    const filename = file.name;
+    return new Promise((resolve, reject) => {
+      const poll = async () => {
+        try {
+          const progressRes = await fetch(`/api/upload/progress?filename=${encodeURIComponent(filename)}`, { credentials: 'include' });
+          const progressData = await progressRes.json();
+          const val = progressData.progress;
+          if (onProgress) onProgress(typeof val === 'number' ? val : 0);
+          if (val === 100) return resolve(undefined);
+          if (typeof val === 'string' && val.startsWith('Failed')) return reject(val);
+          setTimeout(poll, 700);
+        } catch {
+          setTimeout(poll, 1200);
+        }
+      };
+      poll();
+    });
+  };
+
+  const handleDocUpload = async (file) => {
+    if (!file) return;
+    setUploadProgress(0);
+    // Compute a reasonable final path in Nextcloud based on current selection
+    const programCode = selectedProgram?.programCode || 'General';
+    const areaFolder = (selectedArea?.areaName || 'General').replaceAll('/', '-');
+    const subFolder = (selectedSubarea?.subareaName || 'General').replaceAll('/', '-');
+    const finalPath = `UDMS_Repository/Accreditation/Programs/${programCode}/${areaFolder}/${subFolder}/${file.name}`;
+    try {
+      await uploadChunked(file, finalPath, (p) => setUploadProgress(p));
+      setUploadProgress(100);
+      toast.success('Upload complete');
+      // Optionally refresh areas/doc list here
+    } catch (err) {
+      setUploadProgress(0);
+      toast.error(`Upload failed: ${err}`);
+    }
+  };
+
   // Fetch programs
   const fetchPrograms = async () => {
     
@@ -81,22 +138,7 @@ import toast, { Toaster } from 'react-hot-toast'
         const userPermissions = response.data?.userPermissions ?? response.userPermissions;
 
         Array.isArray(programsArr) ? setPrograms(programsArr) : setPrograms([]);
-        
-        // Log user access information for debugging
-        console.log('Program Access Info:', {
-          accessLevel,
-          userPermissions,
-          programCount: programsArr.length
-        });
 
-        // Show user-friendly message based on access level
-        if (accessLevel === 'assigned' && programsArr.length === 0) {
-          console.log('User has no assigned programs');
-        } else if (accessLevel === 'full') {
-          console.log('User has full program access');
-        } else {
-          console.log(`User has access to ${programsArr.length} assigned programs`);
-        }
 
       } else {
         console.error('Failed to fetch the programs:', response.error || response);
@@ -128,13 +170,7 @@ import toast, { Toaster } from 'react-hot-toast'
             const userPermissions = response.data?.userPermissions ?? response.userPermissions;
 
             Array.isArray(institutesArr) ? setInstitutes(institutesArr) : setInstitutes([]);
-            
-            // Log user access information for debugging
-            console.log('Institute Access Info:', {
-              accessLevel,
-              userPermissions,
-              instituteCount: institutesArr.length
-            });
+          
           } else {
             console.error('Failed to fetch institutes:', response.error || response);
             setInstitutes([]);
@@ -178,7 +214,7 @@ import toast, { Toaster } from 'react-hot-toast'
           
           if (response.success) {
           Array.isArray(response.data.institutes) ? setInstituteOption(response.data.institutes) : setInstituteOption([]);
-          console.log(response.data)
+          
           } else {
             console.error("Error fetching institutes:", response.error);
             setInstituteOption([]);
@@ -225,7 +261,6 @@ import toast, { Toaster } from 'react-hot-toast'
               setAreas([])
             };
           } catch(err){
-            console.log(err.response?.data || err.message);
             setAreas([]);
           }
         }
@@ -912,8 +947,7 @@ import toast, { Toaster } from 'react-hot-toast'
                     
                     {/* Program Cards Section */}
                     <div className={`${visible == "programs" ? 'block' : 'hidden'} flex flex-wrap gap-4`}>
-                
-                 <PermissionGate requires={'crudProgramEnable'}>
+                  <PermissionGate requires={'crudProgramEnable'}>
                     <CreateCard form={form} handleChange={handleChange} setShowForm={setShowForm} title="Program" />
                   </PermissionGate>
                   {programLoading ? (
@@ -941,6 +975,7 @@ import toast, { Toaster } from 'react-hot-toast'
                       {selectedProgram && visible === "areas" && (
                         <div className="flex flex-col w-full overflow-auto">
                           <div className="w-full p-2 text-gray-700 rounded-xl">
+                            {/* Upload UI preserved in existing modals; no changes here */}
                             {areas.sort((a, b) => a.areaID - b.areaID).map((area) => {
                               const allCriteria = Array.isArray(area.subareas)
                                 ? area.subareas.flatMap(sub => [
@@ -1106,6 +1141,7 @@ import toast, { Toaster } from 'react-hot-toast'
                 </div>
 
                 {/*Form Modal*/}
+                
                 <PermissionGate requires={'crudProgramEnable'}>
                 {showForm && 
                 <CreateForm 
@@ -1124,7 +1160,8 @@ import toast, { Toaster } from 'react-hot-toast'
                   handleChange={handleChange}
                   handleModify={handleModify}
                 />}
-               </PermissionGate>
+                </PermissionGate>
+               
             </div>
       </>
     );
