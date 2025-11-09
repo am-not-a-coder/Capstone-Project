@@ -51,7 +51,7 @@ const OtpInput = ({ value = '', onChange, length = 6, autoFocus = true, disabled
           onChange={(e) => handleChange(i, e.target.value)}
           onKeyDown={(e) => handleKeyDown(i, e)}
           disabled={disabled}
-          className="w-12 h-16 text-center text-2xl border-2 border-blue-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-600 dark:text-white dark:border-blue-400 transition-transform duration-150 hover:scale-105"
+          className="w-12 h-16 text-2xl text-center transition-transform duration-150 border-2 border-blue-500 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-600 dark:text-white dark:border-blue-400 hover:scale-105"
         />
       ))}
     </div>
