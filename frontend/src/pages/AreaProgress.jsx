@@ -1,17 +1,12 @@
-import { useState, useEffect } from 'react';
-import { 
-    faSearch, 
-    faFilter,
-    faCalendar,     
-    faBookOpen,
-    faArrowTrendUp
-} from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { apiGet } from '../utils/api_utils';
-import { adminHelper } from '../utils/auth_utils';
-import StatusModal from '../components/modals/StatusModal';
-import {Area} from './Tasks'
-import AreaDetailModal from '../components/modals/AreaDetailModal';
+import { useState, useEffect } from 'react'
+import {faSearch, faFilter, faCalendar, faBookOpen, faArrowTrendUp} from '@fortawesome/free-solid-svg-icons'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import { apiGet } from '../utils/api_utils'
+import { adminHelper } from '../utils/auth_utils'
+import StatusModal from '../components/modals/StatusModal'
+import {Area} from './Dashboard'
+import AreaDetailModal from '../components/modals/AreaDetailModal'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 // Filter Component
 const FilterPanel = ({ filters, onFilterChange, programs = [] }) => {
@@ -20,11 +15,7 @@ const FilterPanel = ({ filters, onFilterChange, programs = [] }) => {
       {/* Program Filter */}
       <div className="flex flex-col">
         <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Program</label>
-        <select 
-          value={filters.program} 
-          onChange={(e) => onFilterChange('program', e.target.value)}
-          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-200 inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-900 text-gray-700 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-        >
+        <select value={filters.program} onChange={(e) => onFilterChange('program', e.target.value)} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-200 inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-900 text-gray-700 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent" >
           <option value="">All Programs</option>
           {programs.map(program => (
             <option key={program.code} value={program.code}>{program.name}</option>
@@ -35,11 +26,7 @@ const FilterPanel = ({ filters, onFilterChange, programs = [] }) => {
       {/* Progress Filter */}
       <div className="flex flex-col">
         <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Progress Level</label>
-        <select 
-          value={filters.progressLevel} 
-          onChange={(e) => onFilterChange('progressLevel', e.target.value)}
-          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-200 inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-900 text-gray-700 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-        >
+        <select value={filters.progressLevel} onChange={(e) => onFilterChange('progressLevel', e.target.value)} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-200 inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-900 text-gray-700 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent" >
           <option value="">All Levels</option>
           <option value="excellent">Excellent (80%+)</option>
           <option value="good">Good (60-79%)</option>
@@ -51,11 +38,7 @@ const FilterPanel = ({ filters, onFilterChange, programs = [] }) => {
       {/* Sort */}
       <div className="flex flex-col">
         <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sort By</label>
-        <select 
-          value={filters.sortBy} 
-          onChange={(e) => onFilterChange('sortBy', e.target.value)}
-          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-200 inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-900 text-gray-700 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-        >
+        <select value={filters.sortBy} onChange={(e) => onFilterChange('sortBy', e.target.value)} className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-200 inset-shadow-sm inset-shadow-gray-400 dark:bg-gray-900 text-gray-700 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent" >
           <option value="name">Area Name</option>
           <option value="progress-high">Progress (High to Low)</option>
           <option value="progress-low">Progress (Low to High)</option>
@@ -63,15 +46,15 @@ const FilterPanel = ({ filters, onFilterChange, programs = [] }) => {
         </select>
       </div>
     </div>
-  );
-};
+  )
+}
 
 // Statistics Panel Component
 const StatsPanel = ({ areas }) => {
-  const totalAreas = areas.length;
-  const avgProgress = Math.round(areas.reduce((sum, area) => sum + area.progress, 0) / totalAreas);
-  const excellentAreas = areas.filter(area => area.progress >= 80).length;
-  const needsAttentionAreas = areas.filter(area => area.progress < 40).length;
+  const totalAreas = areas.length
+  const avgProgress = Math.round(areas.reduce((sum, area) => sum + area.progress, 0) / totalAreas)
+  const excellentAreas = areas.filter(area => area.progress >= 80).length
+  const needsAttentionAreas = areas.filter(area => area.progress < 40).length
 
   return (
     <div className="grid grid-cols-4 gap-4 mb-6">
@@ -119,70 +102,67 @@ const StatsPanel = ({ areas }) => {
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
 const AreaProgressPage = () => {
   // Admin check
-  const isAdmin = adminHelper();
-
-  const [areas, setAreas] = useState([]);
-  const [filteredAreas, setFilteredAreas] = useState([]);
-  const [programs, setPrograms] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  const isAdmin = adminHelper()
+  const [areas, setAreas] = useState([])
+  const [filteredAreas, setFilteredAreas] = useState([])
+  const [programs, setPrograms] = useState([])
+  const [searchTerm, setSearchTerm] = useState('')
   const [filters, setFilters] = useState({
     program: '',
     progressLevel: '',
     sortBy: 'name'
-  });
+  })
+  const [programChart, setProgramChart] = useState('allDept')
 
   // Loading and error states
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [statusMessage, setStatusMessage] = useState('');
-  const [statusType, setStatusType] = useState('success');
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [showStatusModal, setShowStatusModal] = useState(false)
+  const [statusMessage, setStatusMessage] = useState('')
+  const [statusType, setStatusType] = useState('success')
 
   // Modal states
-  const [showAreaDetail, setShowAreaDetail] = useState(false);
-  const [selectedArea, setSelectedArea] = useState(null);
-
+  const [showAreaDetail, setShowAreaDetail] = useState(false)
+  const [selectedArea, setSelectedArea] = useState(null)
 
   // FETCH PROGRAMS
   useEffect(() => {
     const fetchPrograms = async () => {
       try {
-        const res = await apiGet('/api/program', { withCredentials: true });
-        
+        const res = await apiGet('/api/program', { withCredentials: true })
         if (Array.isArray(res.data.programs)) {
           const programsData = res.data.programs.map(program => ({
             code: program.programCode,
             name: program.programName,
-            id: program.programID
-          }));
-          setPrograms(programsData);
+            id: program.programID,
+            color: program.programColor
+          }))
+          setPrograms(programsData)
         } else {
-          setPrograms([]);
+          setPrograms([])
         }
       } catch (err) {
-        console.error("Error occurred when fetching programs", err);
-        setError("Failed to fetch programs");
-        setStatusMessage("Failed to fetch programs");
-        setStatusType("error");
-        setShowStatusModal(true);
+        console.error("Error occurred when fetching programs", err)
+        setError("Failed to fetch programs")
+        setStatusMessage("Failed to fetch programs")
+        setStatusType("error")
+        setShowStatusModal(true)
       }
-    };
-    
-    fetchPrograms();
-  }, []);
+    }
+    fetchPrograms()
+  }, [])
 
   // FETCH AREAS WITH PROGRESS
   useEffect(() => {
     const fetchAreas = async () => {
-      setLoading(true);
+      setLoading(true)
       try {
-        const res = await apiGet('/api/area', { withCredentials: true });
-        
+        const res = await apiGet('/api/area', { withCredentials: true })
         if (Array.isArray(res.data.area)) {
           // Process the area data to match your component structure
           const processedAreas = res.data.area.map(area => ({
@@ -194,33 +174,32 @@ const AreaProgressPage = () => {
             programName: area.programName,
             programID: area.programID,
             lastUpdated: area.updated_at ? new Date(area.updated_at).toLocaleDateString() : new Date().toLocaleDateString()
-          }));
+          }))
 
           // Remove duplicates based on areaID
           const uniqueAreas = processedAreas.filter((area, index, self) => 
             index === self.findIndex(a => a.id === area.id)
-          );
-
-          setAreas(uniqueAreas);
-        } else {
-          setAreas([]);
+          )
+          setAreas(uniqueAreas)
+        } 
+        else {
+          setAreas([])
         }
       } catch (err) {
-        console.error("Error occurred when fetching areas", err);
-        setError("Failed to fetch areas");
-        setStatusMessage("Failed to fetch area data");
-        setStatusType("error");
-        setShowStatusModal(true);
+        console.error("Error occurred when fetching areas", err)
+        setError("Failed to fetch areas")
+        setStatusMessage("Failed to fetch area data")
+        setStatusType("error")
+        setShowStatusModal(true)
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
-
-    fetchAreas();
-  }, []);
+    }
+    fetchAreas()
+  }, [])
 
   useEffect(() => {
-    let filtered = [...areas];
+    let filtered = [...areas]
 
     // Apply search filter
     if (searchTerm) {
@@ -228,76 +207,82 @@ const AreaProgressPage = () => {
         area.areaTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
         area.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
         area.programCode.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      )
     }
 
     // Apply program filter
     if (filters.program) {
-      filtered = filtered.filter(area => area.programCode === filters.program);
+      filtered = filtered.filter(area => area.programCode === filters.program)
     }
 
     // Apply progress level filter
     if (filters.progressLevel) {
       switch (filters.progressLevel) {
         case 'excellent':
-          filtered = filtered.filter(area => area.progress >= 80);
-          break;
+          filtered = filtered.filter(area => area.progress >= 80)
+          break
         case 'good':
-          filtered = filtered.filter(area => area.progress >= 60 && area.progress < 80);
+          filtered = filtered.filter(area => area.progress >= 60 && area.progress < 80)
           break;
         case 'fair':
-          filtered = filtered.filter(area => area.progress >= 40 && area.progress < 60);
-          break;
+          filtered = filtered.filter(area => area.progress >= 40 && area.progress < 60)
+          break
         case 'needs-attention':
-          filtered = filtered.filter(area => area.progress < 40);
-          break;
+          filtered = filtered.filter(area => area.progress < 40)
+          break
       }
     }
 
     // Apply sorting
     switch (filters.sortBy) {
       case 'progress-high':
-        filtered.sort((a, b) => b.progress - a.progress);
-        break;
+        filtered.sort((a, b) => b.progress - a.progress)
+        break
       case 'progress-low':
-        filtered.sort((a, b) => a.progress - b.progress);
-        break;
+        filtered.sort((a, b) => a.progress - b.progress)
+        break
       case 'updated':
-        filtered.sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated));
-        break;
+        filtered.sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated))
+        break
       case 'name':
-          filtered.sort((a, b) => a.description.localeCompare(b.areaTitle));
+          filtered.sort((a, b) => a.description.localeCompare(b.areaTitle))
       default:
-          filtered.sort((a, b) => a.areaNum.localeCompare(b.areaTitle));
-        break;
+          filtered.sort((a, b) => a.areaNum.localeCompare(b.areaTitle))
+        break
     }
 
-    setFilteredAreas(filtered);
-  }, [areas, searchTerm, filters]);
+    // Add program color in each area
+    const updatedFiltered = filtered.map((filteredArea) => {
+      const areaProgram = programs.find(program => program.code === filteredArea.programCode)
+      console.log('areaProgram: ', areaProgram)
+      return ({...filteredArea, areaColor: areaProgram.color})
+    })
+    setFilteredAreas(updatedFiltered)
+  }, [areas, searchTerm, filters])
 
   const handleFilterChange = (filterType, value) => {
-    setFilters(prev => ({ ...prev, [filterType]: value }));
+    setFilters(prev => ({ ...prev, [filterType]: value }))
   };
 
    const handleAreaClick = (area) => {
-    console.log('Area clicked:', area);
-    setSelectedArea(area);
-    setShowAreaDetail(true);
+    console.log('Area clicked:', area)
+    setSelectedArea(area)
+    setShowAreaDetail(true)
   };
 
   const handleCloseAreaDetail = () => {
-    setSelectedArea(null);
-    setShowAreaDetail(false);
+    setSelectedArea(null)
+    setShowAreaDetail(false)
   };
 
   const refreshData = async () => {
-    setLoading(true);
+    setLoading(true)
     try {
       // Refetch both programs and areas
       const [programRes, areaRes] = await Promise.all([
         apiGet('/api/program', { withCredentials: true }),
         apiGet('/api/area', { withCredentials: true })
-      ]);
+      ])
 
       // Update programs
       if (Array.isArray(programRes.data.programs)) {
@@ -305,8 +290,8 @@ const AreaProgressPage = () => {
           code: program.programCode,
           name: program.programName,
           id: program.programID
-        }));
-        setPrograms(programsData);
+        }))
+        setPrograms(programsData)
       }
 
       // Update areas
@@ -320,27 +305,27 @@ const AreaProgressPage = () => {
           programName: area.programName,
           programID: area.programID,
           lastUpdated: area.updated_at ? new Date(area.updated_at).toLocaleDateString() : new Date().toLocaleDateString()
-        }));
+        }))
 
         const uniqueAreas = processedAreas.filter((area, index, self) => 
           index === self.findIndex(a => a.id === area.id)
-        );
+        )
 
-        setAreas(uniqueAreas);
+        setAreas(uniqueAreas)
       }
 
-      setStatusMessage("Data refreshed successfully");
-      setStatusType("success");
-      setShowStatusModal(true);
+      setStatusMessage("Data refreshed successfully")
+      setStatusType("success")
+      setShowStatusModal(true)
     } catch (err) {
-      console.error("Error refreshing data", err);
-      setStatusMessage("Failed to refresh data");
-      setStatusType("error");
-      setShowStatusModal(true);
+      console.error("Error refreshing data", err)
+      setStatusMessage("Failed to refresh data")
+      setStatusType("error")
+      setShowStatusModal(true)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   if (loading && areas.length === 0) {
     return (
@@ -352,8 +337,23 @@ const AreaProgressPage = () => {
           </div>
         </div>
       </div>
-    );
+    )
   }
+
+  // Processed data for bar chart
+  const displayedAreas = programChart === 'allDept' ? areas : areas.filter(area => area.programCode === programChart)
+  const groupedAreas = Object.values(displayedAreas.reduce((acc, curr)=> {
+    if(!acc[curr.areaNum]) {
+      acc[curr.areaNum] = {areaNum: curr.areaNum, totalProgress: 0, count: 0}
+    }
+    acc[curr.areaNum].totalProgress =+ curr.progress
+    acc[curr.areaNum].count =+ 1
+    return acc
+  }, {})).map(group => ({
+    areaNum: group.areaNum,
+    totalProgress: parseInt((group.totalProgress / group.count))
+  }))
+  console.log('grouped areas: ', groupedAreas)
 
   return (
     <div className="w-full p-5 bg-neutral-200 border border-neutral-300 text-neutral-800 rounded-[20px] shadow-inner shadow-gray-400 dark:bg-gray-900 dark:shadow-emerald-900 dark:text-white min-h-screen">
@@ -372,11 +372,7 @@ const AreaProgressPage = () => {
         <h1 className="text-3xl font-bold">Area Progress Overview</h1>
         <div className="flex items-center gap-4">
           {/* Refresh Button */}
-          <button
-            onClick={refreshData}
-            disabled={loading}
-            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-300"
-          >
+          <button onClick={refreshData} disabled={loading} className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors duration-300" >
             {loading ? 'Refreshing...' : 'Refresh'}
           </button>
 
@@ -410,6 +406,30 @@ const AreaProgressPage = () => {
         </div>
       )}
 
+      {/* Graphs */}
+      <section className=' flex h-100 flex-col items-end p-4 w-full overflow-auto shadow-inner shadow-gray-400 border border-gray-300 bg-gray-200 rounded-xl [&_*:focus]:outline-none ' >
+        <select value={programChart} onChange={(e)=> setProgramChart(e.target.value)}  name="selectDept" className='w-1/2 p-2 right-0 outline-0 border mb-8 border-gray-300 shadow-inner shadow-gray-400 rounded text-neutral-800' >
+          <option value="allDept" selected  className='text-gray-400' >All Department</option>
+          {programs.map((program)=> (
+            <option key={program.code} value={program.code}>{program.name}</option>
+          ))}
+        </select>
+        {groupedAreas.length === 0 ? (
+          <p className='text-gray-500 text-7xl place-self-center' >This program have no Areas</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={290}>
+            <BarChart data={groupedAreas}>
+              <CartesianGrid strokeDasharray="5" />
+              <XAxis dataKey='areaNum'/>
+              <YAxis domain={[0, 100]} tickCount={6} tickFormatter={(value)=> `${value}%`} />
+              <Tooltip formatter={(value)=> `${value}%`} />
+              <Legend />
+              <Bar dataKey="totalProgress" name="Progress" fill="#329a65" radius={[10, 10, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </section>
+
       {/* Filters */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-4">
@@ -439,6 +459,7 @@ const AreaProgressPage = () => {
                 desc={area.description} 
                 program={area.programCode} 
                 progress={area.progress}
+                areaColor={area.areaColor}
               />
             ))}
           </div>
@@ -462,4 +483,4 @@ const AreaProgressPage = () => {
   );
 };
 
-export default AreaProgressPage;
+export default AreaProgressPage

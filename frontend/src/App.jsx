@@ -4,12 +4,10 @@ import { isLoggedIn } from './utils/auth_utils';
 import Login from './pages/Login';
 import MainLayout from './MainLayout';
 import Dashboard from './pages/Dashboard';
-import Institutes from './pages/Institutes';
 import Accreditation from './pages/Accreditation';
 import Documents from './pages/Documents';
 import Programs from './pages/Programs';
 import Users from './pages/Users';
-import Tasks from './pages/Tasks';
 import Profile from './pages/Profile';
 import Notification from './pages/Notification';
 import Messages from './pages/Messages';
@@ -401,7 +399,6 @@ const PublicOnlyRoute = ({ children }) => {
               <Templates isAdmin={isAdmin}/>
             </AdminRoute>
             } />
-          <Route path="/Tasks" element={<Tasks />} />
           <Route path="/Progress" element={<AreaProgress />} />
           <Route path="/Documents" element={<Documents />} />
 

@@ -184,7 +184,7 @@ const SubCont = ({title, subareaID, criteria, programCode, areaName, subareaName
                 return (
                 <div 
                  key={itemIndex} 
-                 className='relative flex flex-row justify-between gap-3 p-3 py-10 mb-2 ml-5 overflow-visible transition-all duration-300 border shadow-md cursor-default rounded-2xl border-neutral-400 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600'>
+                 className='relative flex flex-col md:flex-row justify-between gap-3 p-3 py-10 mb-2 ml-0 md:ml-5 overflow-visible transition-all duration-300 border overflow-visible shadow-md cursor-default rounded-2xl border-neutral-400 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600'>
                     {editMode && isEditingCriteria ? (
                         <div className='flex flex-col w-full gap-2' onClick={(e) => e.stopPropagation()}>
                         <textarea
@@ -233,8 +233,8 @@ const SubCont = ({title, subareaID, criteria, programCode, areaName, subareaName
                             )}
                         </div>
 
-                        <span className='absolute text-xs italic text-gray-500 md:text-sm bottom-2 left-3 dark:text-gray-300'>
-                            Criteria ID: {item.criteriaID}
+                        <span className='absolute text-xs md:text-sm italic text-gray-500 bottom-2 left-3 dark:text-gray-300'>
+                            Area ID: {item.criteriaID}
                         </span>
                         <h1
                             onMouseEnter={() => {

@@ -308,10 +308,11 @@ const Login = () => {
                 </form>
             </div>
         </div>
+        
         {showOtpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center text-black">
-            <div className="absolute inset-0 bg-black/50" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }} />
-            <div className="relative bg-white dark:bg-gray-700 shadow-2xl rounded-3xl w-full max-w-md overflow-hidden transform transition-transform duration-200"
+            <div className="absolute inset-0 bg-black/50 " onClick={(e) => { e.preventDefault(); e.stopPropagation(); }} />
+            <div className="relative bg-white dark:bg-gray-700 shadow-2xl rounded-3xl w-full scale-80 md:scale-100 max-w-md overflow-hidden transform transition-transform duration-200"
          onClick={(e) => e.stopPropagation()}>
             <div className="p-8 text-center">
                 <div className="mx-auto mb-6 w-40 h-40">
@@ -338,7 +339,7 @@ const Login = () => {
                 <button
                 type="button"
                 onClick={handleResendOtp}
-                className={`text-blue-600 hover:underline dark:text-blue-400 ${resendCooldown ? 'opacity-60 cursor-not-allowed' : ''}`}
+                className={`text-blue-600 hover:underline cursor-pointer active:text-blue-400 active:scale-90  dark:text-blue-400 ${resendCooldown ? 'opacity-60 cursor-not-allowed' : ''}`}
                 disabled={otpLoading || resendCooldown > 0}
                 >
                 {resendCooldown ? `Resend in ${resendCooldown}s` : 'Resend OTP'}
@@ -349,7 +350,7 @@ const Login = () => {
                 type="button"
                 onClick={handleOtpSubmit}
                 disabled={otpLoading}
-                className="w-full py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-60"
+                className="w-full py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-60 active:scale-90 cursor-pointer"
                 >
                 {otpLoading ? 'Verifying...' : 'Verify OTP'}
                 </button>

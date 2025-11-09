@@ -417,7 +417,6 @@ useEffect(() => {
      const res = await apiGet('/api/area', 
           {withCredentials: true}
      )
-
      try{
           Array.isArray(res.data.area) ? (setAreaOption(res.data.area), setAllAreas(res.data.area)) : (setAreaOption([]), setAllAreas([]));
       } catch (err) {

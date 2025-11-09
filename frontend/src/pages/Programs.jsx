@@ -802,7 +802,7 @@ import toast, { Toaster } from 'react-hot-toast'
                   />             
                 
                 {/* Breadcrumbs */}
-                <div className='w-full p-3 font-semibold bg-neutral-300/90 rounded-xl border-neutral-300 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50'>
+                <div className='w-full p-1 overflow-auto  md:p-3 font-semibold bg-neutral-300/90 rounded-xl border-neutral-300 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50'>
                   <nav className="flex items-center overflow-hidden font-semibold text-gray-700 gap-x-2 text-md lg:text-lg dark:text-white">
                     
                     {/* Programs Breadcrumb */}
@@ -940,7 +940,7 @@ import toast, { Toaster } from 'react-hot-toast'
                 </div>
 
                 {/* Content Area */}
-                <div className="flex flex-row flex-1 gap-4">
+                <div className="flex flex-row flex-1 gap-4 md:mt-5">
                   
                   {/* Programs/Areas */}
                   <div className={`flex flex-col transition-all duration-500 ${showPreview ? 'w-1/2' : 'w-full'}`}>
