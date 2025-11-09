@@ -128,7 +128,20 @@ const Login = () => {
         } catch (err) {
             // Handle unexpected errors (network issues, etc.)
             console.error('Login error:', err);
-            setError('Server error. Please try again.');
+            
+            // Check if it's an IP block error (429 status)
+            if (err.response && err.response.status === 429) {
+                const blockMessage = err.response.data?.message || 'Too many failed login attempts. Your IP has been temporarily blocked.';
+                setError(blockMessage);
+                toast.error('IP Blocked', {
+                    duration: 6000,
+                    icon: '🚫',
+                });
+            } else {
+                setError('Server error. Please try again.');
+                toast.error('Login Failed');
+            }
+            
             setLoading(false)
             toast.dismiss(toastId)
         }
@@ -263,7 +276,28 @@ const Login = () => {
                             <FontAwesomeIcon icon={showPassword ? faEye : faEyeSlash} 
                             onClick={() => {setShowPassword((current) => !current)}}
                             className='absolute cursor-pointer top-9 right-3 text-neutral-400'/>
-                            {error && <span className='text-[11px] text-red-600'>{error}</span>}
+                            {error && (
+                                <div className={`mt-2 p-3 rounded-md ${
+                                    error.includes('blocked') || error.includes('IP') 
+                                    ? 'bg-red-100 border border-red-400' 
+                                    : ''
+                                }`}>
+                                    <span className={`text-[11px] ${
+                                        error.includes('blocked') || error.includes('IP')
+                                        ? 'text-red-700 font-semibold'
+                                        : 'text-red-600'
+                                    }`}>
+                                        {error.includes('blocked') || error.includes('IP') ? '🚫 ' : ''}
+                                        {error}
+                                    </span>
+                                    {(error.includes('blocked') || error.includes('IP')) && (
+                                        <div className="mt-2 text-[10px] text-red-600">
+                                            Your IP has been temporarily blocked due to multiple failed login attempts. 
+                                            Please try again in 30 minutes or contact an administrator.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div><br />
                     
                     <a href='#' className='mb-2 font-light text-blue-600'>Forgot your password?</a>
@@ -274,10 +308,11 @@ const Login = () => {
                 </form>
             </div>
         </div>
+        
         {showOtpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center text-black">
-            <div className="absolute inset-0 bg-black/50" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }} />
-            <div className="relative bg-white dark:bg-gray-700 shadow-2xl rounded-3xl w-full max-w-md overflow-hidden transform transition-transform duration-200"
+            <div className="absolute inset-0 bg-black/50 " onClick={(e) => { e.preventDefault(); e.stopPropagation(); }} />
+            <div className="relative bg-white dark:bg-gray-700 shadow-2xl rounded-3xl w-full scale-80 md:scale-100 max-w-md overflow-hidden transform transition-transform duration-200"
          onClick={(e) => e.stopPropagation()}>
             <div className="p-8 text-center">
                 <div className="mx-auto mb-6 w-40 h-40">
@@ -304,7 +339,7 @@ const Login = () => {
                 <button
                 type="button"
                 onClick={handleResendOtp}
-                className={`text-blue-600 hover:underline dark:text-blue-400 ${resendCooldown ? 'opacity-60 cursor-not-allowed' : ''}`}
+                className={`text-blue-600 hover:underline cursor-pointer active:text-blue-400 active:scale-90  dark:text-blue-400 ${resendCooldown ? 'opacity-60 cursor-not-allowed' : ''}`}
                 disabled={otpLoading || resendCooldown > 0}
                 >
                 {resendCooldown ? `Resend in ${resendCooldown}s` : 'Resend OTP'}
@@ -315,7 +350,7 @@ const Login = () => {
                 type="button"
                 onClick={handleOtpSubmit}
                 disabled={otpLoading}
-                className="w-full py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-60"
+                className="w-full py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-60 active:scale-90 cursor-pointer"
                 >
                 {otpLoading ? 'Verifying...' : 'Verify OTP'}
                 </button>

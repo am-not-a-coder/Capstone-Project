@@ -59,6 +59,12 @@ def create_notification(recipient_id, notification_type, title, content, sender_
         )
         db.session.add(notification)
         db.session.commit()
+        # Invalidate notification caches for the recipient
+        try:
+            redis_client.delete(f'notif_unread:{recipient_id}')
+            redis_client.delete(f'notif_list:{recipient_id}:1')
+        except Exception:
+            pass
         print(f"Notification created with ID: {notification.notificationID}")
         
         # Get sender info for the notification

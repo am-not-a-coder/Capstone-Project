@@ -38,7 +38,7 @@ const OtpInput = ({ value = '', onChange, length = 6, autoFocus = true, disabled
   const chars = Array.from({ length }, (_, i) => value[i] || '');
 
   return (
-    <div className="flex justify-center gap-3" onPaste={handlePaste}>
+    <div className="flex justify-center gap-3 scale-80 md:scale-100" onPaste={handlePaste}>
       {chars.map((digit, i) => (
         <input
           key={i}

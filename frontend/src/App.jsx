@@ -4,7 +4,6 @@ import { isLoggedIn } from './utils/auth_utils';
 import Login from './pages/Login';
 import MainLayout from './MainLayout';
 import Dashboard from './pages/Dashboard';
-import Institutes from './pages/Institutes';
 import Accreditation from './pages/Accreditation';
 import Documents from './pages/Documents';
 import Programs from './pages/Programs';
@@ -386,7 +385,6 @@ const PublicOnlyRoute = ({ children }) => {
           }>
           <Route index element={<Navigate to="/Dashboard" replace />} />
           <Route path="/Dashboard" element={<Dashboard />} />
-          <Route path="/Institutes" element={<Institutes />} />
           <Route path="/Programs" element={<Programs />} />
           <Route path="/Accreditation" element={
             <RatingRoute>

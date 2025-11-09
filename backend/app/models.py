@@ -37,13 +37,13 @@ class Employee(db.Model):
     crudFormsEnable = db.Column(db.Boolean, default=False)
     crudProgramEnable = db.Column(db.Boolean, default=False)
     crudInstituteEnable = db.Column(db.Boolean, default=False)
-    isRating = db.Column(db.Boolean, default=False)
-    isEdit = db.Column(db.Boolean, default=False)
-    crudFormsEnable = db.Column(db.Boolean, default=False)
-    crudProgramEnable = db.Column(db.Boolean, default=False)
-    crudInstituteEnable = db.Column(db.Boolean, default=False)
-    isOnline = db.Column(db.Boolean, default=False)
-    experiences = db.Column(db.Text)
+    # isRating = db.Column(db.Boolean, default=False)
+    # isEdit = db.Column(db.Boolean, default=False)
+    # crudFormsEnable = db.Column(db.Boolean, default=False)
+    # crudProgramEnable = db.Column(db.Boolean, default=False)
+    # crudInstituteEnable = db.Column(db.Boolean, default=False)
+    # isOnline = db.Column(db.Boolean, default=False)
+    # experiences = db.Column(db.Text)
     isCoAdmin = db.Column(db.Boolean, default=False)
 
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
@@ -52,7 +52,7 @@ class Employee(db.Model):
     otpcode = db.Column(db.String(6))
     otpexpiry = db.Column(db.DateTime(timezone=True))
     otpverified = db.Column(db.Boolean, default=False)
-
+    
     # Relationships to junction tables
     employee_programs = db.relationship("EmployeeProgram", backref="employee")
     employee_areas = db.relationship("EmployeeArea", backref="employee")
@@ -85,9 +85,11 @@ class AreaReference(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     areaName = db.Column(db.String(120), nullable=False) 
     areaNum = db.Column(db.String(25), nullable=False)
-    # Relationships
-    # program = db.relationship("Program", foreign_keys=[programID], backref="employees")
-    # ============================ 
+
+    # Relationships to junction tables
+    # employee_programs = db.relationship("EmployeeProgram", backref="employeeID")
+    # employee_areas = db.relationship("EmployeeArea", backref="employeeID")
+    # employee_folders = db.relationship("EmployeeFolder", backref="employeeID")
 
 # class AccreditationCycle(db.Model):
 #     __tablename__ = 'accreditationCycle'
@@ -98,8 +100,7 @@ class AreaReference(db.Model):
 #     cycleName = db.Column(db.String(255), nullable=False)
 #     startDate = db.Column(db.Date, nullable=False)
 #     endDate = db.Column(db.Date, nullable=False)
-#     status = db.Column(db.String(50), nullable=False)  # e.g., 'active', 'archived'
-                                                 
+#     status = db.Column(db.String(50), nullable=False)  # e.g., 'active', 'archived'                  
     
 class Template(db.Model):
     __tablename__ = 'template'
@@ -113,12 +114,8 @@ class Template(db.Model):
     archived = db.Column(db.Boolean, default=False)
     
     programs = db.relationship("Program", back_populates="template", lazy=True)
-
     employee = db.relationship("Employee", backref="templates")    
-
     areas = db.relationship("AreaBlueprint", backref="template", cascade="all, delete-orphan")
-    
-
 
 class AreaBlueprint(db.Model):
     __tablename__ = "areaBlueprint"

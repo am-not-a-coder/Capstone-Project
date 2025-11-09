@@ -69,16 +69,13 @@ export const SidebarContext = createContext();
     
     
       const handleSearch = async (e) => {
-        e.preventDefault();
-        if(!query.trim()) return;
+        e.preventDefault()
+        if(!query.trim()) return
         try{
-            const res = await apiGet(`/api/search?q=${encodeURIComponent(query)}`);      
-    
-            Array.isArray(res.data) ? setResults(res.data) : setResults([]);
-            console.log(res.data); 
-          } catch(err){
-            console.error("Search failed: ", err)
-          }
+            const res = await apiGet(`/api/search?q=${encodeURIComponent(query)}`)     
+            Array.isArray(res.data) ? setResults(res.data) : setResults([])
+            console.log(res.data)
+			} catch(err){console.error("Search failed: ", err)}
       }
 
       
@@ -129,88 +126,77 @@ export const SidebarContext = createContext();
   }
 
 
-    // Sidebar component with state for expanded/collapsed
+   // Sidebar component with state for expanded/collapsed
    return(
-    
-        <>
-            
-            <aside className={`absolute lg:relative row-span-5 h-screen mt-0 lg:mt-3 ml-0 lg:ml-3 transition-all duration-500 ${ expanded ? 'w-70' : 'hidden lg:block w-13'} z-40`}>
-                
-                <nav className={`${expanded ? '' : 'hidden lg:block'} min-h-[625px] relative flex flex-col bg-gray-200 border-1 border-neutral-600 dark:border-neutral-500 rounded-lg shadow-lg transition-all duration-500 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-800 dark:bg-gray-900`}>
+      <>
+		<aside className={`absolute lg:relative row-span-5 h-screen mt-0 lg:mt-3 ml-0 lg:ml-3 transition-all duration-500 ${ expanded ? 'w-70' : 'hidden lg:block w-13'} z-40`}>
+			<nav className={`${expanded ? '' : 'hidden lg:block'} min-h-[625px] relative flex flex-col bg-gray-200 border-1 border-neutral-600 dark:border-neutral-500 rounded-lg shadow-lg transition-all duration-500 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-800 dark:bg-gray-900`}>
+				{/* Title and Logo */}
+				<div className={`flex items-center justify-between pt-3 pb-2 ${expanded ? 'pr-10 pl-2' : 'pl-1'}  transition-all duration-500`}>
+					<img src={udmsLogo} alt="UDMS Logo" className={`${expanded ? 'm-2' : ''} h-10 rounded-full w-10 transition-all duration-500`}/>
+					<h4 className={`overflow-hidden transition-all m-1 line-clamp-2 font-semibold text-neutral-950 ${expanded ? 'w-42 opacity-100 ml-2' : 'w-0 opacity-0 ml-0'} dark:text-white transition-all duration-500`}>University Document Management System</h4>
+					
+				</div>
 
-                {/* Title and Logo */}
-                <div className={`flex items-center justify-between pt-3 pb-2 ${expanded ? 'pr-10 pl-2' : 'pl-1'}  transition-all duration-500`}>
-                    <img src={udmsLogo} alt="UDMS Logo" className={`${expanded ? 'm-2' : ''} h-10 rounded-full w-10 transition-all duration-500`}/>
-                    <h4 className={`overflow-hidden transition-all m-1 line-clamp-2 font-semibold text-neutral-950 ${expanded ? 'w-42 opacity-100 ml-2' : 'w-0 opacity-0 ml-0'} dark:text-white transition-all duration-500`}>University Document Management System</h4>
-                    
-                </div>
-                
-
-                {/* Search bar*/}
-                <div className='relative'>
-                    <div className="relative px-1 py-2 ml-1 overflow-hidden">
-                        <FontAwesomeIcon icon={faSearch} className={`absolute text-zuccini-800 ml-3.5 mt-3.5 ${expanded ? '' : 'cursor-pointer'}`} />
-                        <input
-                            type="text" 
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                             onKeyDown={(e) => {
-                                if (e.key === "Enter") handleSearch(); // trigger search on Enter key
-                            }}
-                            placeholder="Search..." 
-                            className={`min-w-65 p-2 pl-10 text-gray-800 dark:text-gray-200 placeholder-neutral-400 rounded-xl bg-gray-300 border dark:bg-gray-950 dark:border-gray-800 border-gray-900 transition-colors duration-500 focus:outline-none focus:ring-2 focus:ring-zuccini-900 ${expanded ? '' : 'cursor-pointer'} dark:border-neutral-800 dark:bg-[#242424]`}
-                        />
-                    </div>
-                 
-        
-                        {/* Search results */}
-                    {query.trim() !== "" && (
-                        <ul className="absolute z-10 w-full max-w-[300px] p-2 pt-3 overflow-y-scroll border border-gray-300 right-0 top-full bg-gray-100/50 backdrop-blur-sm rounded-b-xl text-neutral-800 dark:text-white dark:border-gray-900 dark:bg-gray-800/20 max-h-72 ">
-                        {loading ? (
-                            <li className="flex justify-center p-3">
-                            <FontAwesomeIcon icon={faCircleNotch} className="animate-spin text-zuccini-700" />
-                            </li>
-                        ) : results.length > 0 ? (
-                            results.map((doc) => (
-                            <li
-                                onClick={() => handleResultClick(doc)}
-                                key={doc.docID}
-                                className="p-2 mb-1 cursor-pointer rounded-xl hover:bg-gray-400/20 dark:hover:bg-gray-700/20"
-                            >
-                                <div className="flex flex-col">
-                                <h1 className="text-lg font-medium">{doc.docName}</h1>
-                                <span
-                                    className="text-sm italic text-gray-500 truncate"
-                                    dangerouslySetInnerHTML={{ __html: doc.file_snippet }}
-                                />
-                                </div>
-                            </li>
-                            ))
-                        ) : (
-                            <li className="p-2 mb-1 cursor-pointer rounded-xl hover:bg-gray-400/20 dark:hover:bg-gray-700/20">
-                            No results found
-                            </li>
-                        )}
-                        </ul>
-                    )}
-                </div>
+				{/* Search bar*/}
+				<div className='relative'>
+					<div className="relative px-1 py-2 ml-1 overflow-hidden">
+						<FontAwesomeIcon icon={faSearch} className={`absolute text-zuccini-800 ml-3.5 mt-3.5 ${expanded ? '' : 'cursor-pointer'}`} />
+						<input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search..."
+							onKeyDown={(e) => {
+								if (e.key === "Enter") handleSearch(); // trigger search on Enter key
+							}}
+							className={`min-w-65 p-2 pl-10 text-gray-800 dark:text-gray-200 placeholder-neutral-400 rounded-xl bg-gray-300 border dark:bg-gray-950 dark:border-gray-800 border-gray-900 transition-colors duration-500 focus:outline-none focus:ring-2 focus:ring-zuccini-900 ${expanded ? '' : 'cursor-pointer'} dark:border-neutral-800 dark:bg-[#242424]`}
+						/>
+					</div>
+				
+	
+						{/* Search results */}
+					{query.trim() !== "" && (
+						<ul className="absolute z-10 w-full max-w-[300px] p-2 pt-3 overflow-y-scroll border border-gray-300 right-0 top-full bg-gray-100/50 backdrop-blur-sm rounded-b-xl text-neutral-800 dark:text-white dark:border-gray-900 dark:bg-gray-800/20 max-h-72 ">
+						{loading ? (
+								<li className="flex justify-center p-3">
+								<FontAwesomeIcon icon={faCircleNotch} className="animate-spin text-zuccini-700" />
+								</li>
+						) : results.length > 0 ? (
+								results.map((doc) => (
+								<li
+									onClick={() => handleResultClick(doc)}
+									key={doc.docID}
+									className="p-2 mb-1 cursor-pointer rounded-xl hover:bg-gray-400/20 dark:hover:bg-gray-700/20"
+								>
+									<div className="flex flex-col">
+									<h1 className="text-lg font-medium">{doc.docName}</h1>
+									<span
+										className="text-sm italic text-gray-500 truncate"
+										dangerouslySetInnerHTML={{ __html: doc.file_snippet }}
+									/>
+									</div>
+								</li>
+								))
+						) : (
+								<li className="p-2 mb-1 cursor-pointer rounded-xl hover:bg-gray-400/20 dark:hover:bg-gray-700/20">
+								No results found
+								</li>
+						)}
+						</ul>
+					)}
+				</div>
 
 
-                {/* Nav Links */}
-                <SidebarContext.Provider value={{expanded}}>
-                <ul className={`flex flex-col flex-1 ml-1 mt-1 ${expanded ? 'items-end' : ''}`}>{children}</ul> 
-                </SidebarContext.Provider>
-                {/* SidebarLinks is are generated below */}
+					{/* Nav Links */}
+					<SidebarContext.Provider value={{expanded}}>
+					<ul className={`flex flex-col flex-1 ml-1 mt-1 ${expanded ? 'items-end' : ''}`}>{children}</ul> 
+					</SidebarContext.Provider>
+					{/* SidebarLinks is are generated below */}
 
-                </nav>
+			</nav>
+		</aside>
 
-                
-            </aside>
-
-            <button onClick={() => setExpanded(current => !current)} className={`${expanded ? 'left-65 lg:left-67 lg:top-8 z-50 ' : 'left-2 lg:top-8 lg:left-8 z-60 lg:hover:left-12 '} top-4 absolute p-2 px-4 transition-none lg:transition-all duration-500 rounded-lg bg-zuccini-900`}>
-                { expanded ? <FontAwesomeIcon icon={faAngleLeft} /> : <FontAwesomeIcon icon={faAngleRight} /> }
-            </button>
-        </>
+		<button onClick={() => setExpanded(current => !current)} className={`${expanded ? 'left-65 md:left-67 md:top-8 z-50 ' : 'left-2 md:top-[5%] md:left-[1.2%] z-60'} hover:scale-110 cursor-pointer top-4 absolute p-2 px-4 md:transition-all duration-500 active:scale-90 rounded-lg bg-zuccini-900`}>
+				{ expanded ? <FontAwesomeIcon icon={faAngleLeft} /> : <FontAwesomeIcon icon={faAngleRight} /> }
+		</button>
+      </>
    );
     
 };

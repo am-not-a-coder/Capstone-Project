@@ -101,7 +101,7 @@ const Users = () => {
   }
 
   const handleEditUser = async (user) => {
-        console.log('Edit button clicked, user data:', user)
+        
         
         // Populate form with existing user data for editing
         setEmployeeID(user.employeeID)
@@ -123,9 +123,6 @@ const Users = () => {
             // Fetch all programs and areas to match with user's assigned ones
             const programsRes = await apiGet('/api/program')
             const areasRes = await apiGet('/api/area')
-            
-            console.log('Programs API response:', programsRes)
-            console.log('Areas API response:', areasRes)
 
             if (programsRes.success && areasRes.success) {
                 // Map user program names to program objects
@@ -171,7 +168,6 @@ const Users = () => {
                     }
                 })
                 setSelectedFolder(selectedFolders)
-                console.log('Loaded user folders:', selectedFolders)
             } else {
                 setSelectedFolder([])
             }
@@ -277,12 +273,6 @@ const Users = () => {
           formData.append("crudInstituteEnable", crudInstitute);
           formData.append('selectedFolder', JSON.stringify(selectedFolder.map(f => f.value)))
 
-
-        console.log("Form data being sent:");
-          for (let [key, value] of formData.entries()) {
-              console.log(key, value);
-          }
-
       try{
           setLoading(true)
 
@@ -348,7 +338,6 @@ const Users = () => {
           setStatusMessage("Server error. Please try again");
           setShowStatusModal(true);
           setStatusType("error");
-          console.log(err.res?.data || err.message)
       }
   }
 
@@ -371,7 +360,7 @@ const Users = () => {
                               
                               // Check if the request was successful
                               if (picRes && picRes.success && picRes.data) {
-                                  console.log("Blob type:", picRes.data);
+                                  
                                   const objectURL = URL.createObjectURL(picRes.data);
                                   return { ...user, profilePicUrl: objectURL };
                               } else {
@@ -451,7 +440,7 @@ useEffect(() => {
         }));
         
         setAreaReferenceOptions(areaOptions);
-        console.log(areaReferenceOptions)
+        
       } catch (err) {
         console.error("Error occurred during area reference fetching", err);
       }
@@ -518,13 +507,13 @@ useEffect(() => {
     const fetchFolders = async () => {
         try {
             const res = await apiGet('/api/documents')
-            console.log('Full API response:', res.data) // Debug log
+           
             
             // Based on your console output, the structure is:
             // folders: { BSED: {...}, BSIT: {...} }
             const programsFolders = res.data?.folders;
             
-            console.log('Programs folders found:', programsFolders) // Debug log
+         
             
             if (programsFolders && typeof programsFolders === 'object') {
                 const options = Object.keys(programsFolders)
@@ -535,10 +524,10 @@ useEffect(() => {
                     }))
                     .filter(option => option.value && option.label); // Additional safety check
                 
-                console.log('Folder options created:', options) // Debug log
+                
                 setFolderOptions(options)
             } else {
-                console.log('No programs folders found or invalid structure') // Debug log
+                
                 setFolderOptions([])
             }
         } catch (err) {

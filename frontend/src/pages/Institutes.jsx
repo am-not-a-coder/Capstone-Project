@@ -10,9 +10,6 @@ import { CardSkeleton } from "../components/Skeletons";
 import { PermissionGate } from "../utils/auth_utils";
 
 const Institutes = () => {
-
-
-
         // State for institutes data
         const [institutes, setInstitutes] = useState([]);
         const [loading, setLoading] = useState(true);        
