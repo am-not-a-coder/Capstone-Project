@@ -320,7 +320,7 @@ const Institutes = () => {
               
              
                 {/* Main Content */}
-              <div className="flex flex-wrap gap-5 mt-20 mb-8 lg:mt-8" >
+              <div className="flex flex-col md:flex-row md:flex-wrap gap-5 mt-20 mb-8 lg:mt-8" >
                   <PermissionGate requires='crudInstituteEnable'>
                     <CreateCard setShowForm={setShowForm} title="Institute"/>
                   </PermissionGate>

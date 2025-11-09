@@ -1,5 +1,5 @@
 
-const CircularProgressBar = ({circleWidth, progress, placement}) =>{
+const CircularProgressBar = ({circleWidth, progress, placement, strokeColor}) =>{
     const strokeWidth = 7;
     const radius = (circleWidth - strokeWidth) / 2;
     const dashArray = radius * Math.PI * 2;
@@ -28,7 +28,7 @@ const CircularProgressBar = ({circleWidth, progress, placement}) =>{
                 cy={circleWidth / 2}
                 strokeWidth={strokeWidth}
                 r={radius}
-                className="fill-none stroke-zuccini-500"    
+                className={`fill-none ${strokeColor}`} 
                 style={{
                    strokeDasharray: dashArray,
                    strokeDashoffset: dashOffset

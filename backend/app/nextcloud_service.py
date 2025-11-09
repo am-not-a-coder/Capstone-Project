@@ -110,6 +110,9 @@ def upload_to_nextcloud(file, path):
     
     filename = secure_filename(file.filename)
     target_url = build_nextcloud_url(f"{path}/{filename}")
+    
+    print(f"Uploading to Nextcloud URL: {target_url}")
+    print(f"Using credentials - User: {NEXTCLOUD_USER}, Password: {'*' * len(NEXTCLOUD_PASSWORD)}")
 
     #idk what the f is this tbh
     def _chunk_iter(stream, chunk_size=1024 * 1024):  # 1MB chunks
@@ -164,12 +167,29 @@ def preview_from_nextcloud(doc_path):
     
 
 def rename_file_nextcloud(old_path, new_path):
-    UDMS_URL = f"{NEXTCLOUD_URL}/UDMS_Repository/"
-   
-    old_url = UDMS_URL + '/'.join(quote(part) for part in old_path.split('/'))
-    new_url = UDMS_URL + '/'.join(quote(part) for part in new_path.split('/'))
+    UDMS_URL = f"{NEXTCLOUD_URL}/remote.php/dav/files/{NEXTCLOUD_USER}/"
+    
+    # Paths come URL-encoded from frontend, just append them
+    # If they already contain UDMS_Repository, use as-is
+    # If not, prepend it
+    
+    # Decode to check structure
+    old_path_decoded = unquote(old_path)
+    new_path_decoded = unquote(new_path)
+    
+    # Ensure UDMS_Repository prefix exists
+    if not old_path_decoded.startswith('UDMS_Repository'):
+        old_path_decoded = f"UDMS_Repository/{old_path_decoded}"
+    if not new_path_decoded.startswith('UDMS_Repository'):
+        new_path_decoded = f"UDMS_Repository/{new_path_decoded}"
+    
+    # Re-encode properly for URL
+    old_url = UDMS_URL + '/'.join(quote(part, safe='') for part in old_path_decoded.split('/'))
+    new_url = UDMS_URL + '/'.join(quote(part, safe='') for part in new_path_decoded.split('/'))
 
-    print(f"Renaming in Nextcloud: {old_url} -> {new_url}")
+    print(f"Renaming in Nextcloud:")
+    print(f"  Old: {old_url}")
+    print(f"  New: {new_url}")
 
     try:
         response = _session.request(
@@ -177,10 +197,17 @@ def rename_file_nextcloud(old_path, new_path):
             old_url,
             headers = {"Destination": new_url},
         )
+        
+        print(f"Nextcloud rename response: {response.status_code}")
+        if response.status_code not in (200, 201, 204, 207):
+            print(f"Response body: {response.text}")
+        
         return response  
     
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except requests.exceptions.RequestException as e:
+        print(f"Nextcloud rename error: {str(e)}")
+        # Don't return jsonify here - this function should return response object
+        raise Exception(f"Nextcloud connection failed: {str(e)}")
 
 
 
@@ -245,7 +272,7 @@ def delete_from_nextcloud(doc_path):
         return MockResponse()
 
 
-    # Fetch all files & folders from Nextcloud and return as a nested dict (tree).
+# Fetch all files & folders from Nextcloud and return as a nested dict (tree).
 def list_files_from_nextcloud():
     # root of repository inside user's files namespace
     _, files_base, _ = _get_webdav_bases()
@@ -303,13 +330,14 @@ def list_files_from_nextcloud():
 
             size = props.find("d:getcontentlength", ns)
             mime = props.find("d:getcontenttype", ns)
-            modified = props.find("d:getlastmodified", ns)
+            modified = props.find("d:getlastmodified", ns)            
 
             if is_last:
                 ext = os.path.splitext(part)[1].lower().lstrip(".")
                 if ext in file_ext:
-                    # Add UDMS_Repository to match DB docPath
-                    db_doc = db_docs.get(f"UDMS_Repository/{path}")
+                    # Add UDMS_Repository to match DB docPath                    
+                    db_doc = db_docs.get(f"UDMS_Repository/{path}")     
+                    print(f"Looking for: UDMS_Repository/{path}")                    
 
                     file_obj = {
                         "name": unquote(part),

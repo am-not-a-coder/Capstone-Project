@@ -221,7 +221,7 @@ const AreaDetailModal = ({
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center space-x-4">
             <div className="flex-shrink-0">
-              <CircularProgressBar progress={area.progress || 0} circleWidth="80" placement={''} />
+              <CircularProgressBar strokeColor="stroke-zuccini-500" progress={area.progress || 0} circleWidth="80" placement={''} />
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-800 dark:text-white">

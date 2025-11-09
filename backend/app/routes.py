@@ -10,9 +10,10 @@ from datetime import timedelta, datetime, timezone
 from app.utils.normalize_path import normalize_path
 from app.utils.file_extractor import extract_pdf, extract_docs, extract_excel, extract_image
 from app.utils.tagging_utils import rule_based_tag, extract_global_tfid_tags
-from app.utils.helper_functions import reapply_template
-from app.nextcloud_service import upload_to_nextcloud, preview_from_nextcloud, delete_from_nextcloud, ensure_directories, safe_path, list_files_from_nextcloud, preview_file_nextcloud, download_file_nextcloud, rename_file_nextcloud, edit_file_nextcloud, upload_to_nextcloud_chunked
+from app.utils.helper_functions import reapply_template, compare_documents
+from app.nextcloud_service import upload_to_nextcloud, preview_from_nextcloud, delete_from_nextcloud, ensure_directories, safe_path, list_files_from_nextcloud, preview_file_nextcloud, download_file_nextcloud, rename_file_nextcloud, edit_file_nextcloud
 from sentence_transformers import SentenceTransformer
+from urllib.parse import quote, unquote
 import numpy as np
 import pandas as pd
 import joblib
@@ -24,7 +25,7 @@ import redis
 from app.otp_utils import generate_random
 from flask_mail import Message as MailMessage
 from app.login_handlers import complete_user_login
-from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message, MessageDeletion, Template, AreaBlueprint, SubareaBlueprint, CriteriaBlueprint, AppliedTemplate, Notification, EmployeeProgram, EmployeeArea, EmployeeFolder, AreaReference, EmployeeProgram, EmployeeArea, EmployeeFolder, AreaReference
+from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message, MessageDeletion, Template, AreaBlueprint, SubareaBlueprint, CriteriaBlueprint, AppliedTemplate, Notification, EmployeeProgram, EmployeeArea, EmployeeFolder, AreaReference, EmployeeProgram, EmployeeArea, EmployeeFolder, AreaReference, DeadlineCriteria
 from sqlalchemy import cast, String, func, text
 from app.security.anti_brute_force import get_client_ip, is_ip_blocked, track_failed_login, block_ip, clear_failed_attempts
 
@@ -444,7 +445,7 @@ def register_routes(app):
             currentUser = Employee.query.filter_by(employeeID=userID).first()
             new_log = AuditLog(
                 employeeID = currentUser.employeeID,
-                action = f"{currentUser.lName}, {currentUser.fName} {currentUser.suffix} CREATED ANNOUNCEMENT {title}"
+                action = f"{currentUser.lName}, {currentUser.fName} {currentUser.suffix} Created a new announcement {title}"
             )
             db.session.add(new_log)
             db.session.commit()
@@ -867,7 +868,7 @@ def register_routes(app):
         # Audit deleted user
         new_log = AuditLog(
             employeeID = admin_user.employeeID,
-            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} DELETED THE USER {user.lName}, {user.fName} {user.suffix}"
+            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} Deleted a user: {user.lName}, {user.fName} {user.suffix}"
         )
         db.session.add(new_log)
         db.session.commit()
@@ -1308,7 +1309,7 @@ def register_routes(app):
             # audit edit of institute
             new_log = AuditLog(
                 employeeID = admin_user.employeeID,
-                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} EDITED THE INSTITUTE {institute.instName}"
+                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} Edited the institute {institute.instName}"
             )
             db.session.add(new_log)
             # Save changes
@@ -1389,7 +1390,7 @@ def register_routes(app):
             admin_user = Employee.query.filter_by(employeeID=get_jwt_identity()).first()
             new_log = AuditLog(
                 employeeID = admin_user.employeeID,
-                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED INSTITUTE {instName}"
+                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} Created an institute: {instName}"
             )
             db.session.add(new_log)
             db.session.commit()
@@ -1446,7 +1447,7 @@ def register_routes(app):
             # Audit deleted institute
             new_log = AuditLog(
                 employeeID = admin_user.employeeID,
-                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} DELETED INSTITUTE {institute.instName}"
+                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} Deleted the institute {institute.instName}"
             )
             db.session.add(new_log)
             db.session.commit()
@@ -1637,7 +1638,7 @@ def register_routes(app):
             # Audit edited program
             new_log = AuditLog(
                 employeeID = admin_user.employeeID,
-                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} EDITED THE PROGRAM {program.programName}"
+                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} Edited the program {program.programName}"
             )
             db.session.add(new_log)
             db.session.commit() # Save changes to database
@@ -1709,7 +1710,7 @@ def register_routes(app):
             # Audit new program
             new_log = AuditLog(
                 employeeID = admin_user.employeeID,
-                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW PROGRAM {data.get('programName')}"
+                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} Created a new program: {data.get('programName')}"
             )
             db.session.add(new_log)
             db.session.commit()  # Save changes
@@ -1774,7 +1775,7 @@ def register_routes(app):
             # Audit deleted program
             new_log = AuditLog(
                 employeeID = admin_user.employeeID,
-                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} DELETED PROGRAM {programs.programName}"
+                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} Deleted a program: {programs.programName}"
             )
             db.session.add(new_log)
             db.session.commit()
@@ -2283,8 +2284,9 @@ def register_routes(app):
                 'areaNum': area.areaNum,
                 'areaName': f"{area.areaNum}: {area.areaName}",
                 'progress': area.progress,
-                'subareaName': area.subareaName,                
+                'subareaName': area.subareaName,  
                 'archived': area.archived,                
+                'archived': area.archived              
             }
             area_list.append(area_data)
         
@@ -2294,33 +2296,46 @@ def register_routes(app):
 
     #Create deadline
     @app.route('/api/deadline', methods=["POST"])
-    def create_deadline():        
+    def create_deadline():
         data = request.form
-        #gets the data input from the frontend forms
-        programID = data.get("program")
-        areaID = data.get("area")
+        programID = int(data.get("program"))
+        areaID = int(data.get("area"))
         content = data.get("content")
-        criteriaID = data.get("criteria") 
-        due_date = data.get("due_date")             
-        
+        due_date = data.get("due_date")
+
         try:
-            # Create a new deadline 
+            # 1️⃣ Get all subareas under this area
+            subareas = Subarea.query.filter_by(areaID=areaID, archived=False).all()
+            if not subareas:
+                return jsonify({'success': False, 'message': f'No subareas found for areaID={areaID}'}), 404
+
+            # 2️⃣ Get all criteria under those subareas
+            criteria_list = Criteria.query.filter(Criteria.subareaID.in_([s.subareaID for s in subareas])).all()
+            if not criteria_list:
+                return jsonify({'success': False, 'message': 'No criteria found for this area'}), 404
+
+            # 3️⃣ Create a deadline
             new_deadline = Deadline(
                 programID=programID,
                 areaID=areaID,
-                criteriaID=criteriaID,  
                 content=content,
                 due_date=due_date
             )
-
             db.session.add(new_deadline)
-            db.session.commit()
+            db.session.flush()
 
-            return jsonify({'success': True, 'message': 'Deadline created successfully!'}), 200
+            # 4️⃣ Link criteria
+            for c in criteria_list:
+                link = DeadlineCriteria(deadlineID=new_deadline.deadlineID, criteriaID=c.criteriaID)
+                db.session.add(link)
+
+            db.session.commit()
+            return jsonify({'success': True, 'message': f'Deadline created and linked to {len(criteria_list)} criteria!'}), 200
 
         except Exception as e:
             db.session.rollback()
             return jsonify({'success': False, 'message': f'Failed to create deadline: {str(e)}'}), 500
+
 
 
     # ============================================ Tasks Route ============================================
@@ -2427,13 +2442,15 @@ def register_routes(app):
                 Document.docType,
                 Document.docPath,
                 Document.isApproved,
-                Document.predicted_rating
+                Document.predicted_rating,
+                Document.predicted_probability,
+                Document.similar_docs
             )
             .outerjoin(Program, Area.programID == Program.programID)
-        .outerjoin(Subarea, (Area.areaID == Subarea.areaID) & (Subarea.archived == False))
-        .outerjoin(Criteria, (Subarea.subareaID == Criteria.subareaID) & (Criteria.archived == False))
-            .outerjoin(Document, Criteria.docID == Document.docID)       
-        .filter(Program.programCode == program_code, Area.archived == False)
+            .outerjoin(Subarea, (Area.areaID == Subarea.areaID) & (Subarea.archived == False))
+            .outerjoin(Criteria, (Subarea.subareaID == Criteria.subareaID) & (Criteria.archived == False))
+            .outerjoin(Document, Criteria.docID == Document.docID)
+            .filter(Program.programCode == program_code, Area.archived == False)
             .order_by(Area.areaID.asc(), Subarea.subareaID.asc(), Criteria.criteriaID.asc())
             .all() 
         )
@@ -2474,6 +2491,8 @@ def register_routes(app):
                     'docName': row.docName,
                     'docPath': row.docPath,
                     'predicted_rating': row.predicted_rating,
+                    'predicted_probability': row.predicted_probability,
+                    "similar_docs": row.similar_docs,
                     'isApproved': row.isApproved,
                     'rating': row.rating
                 }
@@ -2574,79 +2593,87 @@ def register_routes(app):
         if not filename:
             return jsonify({'success': False, 'message': 'Invalid filename'}), 400
                        
-        try:            
-             # === Ensures that the directory exists in Nextcloud ===
+        try:
+            # === Ensures that the directory exists in Nextcloud ===
+            print(f"[upload_file] ensure_directories for path: {path}")
             if not ensure_directories(path):
+                print("[upload_file] ensure_directories returned False")
                 return jsonify({
                     'success': False,
                     'message': 'Failed to create directory structure in Nextcloud'
                 }), 400
 
             # === Save file to Nextcloud ===
+            print(f"[upload_file] calling upload_to_nextcloud for: {filename} -> {path}")
             response = upload_to_nextcloud(file, path)
+            print(f"[upload_file] upload_to_nextcloud response: {getattr(response, 'status_code', None)}")
+            if hasattr(response, 'text'):
+                print(f"[upload_file] upload response text: {response.text}")
+
             if response.status_code not in (200, 201, 204):
+                print(f"[upload_file] Nextcloud responded with non-success: {response.status_code}")
                 return jsonify({
                     'success': False,
                     'message': 'Nextcloud upload failed.',
                     'status': response.status_code,
-                    'details': response.text
+                    'details': getattr(response, 'text', '')
                 }), 400
-                                    
+
             # === Extract the text from file ===
-
             temp_path = f"/tmp/{filename}"
-
-            file.save(temp_path) 
-                # Extract text then remove the file
+            print(f"[upload_file] saving temp file -> {temp_path}")
+            file.save(temp_path)
             try:
-                extracted_text = extract_pdf(temp_path) 
-                file_size = os.path.getsize(temp_path)                               
+                extracted_text = extract_pdf(temp_path)
+                file_size = os.path.getsize(temp_path)
+                print(f"[upload_file] extracted_text length: {len(extracted_text)} file_size: {file_size}")
             finally:
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
-            
-            # === Generate Tags === 
+
+            # === Generate Tags ===
+            print("[upload_file] generating rule-based tags")
             tags = set(rule_based_tag(extracted_text))
-            
+
             # Fetch all documents in the DB
             all_docs = [d.content for d in Document.query.with_entities(Document.content).all()]
             all_docs.append(extracted_text)
 
             tfidf_tags = extract_global_tfid_tags(all_docs, len(all_docs) - 1)
             if tfidf_tags:
-                # Flatten tfidf_tags if it's a list of lists
                 from itertools import chain
                 if any(isinstance(tag, list) for tag in tfidf_tags):
                     flat_tags = list(chain.from_iterable(tfidf_tags))
                     tags.update(flat_tags)
                 else:
                     tags.update(tfidf_tags)
+            print(f"[upload_file] total tags: {len(tags)}")
 
-           # === Generate Embedding ===
+            # === Generate Embedding ===
+            print("[upload_file] generating embedding")
             embedding = embedding_model.encode(extracted_text, normalize_embeddings=True)
             embedding = np.array(embedding, dtype=np.float32).tolist()
-            
-                                   
-           # ==== Create or update document record ====
+            print(f"[upload_file] embedding length: {len(embedding)}")
+
+            # ==== Create or update document record ====
+            print(f"[upload_file] looking for existing Document with docName={file_name}")
             doc = Document.query.filter_by(docName=file_name).first()
 
             if doc:
-                # Update existing doc
+                print(f"[upload_file] updating existing Document id={doc.docID}")
                 doc.docPath = f"{normalized_path}/{filename}"
                 doc.docName = file_name
                 doc.content = extracted_text
                 doc.tags = list(tags)
-                doc.embedding = embedding            
+                doc.embedding = embedding
 
-                # Audit updated doc
                 new_log = AuditLog(
                     employeeID = uploader.employeeID,
-                    action = f"{uploader.lName}, {uploader.fName} {uploader.suffix} UPDATED DOCUMENT {filename}"
+                    action = f"{uploader.lName}, {uploader.fName} {uploader.suffix} Updated a document: {filename}"
                 )
                 db.session.add(new_log)
-
             else:
-                # Create new doc
+                print("[upload_file] creating new Document record")
                 doc = Document(
                     docName=file_name,
                     docType=file_type,
@@ -2659,23 +2686,24 @@ def register_routes(app):
                 db.session.add(doc)
                 db.session.flush()  # Assign docID before linking
 
-                # Audit new doc
                 new_log = AuditLog(
                     employeeID = uploader.employeeID,
-                    action = f"{uploader.lName}, {uploader.fName} {uploader.suffix} UPLOADED NEW DOCUMENT {filename}"
+                    action = f"{uploader.lName}, {uploader.fName} {uploader.suffix} Uploaded a new document: {filename}"
                 )
                 db.session.add(new_log)
 
             # ==== Link document to criteria ====
+            print(f"[upload_file] linking document to criteria id={criteria_id}")
             criteria = Criteria.query.get(criteria_id)
-
             if not criteria:
                 db.session.rollback()
+                print(f"[upload_file] criteria not found for id={criteria_id}")
                 return jsonify({'success': False, 'message': 'Criteria not found'}), 404
 
-            criteria.docID = doc.docID  # Always safe, since doc exists now
+            criteria.docID = doc.docID
 
             # ==== Update search vector ====
+            print(f"[upload_file] updating search vector for docID={doc.docID}")
             db.session.execute(
                 text("""
                     UPDATE document
@@ -2685,23 +2713,20 @@ def register_routes(app):
                 {"doc_id": doc.docID}
             )
 
-            # ==== Compute Days Until Deadline ====
+            # compute features and predict
+            print("[upload_file] computing features for rating prediction")
             if not hasattr(criteria, "deadlines") or not criteria.deadlines:
-                days_until_deadline = 0  # fallback if no deadlines linked
+                days_until_deadline = 0
             else:
                 nearest_deadline = min(dl.due_date for dl in criteria.deadlines)
                 days_until_deadline = (nearest_deadline - datetime.utcnow().date()).days
 
-            # ===== Compute Criteria Completion Score =====
             criteria_list = Criteria.query.filter_by(subareaID=criteria.subareaID).count()
             completed_criteria = Criteria.query.filter_by(subareaID=criteria.subareaID, isDone=True).count()
             criteria_completion_score = (completed_criteria / criteria_list) * 100 if criteria_list > 0 else 0
 
-            # ====== Get program ID ======
             program = Program.query.filter_by(programCode=program_code).first()
             programID = program.programID if program else None
-
-            # =========== Build Feature for Rating Prediction ===============
 
             df_input = pd.DataFrame([{
                 "file_size": file_size,
@@ -2709,33 +2734,101 @@ def register_routes(app):
                 "Days_Until_Deadline": days_until_deadline,
                 "isApproved": False,
                 "docType": "application/pdf",
-                "programID": programID     
+                "programID": programID
             }])
 
             emb = pd.DataFrame([embedding])
             emb.columns = [f"emb_{i}" for i in range(len(emb.columns))]
-
             X_new = pd.concat([df_input, emb], axis=1)
 
-            # Predit the rating
-            predicted_rating = float(xgb_model.predict(X_new)[0])
+            print(f"[upload_file] running model.predict with X_new shape: {X_new.shape}")
+            # Diagnostic logs: inspect the model object and its predict attribute
+            try:
+                print(f"[upload_file] xgb_model type: {type(xgb_model)}")
+                print(f"[upload_file] xgb_model has attribute 'predict'? {hasattr(xgb_model, 'predict')}")
+                if hasattr(xgb_model, 'predict'):
+                    print(f"[upload_file] xgb_model.predict type: {type(xgb_model.predict)}, callable: {callable(xgb_model.predict)}")
+                else:
+                    print("[upload_file] xgb_model.predict not found")
+            except Exception as _log_e:
+                print(f"[upload_file] Error inspecting xgb_model: {_log_e}")
 
-            doc.predicted_rating = predicted_rating
+            try:
+                predicted_rating = float(xgb_model.predict(X_new)[0])
+                doc.predicted_rating = predicted_rating
+            except Exception as pred_e:
+                # Log detailed info about the predict attribute to help debug 'bool' object is not callable
+                try:
+                    pred_attr = getattr(xgb_model, 'predict', None)
+                    print(f"[upload_file] Exception during model.predict: {pred_e}")
+                    print(f"[upload_file] type(pred_attr): {type(pred_attr)}")
+                    print(f"[upload_file] repr(pred_attr): {repr(pred_attr)}")
+                    print(f"[upload_file] callable(pred_attr): {callable(pred_attr)}")
+                except Exception as _inner:
+                    print(f"[upload_file] Error while logging predict attr: {_inner}")
+                # Print full traceback here to capture where the error occurred, then re-raise
+                try:
+                    import traceback as _tb
+                    _tb.print_exc()
+                except Exception:
+                    pass
+                # Re-raise to be handled by outer exception handler (so we still rollback and return 500)
+                raise
+
+            # ==== Compare past documents and Predict Probability ====
+            past_docs_query = Document.query.with_entities(
+                Document.docName, Document.embedding, Document.isApproved
+            ).filter(Document.embedding.isnot(None)).all()
+
+            past_docs = pd.DataFrame([
+                {"docName": d.docName, "embedding": d.embedding, "isApproved": d.isApproved}
+                for d in past_docs_query
+            ])
+
+            new_doc_data = {
+                "file_size": file_size,
+                "Criteria_Completion_Score": criteria_completion_score,
+                "Days_Until_Deadline": days_until_deadline,
+                "docType": "application/pdf",
+                "programID": programID,
+                "embedding": embedding
+            }
+
+            prob_approval, top_similar_docs = compare_documents(new_doc_data, past_docs, xgb_model)
             
+
+            if prob_approval is None:
+                prob_approval = 0.0  # default if not computed
+
+            doc.predicted_probability = float(prob_approval)
+            doc.similar_docs = (
+                top_similar_docs.to_dict(orient='records')
+                if hasattr(top_similar_docs, "to_dict")
+                else []
+            )
+
+            print(f"[DEBUG] Probability: {doc.predicted_probability}")
+            print(f"[DEBUG] Similar Docs count: {len(doc.similar_docs)}")
+
             # Final commit
             db.session.commit()
+            print(f"[upload_file] commit successful for docID={doc.docID}")
 
             return jsonify({
-                'success': True, 
-                'message': 'File uploaded successfully!', 
+                'success': True,
+                'message': 'File uploaded successfully!',
                 'filePath': f"{normalized_path}/{filename}",
                 'predict_rating': round(predicted_rating, 2),
-                'status': response.status_code 
+                'probability_of_approval': round(prob_approval, 4) if prob_approval is not None else None,
+                'status': response.status_code
             }), 200
-            
+
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             db.session.rollback()  # Rollback on error
-            return jsonify({'success': False, 'message': f'Failed to upload file: {str(e)}'}), 400
+            print(f"[upload_file] Exception: {str(e)}")
+            return jsonify({'success': False, 'message': f'Failed to upload file: {str(e)}'}), 500
         
 
     # Preview file
@@ -2889,10 +2982,13 @@ def register_routes(app):
         except Exception as e:
             return jsonify({"Error": str(e)}), 500
 
-    
+    @app.route('/api/documents/preview/', defaults={'file_path': None}, methods=["GET"])
     @app.route('/api/documents/preview/<path:file_path>', methods=["GET"])
     def preview_file_documents(file_path):
+        if not file_path:
+            return {"error": "File path required"}, 400
         return preview_file_nextcloud(file_path)
+
     
     @app.route('/api/documents/download/<path:file_path>', methods=["GET"])
     @jwt_required()
@@ -2902,7 +2998,7 @@ def register_routes(app):
         file_name = file_path.split("/")[-1]
         new_log = AuditLog(
             employeeID = user.employeeID,
-            action = f"{user.lName}, {user.fName} {user.suffix} DOWNLOADED {file_name}"
+            action = f"{user.lName}, {user.fName} {user.suffix} Downloaded {file_name}"
         )
         db.session.add(new_log)
         db.session.commit()
@@ -2948,7 +3044,7 @@ def register_routes(app):
             # Audit deleted doc
             new_log = AuditLog(
                 employeeID = admin_user.employeeID,
-                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} DELETED THE FILE {doc.docName}"
+                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} Deleted a file: {doc.docName}"
             )
             db.session.add(new_log)
             db.session.commit()
@@ -2994,7 +3090,7 @@ def register_routes(app):
                     # Audit rename path
                     new_log = AuditLog(
                         employeeID = user.employeeID,
-                        action = f"{user.lName}, {user.fName} {user.suffix} RENAMED FILE {doc.docName}"
+                        action = f"{user.lName}, {user.fName} {user.suffix} Renamed a file {doc.docName}"
                     )
                     db.session.add(new_log)
                     db.session.commit()
@@ -3040,21 +3136,45 @@ def register_routes(app):
         
         filename = secure_filename(file.filename)
 
-        # Upload to Nextcloud
-        response = upload_to_nextcloud(file, directory)
+        try:
+            print(f"Ensuring directory exists: {directory}")
+            # Make sure the directory exists before uploading
+            ensure_result = ensure_directories(directory)
+            if not ensure_result:
+                return jsonify({
+                    "success": False,
+                    "message": "Failed to create directory structure in Nextcloud"
+                }), 500
+                
+            print(f"Starting Nextcloud upload for file: {filename}")
+            print(f"Directory path: {directory}")
+            
+            # Upload to Nextcloud
+            response = upload_to_nextcloud(file, directory)
+            print(f"Nextcloud upload response: {response.status_code}")
+            print(f"Nextcloud response text: {response.text}")
 
-        # Audit successful upload
-        new_log = AuditLog(
-            employeeID = uploader.employeeID,
-            action = f"{uploader.lName}, {uploader.fName} {uploader.suffix} UPLOADED {filename}"
-        )
-        db.session.add(new_log)
-        db.session.commit()
-
-        if response.status_code not in (200, 201, 204):
+            # Only create audit log if upload was successful
+            if response.status_code in (200, 201, 204):
+                new_log = AuditLog(
+                    employeeID = uploader.employeeID,
+                    action = f"{uploader.lName}, {uploader.fName} {uploader.suffix} Uploaded a file: {filename}"
+                )
+                db.session.add(new_log)
+                db.session.commit()
+                print("Audit log created successfully")
+            else:
+                print(f"Nextcloud upload failed with status code: {response.status_code}")
+                print(f"Response text: {response.text}")
+                return jsonify({
+                    "success": False,
+                    "message": f"Upload failed: {response.status_code} - {response.text}"
+                }), 500
+        except Exception as e:
+            print(f"Error in upload/audit process: {str(e)}")
             return jsonify({
                 "success": False,
-                "message": f"Upload failed: {response.status_code} {response.text}"
+                "message": f"Upload process failed: {str(e)}"
             }), 500
 
         # === Extract text ===
@@ -3062,6 +3182,7 @@ def register_routes(app):
         temp_path = f"/tmp/{filename}"
         try:
             file.save(temp_path) 
+            file.seek(0)
 
             file_extension = filename.rsplit('.', 1)[-1].lower()
             if file_extension == 'pdf':
@@ -3105,6 +3226,11 @@ def register_routes(app):
         
         # === Save record to DB ===
         try:
+            print(f"Creating document record with: name={file_name}, type={file_type}, path={directory}/{filename}")
+            print(f"Extracted text length: {len(extracted_text)}")
+            print(f"Number of tags: {len(tags)}")
+            print(f"Embedding shape: {len(embedding)}")
+            
             doc = Document(
                 docName=file_name,
                 docType=file_type,
@@ -3114,10 +3240,15 @@ def register_routes(app):
                 tags=list(tags),
                 embedding=embedding
             )
+            
+            print("Document instance created, adding to session")
             db.session.add(doc)
+            print("Added to session, flushing to get docID")
             db.session.flush() # Assign docID before updating search vector
+            print(f"Got docID: {doc.docID}")
 
             # ==== Update search vector ====
+            print("Updating search vector")
             db.session.execute(
                 text("""
                     UPDATE document
@@ -3126,8 +3257,9 @@ def register_routes(app):
                 """), 
                 {"doc_id": doc.docID}
             )
-
+            print("Search vector updated, committing transaction")
             db.session.commit()
+            print("Database transaction committed successfully")
 
             return jsonify({
                 'success': True,
@@ -3135,8 +3267,14 @@ def register_routes(app):
             }), 200
 
         except Exception as e:
+            print(f"Database error details: {str(e)}")
+            if hasattr(e, '__cause__'):
+                print(f"Caused by: {str(e.__cause__)}")
             db.session.rollback()
-            return jsonify({'success': False, 'message': f'Database save failed: {str(e)}'}), 500
+            return jsonify({
+                'success': False, 
+                'message': f'Database save failed: {str(e)}'
+            }), 500
 
     @app.route('/api/documents/tags', methods=["GET"])
     def get_tags():
@@ -3255,7 +3393,7 @@ def register_routes(app):
             # Audit rated criteria
             new_log = AuditLog(
                 employeeID = admin_user.employeeID,
-                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} RATED THE CRITERIA {criteria.criteriaType}"
+                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} Rated the criteria {criteria.criteriaType}"
             )
             db.session.commit()
 
@@ -3273,7 +3411,9 @@ def register_routes(app):
                 Document.docID,
                 Document.docName,
                 Document.docPath,
-                Document.predicted_rating
+                Document.predicted_rating,
+                Document.predicted_probability,
+                Document.similar_docs
             )
             .outerjoin(Document, Criteria.docID == Document.docID)
             .join(Subarea, Criteria.subareaID == Subarea.subareaID)
@@ -3297,6 +3437,8 @@ def register_routes(app):
                 "docName": c.docName,
                 "docPath": c.docPath,
                 'predicted_rating': c.predicted_rating,
+                "predicted_probability": c.predicted_probability,
+                "similar_docs": c.similar_docs,
                 "rating": c.rating
             }
 
@@ -3382,7 +3524,7 @@ def register_routes(app):
         # Audit rated area
         new_log = AuditLog(
             employeeID = admin_user.employeeID,
-            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} RATED THE AREA {area.areaName}"
+            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} Rated the area {area.areaName}"
         )
         db.session.add(new_log)
         db.session.commit()
@@ -3732,7 +3874,7 @@ def register_routes(app):
         # Audit new area
         new_log = AuditLog(
             employeeID = admin_user.employeeID,
-            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW AREA {areaName}"
+            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} Created a new area: {areaName}"
         )
         db.session.add(new_log)
         db.session.commit()
@@ -3763,7 +3905,7 @@ def register_routes(app):
         # Audit new subarea
         new_log = AuditLog(
             employeeID = admin_user.employeeID,
-            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW SUBAREA {subareaName}"
+            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} Created a new subarea: {subareaName}"
         )
         db.session.add(new_log)
         db.session.commit()
@@ -3798,7 +3940,7 @@ def register_routes(app):
         # Audit new criteria
         new_log = AuditLog(
             employeeID = admin_user.employeeID,
-            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} CREATED NEW CRITERIA {criteriaType} IN {subarea.subareaName}"
+            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} Created a new criteria: {criteriaType} in {subarea.subareaName}"
         )
         db.session.add(new_log)
         db.session.commit()
@@ -3928,6 +4070,14 @@ def register_routes(app):
             .outerjoin(CriteriaBlueprint, CriteriaBlueprint.subareaBlueprintID == SubareaBlueprint.subareaBlueprintID)
             .outerjoin(Program, Program.templateID == Template.templateID)
             .filter(Template.archived == False)
+            .group_by(  # Group to eliminate duplicates
+                Template.templateID,
+                Employee.employeeID,
+                AreaBlueprint.areaBlueprintID,
+                SubareaBlueprint.subareaBlueprintID,
+                CriteriaBlueprint.criteriaBlueprintID,
+                Program.programID
+            )
             .order_by(
                 AreaBlueprint.areaBlueprintID.asc(),
                 SubareaBlueprint.subareaBlueprintID.asc(),
@@ -3993,31 +4143,26 @@ def register_routes(app):
             # --- Group criteria ---
             if row.criteriaBlueprintID and row.criteriaType:
                 crit_type = row.criteriaType.lower()
+                criteria_entry = {
+                    "criteriaID": row.criteriaBlueprintID,
+                    "criteriaContent": row.criteriaContent,
+                    "criteriaType": row.criteriaType,
+                }
+                
+                def add_unique_criteria(array):
+                    # Only add if criteriaID not already in array
+                    if not any(c["criteriaID"] == row.criteriaBlueprintID for c in array):
+                        array.append(criteria_entry)
+                
                 if "input" in crit_type:
-                    subarea["criteria"]["inputs"].append({
-                        "criteriaID": row.criteriaBlueprintID,
-                        "criteriaContent": row.criteriaContent,
-                        "criteriaType": row.criteriaType,
-                    })
+                    add_unique_criteria(subarea["criteria"]["inputs"])
                 elif "process" in crit_type:
-                    subarea["criteria"]["processes"].append({
-                        "criteriaID": row.criteriaBlueprintID,
-                        "criteriaContent": row.criteriaContent,
-                        "criteriaType": row.criteriaType,
-                    })
+                    add_unique_criteria(subarea["criteria"]["processes"])
                 elif "outcome" in crit_type:
-                    subarea["criteria"]["outcomes"].append({
-                        "criteriaID": row.criteriaBlueprintID,
-                        "criteriaContent": row.criteriaContent,
-                        "criteriaType": row.criteriaType,
-                    })
+                    add_unique_criteria(subarea["criteria"]["outcomes"])
                 else:
                     # fallback for undefined types
-                    subarea["criteria"]["inputs"].append({
-                        "criteriaID": row.criteriaBlueprintID,
-                        "criteriaContent": row.criteriaContent,
-                        "criteriaType": row.criteriaType,
-                    })
+                    add_unique_criteria(subarea["criteria"]["inputs"])
 
         # --- Convert nested dicts to lists ---
         template_list = []
@@ -4139,6 +4284,8 @@ def register_routes(app):
     @app.route('/api/programs/apply-template/<int:templateID>', methods=["POST"])
     @jwt_required()
     def apply_template(templateID): 
+        userID = get_jwt_identity()
+
         try:
             data = request.get_json()
             programIDs = data.get("programIDs", [])
@@ -4150,6 +4297,7 @@ def register_routes(app):
             template = Template.query.filter_by(templateID=templateID).first()
             if not template:
                 return jsonify({"success": False, "message": "Template not found"}), 404
+            
             for programID in programIDs:
                 # === Archive existing areas ===
                 active_areas = Area.query.filter_by(programID=programID, archived=False).all()
@@ -4207,25 +4355,36 @@ def register_routes(app):
                             )
                             db.session.add(criteria)
 
-                    # Link program to template
-                    program = Program.query.get(programID)
-                    if program:
-                        program.templateID = template.templateID
+                # Link program to template
+                program = Program.query.get(programID)
+                if program:
+                    program.templateID = template.templateID
 
-                    # Mark template as applied
-                    template.isApplied = True
+            # Mark template as applied
+            template.isApplied = True
 
-                    db.session.commit()
-                    return jsonify({'success': True, 'message': 'Template applied to all selected programs successfully!'}), 201
+            
+            currentUser = Employee.query.filter_by(employeeID=userID).first()
+            new_log = AuditLog(
+                employeeID = currentUser.employeeID,
+                action = f"{currentUser.lName}, {currentUser.fName} {currentUser.suffix} APPLIED the template {template.templateName} to {program.programName}"
+            )
+            db.session.add(new_log)            
+            db.session.commit()
+
+            return jsonify({'success': True, 'message': 'Template applied to all selected programs successfully!'}), 201
 
         except Exception as e:
             db.session.rollback()
             return jsonify({'success': False, 'message': f"Failed to apply template: {str(e)}"}), 500
 
 
+
     @app.route("/api/templates/edit/<int:templateID>", methods=["PUT"])
+    @jwt_required()
     def edit_template(templateID):
         data = request.get_json()
+        userID = get_jwt_identity()
 
         try:
             template = Template.query.get(templateID)
@@ -4311,17 +4470,54 @@ def register_routes(app):
 
                     # Add/update criteria
                     for crit in sub_data.get("criteria", []):
-                        c_bp = existing_crit_bps.get(crit.get("criteriaBlueprintID"))
+                        crit_id = crit.get("criteriaBlueprintID")
+                        c_bp = existing_crit_bps.get(crit_id) if crit_id else None
+                        
+                        # Normalize content and type
+                        content = (crit.get("criteriaContent") or "").strip()
+                        crit_type = (crit.get("criteriaType") or "").strip()
+                        
                         if c_bp:
-                            c_bp.criteriaContent = crit.get("criteriaContent", c_bp.criteriaContent)
-                            c_bp.criteriaType = crit.get("criteriaType", c_bp.criteriaType)
+                            # Update existing blueprint with normalized content
+                            c_bp.criteriaContent = content
+                            c_bp.criteriaType = crit_type
                         else:
-                            c_bp = CriteriaBlueprint(
+                            # try to reuse an existing blueprint with same content for this subarea
+                            c_bp = CriteriaBlueprint.query.filter_by(
                                 subareaBlueprintID=sub_bp.subareaBlueprintID,
-                                criteriaContent=crit.get("criteriaContent"),
-                                criteriaType=crit.get("criteriaType")
-                            )
-                            db.session.add(c_bp)
+                                criteriaContent=content,
+                                criteriaType=crit_type  # Also check type match
+                            ).first()
+                            
+                            if not c_bp:
+                                # Check for content match with different casing/whitespace
+                                similar_content = (
+                                    CriteriaBlueprint.query
+                                    .filter_by(subareaBlueprintID=sub_bp.subareaBlueprintID)
+                                    .filter(
+                                        func.lower(func.trim(CriteriaBlueprint.criteriaContent)) == 
+                                        func.lower(content)
+                                    )
+                                    .first()
+                                )
+                                if similar_content:
+                                    c_bp = similar_content
+                                    c_bp.criteriaContent = content  # Update to normalized version
+                                    c_bp.criteriaType = crit_type
+                                
+                            if c_bp:
+                                # reuse found blueprint
+                                existing_crit_bps[c_bp.criteriaBlueprintID] = c_bp
+                            else:
+                                # Create new only if truly unique
+                                c_bp = CriteriaBlueprint(
+                                    subareaBlueprintID=sub_bp.subareaBlueprintID,
+                                    criteriaContent=content,
+                                    criteriaType=crit_type
+                                )
+                                db.session.add(c_bp)
+                                db.session.flush()
+                                existing_crit_bps[c_bp.criteriaBlueprintID] = c_bp
 
             # Commit template + blueprints first
             db.session.commit()
@@ -4336,7 +4532,15 @@ def register_routes(app):
                     db.session.flush()
 
                 reapply_template(templateID, applied_template)
+        
+            db.session.commit()
 
+            currentUser = Employee.query.filter_by(employeeID=userID).first()
+            new_log = AuditLog(
+                employeeID = currentUser.employeeID,
+                action = f"{currentUser.lName}, {currentUser.fName} {currentUser.suffix} EDITED TEMPLATE {template.templateName}"
+            )
+            db.session.add(new_log)
             db.session.commit()
 
             return jsonify({"success": True, "message": "Template and all linked programs updated successfully"}), 200
@@ -4350,7 +4554,10 @@ def register_routes(app):
 
 
     @app.route('/api/templates/delete/<int:templateID>', methods=["DELETE"])
+    @jwt_required()
     def delete_template(templateID):
+        userID = get_jwt_identity()
+
         try:
             template = Template.query.filter_by(templateID=templateID).first()
             if not template:
@@ -4392,7 +4599,15 @@ def register_routes(app):
             # 4. Finally delete the Template itself
             db.session.delete(template)
 
+            
+            currentUser = Employee.query.filter_by(employeeID=userID).first()
+            new_log = AuditLog(
+                employeeID = currentUser.employeeID,
+                action = f"{currentUser.lName}, {currentUser.fName} {currentUser.suffix} DELETED TEMPLATE {template.templateName}"
+            )
+            db.session.add(new_log)            
             db.session.commit()
+
             return jsonify({"success": True, "message": "Template deleted successfully"}), 200
             
         except Exception as e:
@@ -4600,4 +4815,3 @@ def register_routes(app):
         except Exception:
             return jsonify({'progress': prog.decode()}), 200
 
-    

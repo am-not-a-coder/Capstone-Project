@@ -13,7 +13,7 @@ export default function TemplateCard({title, status, description, createdBy, cre
     onClick={onClick}
     className="relative min-w-[200px] cursor-pointer min-h-lg h-full p-6 hover:scale-101 transition-all duration-300 bg-gray-100 border border-gray-100 shadow-sm rounded-xl hover:shadow-md dark:border-gray-800 dark:bg-gray-800/80">
       {/* Preview Section */}
-      <div className="relative p-6 mb-4 rounded-lg bg-gradient-to-br from-gray-300 to-gray-400 dark:from-gray-950/70 dark:to-gray-900">
+      <div className="relative p-6 mb-4 rounded-lg bg-linear-to-br from-gray-300 to-gray-400 dark:from-gray-950/70 dark:to-gray-900">
         {/* Edit Button */}
         <div 
           title="Edit Template"

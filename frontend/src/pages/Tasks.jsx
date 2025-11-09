@@ -159,11 +159,15 @@ const Tasks = () => {
     // Creates the deadline
     const handleCreateDeadline = async (e) => {
             e.preventDefault()
-            if (!isAdmin || !user.isCoAdmin) return 
+             if (!isAdmin && !(user && user.isCoAdmin)) {
+                setStatusMessage("Only Admins or Co-Admins can create deadlines")
+                setStatusType("error")
+                setShowStatusModal(true)
+                return
+            }            
             const formData = new FormData()
                 formData.append("program", program)
-                formData.append("area", selectedArea)
-                formData.append("criteriaID", criteria) // Add this line to include criteria ID
+                formData.append("area", selectedArea)                
                 formData.append("due_date", dueDate)
                 formData.append("content", content)
 
@@ -171,7 +175,7 @@ const Tasks = () => {
                 //create deadline api
                 const res = await apiPost('/api/deadline', formData, 
                 {withCredentials: true}) 
-
+                    console.log(program, selectedArea, dueDate, content)
                     setStatusMessage(res.data.message);
                     setShowStatusModal(true);
                     setStatusType("success");
@@ -183,7 +187,7 @@ const Tasks = () => {
                     setDueDate("");
 
                 // refetch deadline data
-                const deadlineRes = await apiGet("api/deadlines", {withCredentials: true})
+                const deadlineRes = await apiGet("/api/deadlines", {withCredentials: true});
 
                     Array.isArray(deadlineRes.data.deadline) ? setDeadLines(deadlineRes.data.deadline) : setDeadLines([]);   
                 
@@ -194,9 +198,10 @@ const Tasks = () => {
                     Array.isArray(eventRes.data) ? setEvent(eventRes.data) : setEvent([]);   
 
             }catch(err){
-                setStatusMessage("Server error. Please try again");
+                setStatusMessage("Failed to create deadline");
                 setShowStatusModal(true);
                 setStatusType("error")
+                console.log(err.res?.data || err.message);                
             }
         } 
     
@@ -494,7 +499,7 @@ export const Area = ({onClick, program, areaTitle, desc, progress}) =>{
         className="relative mr-4 min-w-[300px] h-[210px] border-neutral-400 dark:border-neutral-800 border rounded-lg shadow-xl dark:shadow-sm dark:shadow-zuccini-700 overflow-hidden transition-all duration-500 hover:scale-105 cursor-pointer">
             <div className='h-[50%] bg-zuccini-600 dark:bg-zuccini-700'> 
                 <div className='absolute px-5 font-light border border-neutral-400 top-2 right-2 bg-neutral-200 rounded-xl dark:bg-gray-900 dark:text-white'>{program}</div>
-                <CircularProgressBar progress={progress} circleWidth="75" positionX={"left-3"} positionY={"top-17"} placement={`absolute top-17 left-3`}/>           
+                <CircularProgressBar strokeColor="stroke-zuccini-500" progress={progress} circleWidth="75" positionX={"left-3"} positionY={"top-17"} placement={`absolute top-17 left-3`}/>           
             </div>      
 
             <div className='text-right h-[50%] p-3 bg-neutral-200 border-t-1 transition-all duration-500  dark:bg-gray-900 dark:text-white dark:border-t-neutral-600'>

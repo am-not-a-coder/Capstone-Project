@@ -6,7 +6,8 @@ import {
   faFloppyDisk,
   faTrash,
   faCircleExclamation,
-  faSpinner
+  faSpinner,
+  faTriangleExclamation
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { apiGet, apiPost, apiPut } from "../utils/api_utils";
@@ -361,10 +362,8 @@ export default function TemplateBuilder({onClose, template = null}) {
   };
 
 
-  const handleConfirm = () => {
-      setShowConfirm(true);
-      onClose();
-  };
+
+  
 
   return (
     <>
@@ -380,8 +379,46 @@ export default function TemplateBuilder({onClose, template = null}) {
       )}
 
 
-      {/* Cancel Confirmation */}
-      {showConfirm}
+      {/* Cancel Confirmation */}      
+      {showConfirm && (
+        <div
+          onClick={(e) => {
+            e.stopPropagation();                                            
+          }}
+          className="fixed inset-0 flex items-center justify-center transition-all duration-300 transform scale-100 z-150 bg-black/60 backdrop-blur-xs"
+        >
+          <div className={`flex flex-col justify-center items-center p-5 py-10 border border-gray-400 bg-gray-200 dark:bg-gray-900 rounded-xl shadow-xl max-w-xl w-full max-h-[90vh] overflow-y-auto inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-800 ${showConfirm ? 'fade-in' : 'fade-out'}`}>
+            <h1 className='mb-4 text-3xl font-bold text-amber-600 text-shadow-md'>
+              Cancel {isEditMode ? 'Editing' : 'Creating'} Template
+            </h1>
+            <div className="flex items-center justify-center w-20 h-20 mx-auto mb-3 rounded-full bg-amber-100 inset-shadow-sm inset-shadow-amber-500 dark:bg-amber-900/30">
+              <FontAwesomeIcon icon={faTriangleExclamation} className="text-3xl text-amber-500 dark:text-amber-400"/>
+            </div>
+            <div className='flex flex-col justify-center items-center w-[90%]'>
+              <h1 className='mb-1 text-xl font-semibold text-center text-gray-800 dark:text-gray-200'>
+                Are you sure you want to go back?
+              </h1>
+              <p className='mb-5 text-lg text-center text-gray-600 dark:text-gray-400'>
+                Unsaved changes would not be saved.
+              </p>
+            </div>
+            <div className='flex flex-row justify-around w-full'>
+              <button
+                onClick={() => setShowConfirm(false)}
+                className={`px-10 py-3 font-medium transition-colors rounded-full bg-gray-300 dark:bg-gray-700 text-neutral-500 dark:text-gray-300 hover:text-gray-900 hover:bg-gray-400/50 dark:hover:bg-gray-600 dark:hover:text-gray-200 cursor-pointer`}
+              >
+                No
+              </button>
+              <button 
+                onClick={onClose}
+                className={`bg-amber-600/70 hover:bg-amber-600/90 cursor-pointer px-8 py-3 rounded-full font-medium transition-colors flex items-center text-white`}
+              >
+                Yes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       <div className="relative w-full min-h-full p-4 border border-gray-300 shadow-2xl rounded-xl dark:border-gray-700 dark:shadow-md dark:shadow-zuccini-800"> 
           {error && (
@@ -420,7 +457,7 @@ export default function TemplateBuilder({onClose, template = null}) {
             <div className="flex gap-3 place-self-end">
               <button
                 className="px-6 py-2 transition bg-gray-400 rounded-full shadow-lg cursor-pointer hover:bg-gray-500"
-                onClick={handleConfirm}
+                onClick={() => setShowConfirm(true)}
               >
                 Cancel
               </button>
@@ -639,7 +676,7 @@ export default function TemplateBuilder({onClose, template = null}) {
 
             <div className="flex justify-end gap-3 pt-4 ">
               <button
-                onClick={onClose}
+                onClick={() => setShowConfirm(true)}
                 className="px-6 py-2 transition bg-gray-400 rounded cursor-pointer hover:bg-gray-500"
               >
                 Cancel

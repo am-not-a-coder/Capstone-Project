@@ -266,9 +266,9 @@
 
     return(
     <>
-        <div className="relative flex flex-row justify-around border border-neutral-300 rounded-[20px] min-w-[950px] min-h-[90%] shadow-md inset-shadow-sm inset-shadow-gray-400 p-3 bg-neutral-200 dark:bg-gray-900 dark:inset-shadow-zuccini-800">
-          <div className='relative flex flex-col w-full p-3'>
-            <div className='flex flex-row gap-5 mb-5'>
+        <div className="relative flex flex-row justify-around border border-neutral-300 rounded-[20px] w-full min-h-[85%] shadow-md inset-shadow-sm inset-shadow-gray-400 p-3 bg-neutral-200 dark:bg-gray-900 dark:inset-shadow-zuccini-800">
+          <div className='relative flex flex-col w-full p-3' >
+            <div className='flex flex-row md:w-full scale-85 -ml-8 md:-ml-0 md:scale-100 gap-5 mb-5 mt-15 md:mt-0'>
                          
               <FontAwesomeIcon icon={faHouse}
                onClick={() => {backToPrograms()}}
@@ -279,7 +279,7 @@
                />                                           
             
               {/* Breadcrumbs */}
-              <div className='w-full p-3 font-semibold bg-neutral-300/90 rounded-xl border-neutral-300 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:border-gray-900 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50'>
+              <div className=' w-[58%] md:w-full p-3 font-semibold bg-neutral-300/90 rounded-xl border-neutral-300 text-neutral-800 dark:text-white inset-shadow-sm inset-shadow-gray-400 dark:border-gray-900 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50'>
                 <nav className="flex items-center overflow-hidden font-semibold text-gray-700 gap-x-2 text-md lg:text-lg dark:text-white">
                   
                   {/* Programs Breadcrumb */}

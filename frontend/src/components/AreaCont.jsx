@@ -64,7 +64,7 @@ export default function AreaCont({
 
   return (
     <>
-    <div className='relative flex flex-row justify-between min-w-full p-3 py-5 mb-2 transition-all duration-300 border shadow-md cursor-pointer border-neutral-400 rounded-2xl text-neutral-800 hover:scale-101 dark:text-white hover:border-neutral-500 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600'>        
+    <div className='relative flex flex-row justify-between min-w-full p-2 md:p-3 md:py-5 mb-2 transition-all duration-300 border shadow-md cursor-pointer border-neutral-300 rounded-2xl text-neutral-800 hover:scale-101 dark:text-white hover:border-neutral-500 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-950/50 dark:border-gray-700 dark:hover:border-gray-600'>   
       {editMode && isEditing ? (
         <div className='flex flex-col w-full gap-2' onClick={(e) => e.stopPropagation()}>
           <div className='flex gap-2'>
@@ -103,10 +103,10 @@ export default function AreaCont({
       ) : (
         <>
           <div onClick={onClick} className='flex items-center flex-1'>
-            <h1 className='font-semibold text-md'>{title}</h1>
+             <h1 className='font-semibold text-md md:text-lg w-2/3 md:w-full'>{title}</h1>  
           </div>
 
-          <p className={`${editMode && !isEditing ? 'right-[20%]' : 'right-[14%]'} opacity-70 font-semibold absolute `}>{doneCount} / {doneTotal}</p>
+            <p className={`${editMode && !isEditing ? 'right-[20%]' : 'right-[18%]'} opacity-70 font-semibold absolute bottom-1 text-sm md:text-md md:bottom-5`}>{doneCount} / {doneTotal}</p>
 
           <div className='flex items-center gap-3 mr-3'>
             {editMode && !isEditing ? (
@@ -140,14 +140,14 @@ export default function AreaCont({
             ) : (
             <div className='relative'>
               <div className='mr-3'>                
-                        <CircularProgressBar circleWidth="50" progress={progress} placement={`absolute right-10 -top-3 `}/>
+                         <CircularProgressBar circleWidth="50" strokeColor="stroke-zuccini-500" progress={progress} placement={`absolute -right-5 md:right-15 scale-70 md:scale-100 -top-2 md:-top-3 `}/>
                         <FontAwesomeIcon 
                             icon={isExpanded ? faChevronUp : faChevronDown} 
                             onClick={e => {
                                 e.stopPropagation();
                                 if (onIconClick) onIconClick(e);
                             }}
-                            className='cursor-pointer'
+                            className='cursor-pointer -mr-9 mt-10 md:m-0'
                         />
                     </div>             
             </div>

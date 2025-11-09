@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import StatusModal from './StatusModal';
 import { apiGet, apiPostForm } from '../../utils/api_utils';
+import Select from 'react-select';
 
 const CreateModal = ({onClick, onCreate, setShowCreateModal}) => {
     const [programID, setProgramID] = useState('');
@@ -17,6 +18,7 @@ const CreateModal = ({onClick, onCreate, setShowCreateModal}) => {
 
     // options
     const [programOption, setProgramOption] = useState([]);
+    const [staticAreaOption, setStaticAreaOption] = useState([]);
     const [areaOption, setAreaOption] = useState([]);
     const [subAreaOption, setSubAreaOption] = useState([]);
     const [allSubareas, setAllSubareas] = useState([]);
@@ -62,9 +64,20 @@ const CreateModal = ({onClick, onCreate, setShowCreateModal}) => {
         }
     };
 
+    const fetchStaticAreas = async () => {
+        try{
+            const res = await apiGet(`/api/area/option`, {withCredentials: true})
+            Array.isArray(res.data) ? setStaticAreaOption(res.data) : setStaticAreaOption([]);
+        } catch(err){
+            console.error("Error occurred when fetching area", err)
+        }
+    }
+
+    
+
     const fetchAreas = async (programCode) => {
         try{
-            const res = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`, {withCredentials: true})
+            const res = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`,{withCredentials: true})
             Array.isArray(res.data) ? setAreaOption(res.data) : setAreaOption([]);
         } catch(err){
             console.error("Error occurred when fetching area", err)
@@ -135,8 +148,10 @@ const CreateModal = ({onClick, onCreate, setShowCreateModal}) => {
     useEffect(() => {
         if (programCode){
             fetchAreas(programCode);
+            fetchStaticAreas();
             fetchSubAreas(programCode);
         } else{
+            setStaticAreaOption([]);
             setAreaOption([]);
             setSubAreaOption([]);
         }
@@ -264,13 +279,17 @@ const CreateModal = ({onClick, onCreate, setShowCreateModal}) => {
                                 <div>
                                     <label className="block mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
                                         Area Number <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        name="areaNum"
-                                        type="text"
-                                        placeholder="e.g. Area I, Area II, Area III"
-                                        value={areaNum}
-                                        onChange={(e) => setAreaNum(e.target.value)}
+                                    </label>                                   
+                                    <Select                                                                            
+                                        options={staticAreaOption.map(opt => ({
+                                            value: opt.areaNum,
+                                            label: opt.areaNum,
+                                        }))}                                       
+                                        placeholder="Select Area Number"
+                                        isClearable={true}
+                                        isSearchable={true}
+                                        value={areaNum ? { value: areaNum, label: areaNum } : null}  // ✅ Convert to object format
+                                        onChange={(selectedOption) => setAreaNum(selectedOption ? selectedOption.value : '')}  // ✅ Get value from selectedOption
                                         className="w-full px-4 py-3 text-gray-900 placeholder-gray-400 transition-all duration-200 bg-white border border-gray-200 dark:bg-gray-900 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 dark:text-white"
                                         required
                                     />

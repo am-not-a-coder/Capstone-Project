@@ -29,7 +29,7 @@ const ActionButton = memo(({ action, color, icon, isActive, onClick, children })
     <button 
       onClick={onClick}
       className={`
-        flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 min-w-[120px] justify-center
+        flex items-center gap-2 px-3 md:px-6 py-2 md:py-3 rounded-xl font-semibold transition-all duration-300 min-w-[120px] justify-center
         ${isActive ? actionButtonStyles[color].active : actionButtonStyles[color].inactive}
       `}
     >
@@ -41,7 +41,7 @@ const ActionButton = memo(({ action, color, icon, isActive, onClick, children })
 
 // Memoized InputField component to prevent unnecessary re-renders
 const InputField = memo(({ field, form, handleChange, handleFileChange, employees = [], activeModify, institutes = [] }) => {
-  const baseInputClasses = "w-full px-4 py-3 text-gray-800 dark:text-white rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 dark:bg-gray-800 dark:border-gray-600 dark:focus:ring-blue-400";
+   const baseInputClasses = "w-full px-4 py-3 text-gray-800 dark:text-white rounded-xl border border-gray-200 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 dark:bg-gray-800 dark:border-gray-600 dark:focus:ring-blue-400";
   
   return (
     <div className="space-y-2">
@@ -61,7 +61,7 @@ const InputField = memo(({ field, form, handleChange, handleFileChange, employee
         >
           <option value="" className="text-gray-500">{field.placeholder || "Select Institute"}</option>
           {institutes && institutes.map((inst) => (
-            <option key={inst.instID} value={inst.instID} className='text-gray-800'>{inst.instName || inst.Code}</option>
+             <option key={inst.instID} value={inst.instID} className='text-gray-800'>{inst.instName || inst.Code}</option>
           ))}
         </select>
 
@@ -83,7 +83,7 @@ const InputField = memo(({ field, form, handleChange, handleFileChange, employee
         </select>
 
       ) : field.type === "file" ? (
-        <div className="space-y-2">
+        <div className="space-y-2"> 
           <input
             type="file"
             name={field.name}
@@ -246,8 +246,8 @@ export default function CreateForm({
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 max-w-md w-full max-h-[90vh] overflow-y-auto fade-in">
         
         {/* Header */}
-        <div className="relative p-6 border-b border-gray-100 dark:border-gray-800">
-          <h1 className="text-2xl font-bold text-center text-gray-900 dark:text-white">
+        <div className="relative p-3 md:p-6 border-b border-gray-100 dark:border-gray-800">
+          <h1 className="text-2xl mr-8 md:mr-0 font-bold text-center text-gray-900 dark:text-white">
             Manage {title}s
           </h1>
           <button 
@@ -262,7 +262,7 @@ export default function CreateForm({
 
         {/* Action Buttons */}
         <div className="p-6 border-b border-gray-100 dark:border-gray-800">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 mdgrid-cols-3 gap-3">
             <ActionButton
               action="add"
               color="emerald"
@@ -354,7 +354,7 @@ export default function CreateForm({
                   <span className="ml-1 text-red-500">*</span>
                 </label>
                 <select 
-                  className="w-full px-4 py-3 text-gray-800 transition-all duration-200 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-white" 
+                  className="w-full px-4 py-3 text-gray-800 transition-all duration-200 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-white"  
                   value={editIndex ?? ""} 
                   onChange={onEditSelect} 
                   required
@@ -420,7 +420,7 @@ export default function CreateForm({
                   <span className="ml-1 text-red-500">*</span>
                 </label>
                 <select 
-                  className="w-full px-4 py-3 text-gray-800 transition-all duration-200 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-white" 
+                  className="w-full px-4 py-3 text-gray-800 transition-all duration-200 border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent dark:bg-gray-800 dark:border-gray-600 dark:text-white"  
                   value={editIndex ?? ""} 
                   onChange={onDeleteSelect} 
                   required

@@ -385,8 +385,7 @@ const PublicOnlyRoute = ({ children }) => {
           </ProtectedRoute>
           }>
           <Route index element={<Navigate to="/Dashboard" replace />} />
-          <Route path="/Dashboard" element={<Dashboard />} />
-          <Route path="/Institutes" element={<Institutes />} />
+          <Route path="/Dashboard" element={<Dashboard />} />          
           <Route path="/Programs" element={<Programs />} />
           <Route path="/Accreditation" element={
             <RatingRoute>
