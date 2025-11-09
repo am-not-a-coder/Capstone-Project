@@ -112,6 +112,8 @@ class Template(db.Model):
     createdAt = db.Column(db.DateTime, default=datetime.utcnow)
     isApplied = db.Column(db.Boolean, default=False)
     archived = db.Column(db.Boolean, default=False)
+    isApplied = db.Column(db.Boolean, default=False)
+    archived = db.Column(db.Boolean, default=False)
     
     programs = db.relationship("Program", back_populates="template", lazy=True)
     employee = db.relationship("Employee", backref="templates")    
@@ -124,6 +126,7 @@ class AreaBlueprint(db.Model):
     areaNum = db.Column(db.String(10))
     templateID = db.Column(db.Integer, db.ForeignKey("template.templateID"))
 
+
     subareas = db.relationship("SubareaBlueprint", backref="area", cascade="all, delete-orphan")
 
 class SubareaBlueprint(db.Model):
@@ -132,6 +135,7 @@ class SubareaBlueprint(db.Model):
     subareaName = db.Column(db.String(255), nullable=False)
     areaBlueprintID = db.Column(db.Integer, db.ForeignKey("areaBlueprint.areaBlueprintID"))
     criteria = db.relationship("CriteriaBlueprint", backref="subarea", cascade="all, delete-orphan")
+    
     
 
 class CriteriaBlueprint(db.Model):
@@ -162,6 +166,7 @@ class Area(db.Model):
     areaID = db.Column(db.Integer, primary_key=True, nullable=False)
     templateID = db.Column(db.Integer, db.ForeignKey('template.templateID'), nullable=True)
     areaBlueprintID = db.Column(db.Integer, db.ForeignKey("areaBlueprint.areaBlueprintID"))
+    areaBlueprintID = db.Column(db.Integer, db.ForeignKey("areaBlueprint.areaBlueprintID"))
     appliedTemplateID = db.Column(db.Integer, db.ForeignKey("appliedTemplate.appliedTemplateID", ondelete="CASCADE"), nullable=False)
     instID = db.Column(db.Integer, db.ForeignKey('institute.instID'), nullable=True)
     programID = db.Column(db.Integer, db.ForeignKey('program.programID'), nullable=False)
@@ -177,6 +182,7 @@ class Area(db.Model):
     program = db.relationship("Program", back_populates="areas")
     subareas = db.relationship("Subarea", back_populates="area", cascade="all, delete-orphan")
     institute = db.relationship("Institute", back_populates="areas")    
+    institute = db.relationship("Institute", back_populates="areas")    
     
 
 class Program(db.Model):
@@ -184,6 +190,7 @@ class Program(db.Model):
 
     programID = db.Column(db.Integer, primary_key=True, nullable=False)
     instID = db.Column(db.Integer, db.ForeignKey('institute.instID'), nullable=True)
+    templateID = db.Column(db.Integer, db.ForeignKey('template.templateID'), nullable=True)
     templateID = db.Column(db.Integer, db.ForeignKey('template.templateID'), nullable=True)
     employeeID = db.Column(db.String(10), db.ForeignKey('employee.employeeID'))
     programCode = db.Column(db.String(20))
@@ -194,6 +201,7 @@ class Program(db.Model):
     institute = db.relationship("Institute", back_populates="programs")
     areas = db.relationship("Area", back_populates="program", cascade="all, delete-orphan")
     template = db.relationship("Template", back_populates="programs")
+    template = db.relationship("Template", back_populates="programs")
     
 
 
@@ -203,6 +211,7 @@ class Subarea(db.Model):
     subareaID = db.Column(db.Integer, primary_key=True, nullable=False)
     areaID = db.Column(db.Integer, db.ForeignKey('area.areaID'), nullable=False)
     subareaBlueprintID = db.Column(db.Integer, db.ForeignKey("subareaBlueprint.subareaBlueprintID"))
+    subareaBlueprintID = db.Column(db.Integer, db.ForeignKey("subareaBlueprint.subareaBlueprintID"))
     subareaName = db.Column(db.String(100))
     criteriaID = db.Column(db.Integer)
     rating = db.Column(db.Float)
@@ -211,12 +220,14 @@ class Subarea(db.Model):
     area = db.relationship("Area", back_populates="subareas")
 
     criteria = db.relationship("Criteria", back_populates="subarea", cascade="all, delete-orphan")  
+    criteria = db.relationship("Criteria", back_populates="subarea", cascade="all, delete-orphan")  
 
 class Criteria(db.Model):
     __tablename__ = 'criteria'
 
     criteriaID = db.Column(db.Integer, primary_key=True, nullable=False, autoincrement=True)
     subareaID = db.Column(db.Integer, db.ForeignKey('subarea.subareaID'), nullable=False)
+    criteriaBlueprintID = db.Column(db.Integer, db.ForeignKey("criteriaBlueprint.criteriaBlueprintID"))
     criteriaBlueprintID = db.Column(db.Integer, db.ForeignKey("criteriaBlueprint.criteriaBlueprintID"))
     criteriaContent = db.Column(db.Text)
     criteriaType = db.Column(db.String(50))
@@ -359,3 +370,4 @@ class Notification(db.Model):
     # Relationships
     recipient = db.relationship("Employee", foreign_keys=[recipientID], backref="received_notifications")
     sender = db.relationship("Employee", foreign_keys=[senderID], backref="sent_notifications")
+

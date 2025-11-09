@@ -10,6 +10,9 @@ import { CardSkeleton } from "../components/Skeletons";
 import { PermissionGate } from "../utils/auth_utils";
 
 const Institutes = () => {
+
+
+
         // State for institutes data
         const [institutes, setInstitutes] = useState([]);
         const [loading, setLoading] = useState(true);        
@@ -317,7 +320,7 @@ const Institutes = () => {
               
              
                 {/* Main Content */}
-              <div className="flex flex-col md:flex-row md:flex-wrap gap-5 mt-20 mb-8 lg:mt-8" >
+              <div className="flex flex-wrap gap-5 mt-20 mb-8 lg:mt-8" >
                   <PermissionGate requires='crudInstituteEnable'>
                     <CreateCard setShowForm={setShowForm} title="Institute"/>
                   </PermissionGate>

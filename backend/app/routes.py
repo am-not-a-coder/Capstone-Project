@@ -190,6 +190,7 @@ def register_routes(app):
                     'programCode': program.programCode,
                     'programName': program.programName
                 })
+
         for ea in user.employee_areas:
             area = Area.query.get(ea.areaID)
             if area:
@@ -583,7 +584,7 @@ def register_routes(app):
         created_at = datetime.now()
 
         # email regex for validation
-        validEmail = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        validEmail = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         
         # Check if this is an update operation (user already exists)
         existing_user = Employee.query.filter_by(employeeID=empID).first()
@@ -2188,7 +2189,6 @@ def register_routes(app):
                 return {
                     'pendingDocID': getattr(d, 'docID', None),
                     'pendingDocName': name,
-                    'pendingDocPath': d.docPath
                 }
             return jsonify({ 'success': True, 'data': { 'pendingDocs': [serialize_doc(d) for d in pending] } }), 200
         except Exception as e:
@@ -2217,29 +2217,17 @@ def register_routes(app):
     def reject_document():
         data = request.get_json()
         docID = data.get("docID")
+
         document = Document.query.filter_by(docID=docID).first()
+
         document.isApproved = False
         document.approvedBy = get_jwt_identity()
         document.evaluate_at = datetime.utcnow()
+
         db.session.commit()
+
         return jsonify({'success': True, 'message': 'Document Rejected!'}), 200
 
-    # Get subareas from database
-    @app.route('/api/subarea', methods=["GET"])
-    @jwt_required()
-    def get_subareas():
-        subareas = Subarea.query.all()
-        result = []
-        for sa in subareas:
-            subarea_data = {
-                'subareaID': sa.subareaID,
-                'subareaName': sa.subareaName,
-                'areaID': sa.areaID,
-                'rating': sa.rating,
-                'archived': sa.archived
-            }
-            result.append(subarea_data)
-        return jsonify(result)
 
     @app.route('/api/criteria', methods=["GET"])
     def get_criteria(): 

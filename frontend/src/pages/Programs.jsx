@@ -139,6 +139,7 @@ import ArchiveModal from '../components/modals/ArchiveModal';
 
         Array.isArray(programsArr) ? setPrograms(programsArr) : setPrograms([]);
 
+
       } else {
         console.error('Failed to fetch the programs:', response.error || response);
         setPrograms([]);
@@ -791,7 +792,7 @@ import ArchiveModal from '../components/modals/ArchiveModal';
               <div className="relative flex flex-col w-full pt-2">
 
                 {/* Navigation route */}
-                <div className='scale-80 w-[135%] md:w-full md:scale-100 -ml-10 flex flex-row gap-3 mb-5 mt-12 md:m-0'>      
+                <div className='flex flex-row gap-3 mb-5'>      
                   <FontAwesomeIcon icon={faHouse}
                   onClick={() => {backToPrograms()}}
                   className={`${visible === "programs" 
