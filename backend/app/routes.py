@@ -27,10 +27,10 @@ from flask_mail import Message as MailMessage
 from app.login_handlers import complete_user_login
 from app.models import Employee, Program, Area, Subarea, Institute, Document, Deadline, AuditLog, Announcement, Criteria, Conversation, ConversationParticipant, Message, MessageDeletion, Template, AreaBlueprint, SubareaBlueprint, CriteriaBlueprint, AppliedTemplate, Notification, EmployeeProgram, EmployeeArea, EmployeeFolder, AreaReference, EmployeeProgram, EmployeeArea, EmployeeFolder, AreaReference, DeadlineCriteria
 from sqlalchemy import cast, String, func, text
-
+from app.security.anti_brute_force import get_client_ip, is_ip_blocked, track_failed_login, block_ip, clear_failed_attempts
 
 def register_routes(app):
-    # ============================================ AUTHENTICATION(LOGIN/LOGOUT) PAGE ROUTES ============================================
+    # =================================w=========== AUTHENTICATION(LOGIN/LOGOUT) PAGE ROUTES ============================================
     
     # JWT Exception Handler
     @app.errorhandler(JWTExtendedException)
@@ -39,11 +39,20 @@ def register_routes(app):
     
     #LOGIN API
     @app.route('/api/login', methods=["POST"])
+    
     def login():
         try:
             #Get the JSON from the request
             data = request.get_json()
             empID = data.get("employeeID")
+            user_ip = get_client_ip()
+
+            if is_ip_blocked(user_ip):
+                return jsonify({
+                    'success': False,
+                    'message': 'Too many login attempts. IP has temporarily blocked.'
+                }), 429
+
             password = data.get("password")
 
             #Fetches the user from the db using the employeeID
@@ -63,7 +72,10 @@ def register_routes(app):
                 current_app.logger.error(f"Invalid password hash for user {empID}: {hash_error}")
                 return jsonify({'success': False, 'message': 'User account has invalid password format. Contact administrator.'}), 400
                 
-            if is_valid_password: 
+            if is_valid_password:
+                # Clear failed login attempts on successful login
+                clear_failed_attempts(user_ip)
+                
                 # audit successful login
                 new_log = AuditLog(
                     employeeID = user.employeeID,
@@ -74,13 +86,19 @@ def register_routes(app):
 
                 bypass = redis_client.get(f'otp_bypass:{empID}')
                 if bypass:
+                    print(f"DEBUG: Skipping OTP generate for {empID} due to otp_bypass.")
                     return complete_user_login(user, empID)
                 else:
+                    # Defensive: ensure empID is string
+                    if not empID or not isinstance(empID, str):
+                        print(f"ERROR: empID for OTP is not a valid string! empID={empID}")
+        
                     otp_code = generate_random()
-                    otp_expiry = datetime.now(timezone.utc) + timedelta(minutes=2)
-                    user.otpcode = otp_code
-                    user.otpexpiry = otp_expiry
-                    db.session.commit()
+                    # Store OTP in Redis with TTL (3 minutes)
+                    redis_key = f'otp:{empID}'
+                    redis_client.setex(redis_key, 180, str(otp_code))
+                    print(f"DEBUG: Stored OTP in Redis as {redis_key} = {otp_code}")
+
 
                     html_body = render_template(
                         'email/otp.html',
@@ -98,6 +116,13 @@ def register_routes(app):
 
                     return jsonify({'success': True, 'message': 'OTP email sent succesfully'})
             else:
+                attempts = track_failed_login(user_ip)
+                if attempts >= 5:
+                    block_ip(user_ip, employee_id=empID)
+                    return jsonify({
+                        'success': False,
+                        'message': 'Too many failed attempts. IP has been temporarily blocked.'
+                    }), 429
                 return jsonify({'success': False, 'message': 'Invalid password'}), 401
         except Exception as e:
             current_app.logger.error(f"Login error: {e}")
@@ -122,41 +147,42 @@ def register_routes(app):
         user = Employee.query.filter_by(employeeID=employeeID).first()
         if not user:
             return jsonify({'success': False, 'message': 'User not found in database.'}), 400
-        current_time = datetime.now(timezone.utc)
-        otp_expiry = user.otpexpiry
-        if otp_expiry is None:
-            return jsonify({'success': False, 'message': 'No OTP expiry set. Please request a new OTP.'}), 400
-        if otp_expiry.tzinfo is None:
-            otp_expiry = otp_expiry.replace(tzinfo=timezone.utc)
-        if current_time > otp_expiry:
-            return jsonify({'success': False, 'message': 'OTP has expired'}), 400
-            #main check
-        if not str(otp) == str(user.otpcode):
+        # Validate OTP from Redis
+        otp_key = f"otp:{employeeID}"
+        stored_code = redis_client.get(otp_key)
+        if not stored_code:
+            return jsonify({'success': False, 'message': 'OTP has expired or is invalid. Please request a new OTP.'}), 400
+        if str(otp) != stored_code.decode():
             return jsonify({'success': False, 'message': "OTP Doesn't match!"}), 400
-        else:
-            #clean up redis otp:
-            redis_client.hdel('pending_otps', employeeID)
-            #set otp_bypass for 24hrs
-            redis_client.setex(f'otp_bypass:{employeeID}', 24*60*60, '1')
-            #clean otp storage
-            user.otpcode = None
-            user.otpexpiry = None
-            db.session.commit()
-            return complete_user_login(user, employeeID)
+        # Success: invalidate OTP and allow login
+        redis_client.delete(otp_key)
+        redis_client.hdel('pending_otps', employeeID)
+        # set otp_bypass for 24hrs
+        redis_client.setex(f'otp_bypass:{employeeID}', 24*60*60, '1')
+        return complete_user_login(user, employeeID)
 
         
     @app.route('/api/me', methods=['GET'])
     @jwt_required()
     def me():
         emp_id = get_jwt_identity()
+        # 1) Try Redis cache first
+        cache_key = f'user_profile:{emp_id}'
+        cached = redis_client.get(cache_key)
+        if cached:
+            try:
+                return jsonify({'success': True, 'user': json.loads(cached.decode())}), 200
+            except Exception:
+                pass
+
+        # 2) Fallback to DB and rebuild cache
         user = Employee.query.filter_by(employeeID=emp_id).first()
         if not user:
             return jsonify({'success': False, 'message': 'User not found'})
-        
-        # Get user's programs and areas from junction tables
+
         user_programs = []
         user_areas = []
-        
+
         for ep in user.employee_programs:
             program = Program.query.get(ep.programID)
             if program:
@@ -165,7 +191,7 @@ def register_routes(app):
                     'programCode': program.programCode,
                     'programName': program.programName
                 })
-        
+
         for ea in user.employee_areas:
             area = Area.query.get(ea.areaID)
             if area:
@@ -174,29 +200,33 @@ def register_routes(app):
                     'areaName': area.areaName,
                     'areaNum': area.areaNum
                 })
-        
-        return jsonify({
-            'success': True,
-            'user': {
-                'employeeID': user.employeeID,
-                'firstName': user.fName,
-                'lastName': user.lName,
-                'programs': user_programs,
-                'areas': user_areas,
-                'suffix' : user.suffix,
-                'email': user.email,
-                'contactNum': user.contactNum,
-                'profilePic': user.profilePic,
-                'isAdmin': user.isAdmin,
-                'isRating': user.isRating,
-                'isEdit': user.isEdit,
-                'crudFormsEnable': user.crudFormsEnable,
-                'crudProgramEnable': user.crudProgramEnable,
-                'crudInstituteEnable': user.crudInstituteEnable,
-                'role': 'admin' if user.isAdmin else 'user',
-                'isCoAdmin': user.isCoAdmin
-            }
-        }), 200
+
+        profile = {
+            'employeeID': user.employeeID,
+            'firstName': user.fName,
+            'lastName': user.lName,
+            'programs': user_programs,
+            'areas': user_areas,
+            'suffix': user.suffix,
+            'email': user.email,
+            'contactNum': user.contactNum,
+            'profilePic': user.profilePic,
+            'isAdmin': user.isAdmin,
+            'isRating': user.isRating,
+            'isEdit': user.isEdit,
+            'crudFormsEnable': user.crudFormsEnable,
+            'crudProgramEnable': user.crudProgramEnable,
+            'crudInstituteEnable': user.crudInstituteEnable,
+            'role': 'admin' if user.isAdmin else 'user',
+            'isCoAdmin': user.isCoAdmin
+        }
+
+        try:
+            redis_client.setex(cache_key, 300, json.dumps(profile))
+        except Exception:
+            pass
+
+        return jsonify({'success': True, 'user': profile}), 200
     
     @app.route('/api/validate-session', methods=['POST'])
     def validate_session():
@@ -774,6 +804,11 @@ def register_routes(app):
         )
         db.session.add(new_log)
         db.session.commit()
+        # Invalidate cached users list
+        try:
+            redis_client.delete('users:list')
+        except Exception:
+            pass
 
         message = 'Employee updated successfully!' if is_update else 'Employee created successfully!'
         return jsonify({
@@ -837,6 +872,10 @@ def register_routes(app):
         )
         db.session.add(new_log)
         db.session.commit()
+        try:
+            redis_client.delete('users:list')
+        except Exception:
+            pass
 
         return jsonify({"success": True, "message":"Employee has been deleted successfully!"}), 200
 
@@ -1120,6 +1159,14 @@ def register_routes(app):
     @app.route('/api/users', methods=["GET"])
     @jwt_required()
     def get_users():
+        # Try cache first for 60s shared list
+        try:
+            cached = redis_client.get('users:list')
+            if cached:
+                return jsonify({"users": json.loads(cached.decode())}), 200
+        except Exception:
+            pass
+
         users = Employee.query.all()
 
         user_list = []
@@ -1169,9 +1216,12 @@ def register_routes(app):
             } 
         
             user_list.append(user_data)
-        
-        return jsonify({"users": user_list}), 200
-
+        # Save to cache
+        try:
+            redis_client.setex('users:list', 60, json.dumps(user_list))
+        except Exception:
+            pass
+        return jsonify({"users" : user_list}), 200
 
     # ============================================ INSTITUTES PAGE ROUTES ============================================
     
@@ -1531,17 +1581,30 @@ def register_routes(app):
     @app.route('/api/institute/programs', methods=["GET"])
     def get_program_for_inst():
         instID = request.args.get('instID', type=int)
+        if not instID:
+            return jsonify({'programs': []}), 200
+
+        # Try cache first
+        cache_key = f'programs:inst:{instID}'
+        cached = redis_client.get(cache_key)
+        if cached:
+            try:
+                return jsonify({'programs': json.loads(cached.decode())}), 200
+            except Exception:
+                pass
 
         programs = Program.query.filter_by(instID=instID).all()
+        program_list = [{
+            'programID': p.programID,
+            'programCode': p.programCode,
+            'programName': p.programName,
+        } for p in programs]
 
-        program_list = [
-            {
-                'programID': p.programID,
-                'programCode': p.programCode,
-                'programName': p.programName,
-            }
-            for p in programs
-        ]
+        # Save to cache for 30 minutes (programs rarely change)
+        try:
+            redis_client.setex(cache_key, 1800, json.dumps(program_list))
+        except Exception:
+            pass
 
         return jsonify({'programs': program_list}), 200
 
@@ -1565,6 +1628,7 @@ def register_routes(app):
             if not program:
                 return jsonify({'success': False, 'message': 'Program not found'}), 404
 
+            old_inst_id = program.instID
             # Update the database fields with new values
             program.programCode = data.get('programCode', program.programCode)      # Update program code (e.g., "BSIT")
             program.programName = data.get('programName', program.programName)      # Update program name
@@ -1579,6 +1643,15 @@ def register_routes(app):
             )
             db.session.add(new_log)
             db.session.commit() # Save changes to database
+
+            # Invalidate program caches for affected institutes
+            try:
+                if old_inst_id:
+                    redis_client.delete(f'programs:inst:{old_inst_id}')
+                if program.instID and program.instID != old_inst_id:
+                    redis_client.delete(f'programs:inst:{program.instID}')
+            except Exception:
+                pass
 
             return jsonify({        
                 'success': True,
@@ -1642,6 +1715,13 @@ def register_routes(app):
             )
             db.session.add(new_log)
             db.session.commit()  # Save changes
+
+            # Invalidate cache for this institute's programs
+            try:
+                if new_program.instID:
+                    redis_client.delete(f'programs:inst:{new_program.instID}')
+            except Exception:
+                pass
             
             # Get the dean info for response (same as edit route)
             dean = new_program.dean
@@ -1700,6 +1780,13 @@ def register_routes(app):
             )
             db.session.add(new_log)
             db.session.commit()
+
+            # Invalidate cache for this institute's programs
+            try:
+                if programs.instID:
+                    redis_client.delete(f'programs:inst:{programs.instID}')
+            except Exception:
+                pass
             
             return jsonify({
                 'success': True,
@@ -1725,6 +1812,16 @@ def register_routes(app):
             if not current_user:
                 return jsonify({'success': False, 'message': 'User not found'}), 404
             
+            # Serve from cache if available (short TTL as data is not static)
+            cache_key = f'programs:user:{current_user_id}'
+            cached = redis_client.get(cache_key)
+            if cached:
+                try:
+                    payload = json.loads(cached.decode())
+                    return jsonify({'success': True, **payload}), 200
+                except Exception:
+                    pass
+
             # Determine user access level
             is_admin = current_user.isAdmin
             is_co_admin = current_user.isCoAdmin
@@ -1766,8 +1863,7 @@ def register_routes(app):
                 }
                 program_list.append(program_data)
 
-            return jsonify({
-                'success': True,
+            payload = {
                 'programs': program_list,
                 'accessLevel': access_level,
                 'userPermissions': {
@@ -1776,7 +1872,12 @@ def register_routes(app):
                     'crudProgramEnable': has_program_crud,
                     'assignedProgramCount': len(current_user.employee_programs)
                 }
-            }), 200
+            }
+            try:
+                redis_client.setex(cache_key, 60, json.dumps(payload))
+            except Exception:
+                pass
+            return jsonify({'success': True, **payload}), 200
             
         except Exception as e:
             current_app.logger.error(f"Get user program error: {e}")
@@ -1854,9 +1955,21 @@ def register_routes(app):
             page = request.args.get('page', 1, type=int)
             per_page = request.args.get('per_page', 20, type=int)
 
-            notifications = Notification.query.filter_by(recipientID=current_user_id)\
-            .order_by(Notification.createdAt.desc())\
-            .paginate(page=page, per_page=per_page, error_out=False)
+            # Cache only first page for 60s
+            if page == 1:
+                cache_key = f'notif_list:{current_user_id}:1'
+                cached = redis_client.get(cache_key)
+                if cached:
+                    try:
+                        data = json.loads(cached.decode())
+                        return jsonify({'success': True, **data}), 200
+                    except Exception:
+                        pass
+
+            notifications = (Notification.query
+                              .filter_by(recipientID=current_user_id)
+                              .order_by(Notification.createdAt.desc())
+                              .paginate(page=page, per_page=per_page, error_out=False))
 
             notification_list = []
             for notif in notifications.items:
@@ -1879,13 +1992,20 @@ def register_routes(app):
                     'link': notif.link,
                     'sender': sender_info
                 })
-            return jsonify({
-                'success': True,
+            payload = {
                 'notifications': notification_list,
                 'total': notifications.total,
                 'pages': notifications.pages,
                 'current_page': page
-            }), 200
+            }
+
+            if page == 1:
+                try:
+                    redis_client.setex(cache_key, 60, json.dumps(payload))
+                except Exception:
+                    pass
+
+            return jsonify({'success': True, **payload}), 200
         except Exception as e:
             return jsonify({'success': False, 'message': f'Failed to fetch notifications: {e}'}), 500
     
@@ -1910,6 +2030,12 @@ def register_routes(app):
             
             notification.isRead = True
             db.session.commit()
+            # Invalidate caches
+            try:
+                redis_client.delete(f'notif_unread:{current_user_id}')
+                redis_client.delete(f'notif_list:{current_user_id}:1')
+            except Exception:
+                pass
             
             return jsonify({'success': True, 'message': 'Notification marked as read'}), 200
             
@@ -1937,6 +2063,11 @@ def register_routes(app):
             
             db.session.delete(notification)
             db.session.commit()
+            try:
+                redis_client.delete(f'notif_unread:{current_user_id}')
+                redis_client.delete(f'notif_list:{current_user_id}:1')
+            except Exception:
+                pass
             
             return jsonify({'success': True, 'message': 'Notification deleted'}), 200
             
@@ -1956,6 +2087,11 @@ def register_routes(app):
             current_user_id = get_jwt_identity()
             Notification.query.filter_by(recipientID=current_user_id).delete()
             db.session.commit()
+            try:
+                redis_client.delete(f'notif_unread:{current_user_id}')
+                redis_client.delete(f'notif_list:{current_user_id}:1')
+            except Exception:
+                pass
             
             return jsonify({'success': True, 'message': 'All notifications deleted'}), 200
             
@@ -1978,6 +2114,11 @@ def register_routes(app):
                 isRead=False
             ).update({'isRead': True})
             db.session.commit()
+            try:
+                redis_client.delete(f'notif_unread:{current_user_id}')
+                redis_client.delete(f'notif_list:{current_user_id}:1')
+            except Exception:
+                pass
             
             return jsonify({'success': True, 'message': 'All notifications marked as read'}), 200
             
@@ -1995,11 +2136,22 @@ def register_routes(app):
     def get_unread_count_impl():
         try:
             current_user_id = get_jwt_identity()
+            cache_key = f'notif_unread:{current_user_id}'
+            cached = redis_client.get(cache_key)
+            if cached:
+                try:
+                    return jsonify({'success': True, 'count': int(cached.decode())}), 200
+                except Exception:
+                    pass
+
             count = Notification.query.filter_by(
                 recipientID=current_user_id,
                 isRead=False
             ).count()
-            
+            try:
+                redis_client.setex(cache_key, 60, str(count))
+            except Exception:
+                pass
             return jsonify({'success': True, 'count': count}), 200
             
         except Exception as e:
@@ -2263,6 +2415,16 @@ def register_routes(app):
     def get_areas():
         program_code = request.args.get('programCode')
 
+        # Try Redis cache first for the heavy structure
+        try:
+            if program_code:
+                cache_key = f"accr:program:{program_code}"
+                cached = redis_client.get(cache_key)
+                if cached:
+                    return jsonify(json.loads(cached.decode()))
+        except Exception:
+            pass
+
         data = (
             db.session.query(
                 Area.areaID,
@@ -2348,7 +2510,15 @@ def register_routes(app):
             area['subareas'] = list(area['subareas'].values())
 
 
-        return jsonify(list(result.values())) 
+        payload = list(result.values())
+        # Cache for 5 minutes to speed up UI loads
+        try:
+            if program_code:
+                cache_key = f"accr:program:{program_code}"
+                redis_client.setex(cache_key, 300, json.dumps(payload))
+        except Exception:
+            pass
+        return jsonify(payload) 
     
     
     
@@ -2666,25 +2836,48 @@ def register_routes(app):
     @app.route('/api/accreditation/preview/<filename>', methods=["GET"])   
     @jwt_required()   
     def preview_file(filename):                       
-        
         doc = Document.query.filter_by(docName=filename).first()
-        if doc:
-            print("DB docPath:", doc.docPath)
-        else:
-            print("No document found with this name")
-
         if not doc:
             return jsonify({'success': False, 'message': 'File not found.'}), 404    
 
-        # Get the file
+        # Small-object cache in Redis (<=5MB)
+        cache_key = f"preview_cache:{doc.docPath}"
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return Response(cached, content_type="application/pdf", headers={
+                    "Content-Disposition": f'inline; filename="{filename}"',
+                    "Cache-Control": "public, max-age=300"
+                })
+        except Exception:
+            pass
+
+        # Fetch from Nextcloud
         response = preview_from_nextcloud(doc.docPath)
-        
         if response.status_code == 200:
+            # Try to cache small files
+            try:
+                length = response.headers.get("Content-Length")
+                content_bytes = response.content if response.content else None
+                if content_bytes is not None:
+                    if not length:
+                        length = len(content_bytes)
+                    if int(length) <= 5_000_000:  # 5 MB
+                        redis_client.setex(cache_key, 300, content_bytes)
+                        return Response(content_bytes, content_type=response.headers.get("Content-Type", "application/pdf"), headers={
+                            "Content-Disposition": f'inline; filename="{filename}"',
+                            "Cache-Control": "public, max-age=300"
+                        })
+            except Exception:
+                pass
+
+            # Fallback: stream without caching
             return Response(
                 response.iter_content(chunk_size=8192),
                 content_type = response.headers.get("Content-Type", "application/octet-stream"),
                 headers={
-                    "Content-Disposition": f'inline; filename="{filename}"'
+                    "Content-Disposition": f'inline; filename="{filename}"',
+                    "Cache-Control": "public, max-age=120"
                 }
             ) 
         else:
@@ -4422,4 +4615,204 @@ def register_routes(app):
             db.session.rollback()
             return jsonify({'success': False, 'message': f'Failed to delete template: {str(e)}'}), 400
 
+    # =================================== SECURITY DASHBOARD ROUTES ===================================
+    
+    @app.route('/api/security/dashboard', methods=['GET'])
+    @jwt_required()
+    def security_dashboard():
+        """Get security dashboard data - Admin only"""
+        try:
+            from app.security.security_monitor import SecurityMonitor
+            
+            # Get current user
+            emp_id = get_jwt_identity()
+            user = Employee.query.filter_by(employeeID=emp_id).first()
+            
+            if not user or not user.isAdmin:
+                return jsonify({
+                    'success': False,
+                    'message': 'Unauthorized. Admin access required.'
+                }), 403
+            
+            # Get security statistics
+            threat_level = SecurityMonitor.check_threat_level()
+            recent_events = SecurityMonitor.get_recent_events(limit=50)
+            blocked_ips = SecurityMonitor.get_blocked_ips()
+            
+            return jsonify({
+                'success': True,
+                'data': {
+                    'threat_level': threat_level,
+                    'recent_events': recent_events,
+                    'blocked_ips': blocked_ips,
+                    'total_blocked_ips': len(blocked_ips)
+                }
+            }), 200
+            
+        except Exception as e:
+            current_app.logger.error(f"Security dashboard error: {e}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to load security dashboard'
+            }), 500
+    
+    @app.route('/api/security/unblock-ip', methods=['POST'])
+    @jwt_required()
+    def unblock_ip():
+        """Manually unblock an IP address - Admin only"""
+        try:
+            # Get current user
+            emp_id = get_jwt_identity()
+            user = Employee.query.filter_by(employeeID=emp_id).first()
+            
+            if not user or not user.isAdmin:
+                return jsonify({
+                    'success': False,
+                    'message': 'Unauthorized. Admin access required.'
+                }), 403
+            
+            data = request.get_json()
+            ip_to_unblock = data.get('ip_address')
+            
+            if not ip_to_unblock:
+                return jsonify({
+                    'success': False,
+                    'message': 'IP address is required'
+                }), 400
+            
+            # Remove the block
+            block_key = f"ip_blocked:{ip_to_unblock}"
+            result = redis_client.delete(block_key)
+            
+            if result > 0:
+                # Log the action
+                new_log = AuditLog(
+                    employeeID=user.employeeID,
+                    action=f"Admin {user.lName}, {user.fName} manually unblocked IP: {ip_to_unblock}"
+                )
+                db.session.add(new_log)
+                db.session.commit()
+                
+                return jsonify({
+                    'success': True,
+                    'message': f'IP {ip_to_unblock} has been unblocked'
+                }), 200
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': 'IP was not blocked or already expired'
+                }), 404
+                
+        except Exception as e:
+            current_app.logger.error(f"Unblock IP error: {e}")
+            return jsonify({
+                'success': False,
+                'message': 'Failed to unblock IP'
+            }), 500
+
+    @app.route('/api/upload/chunked', methods=['POST'])
+    @jwt_required()
+    def upload_chunked():
+        empID = get_jwt_identity()
+        from app.models import Employee
+        user = Employee.query.filter_by(employeeID=empID).first()
+
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'message': 'No file part in request'}), 400
+        file = request.files['file']
+        final_path = request.form.get('final_path')
+        if not final_path:
+            return jsonify({'success': False, 'message': 'Missing final_path'}), 400
+
+        try:
+            move_resp = upload_to_nextcloud_chunked(
+                file,
+                final_path,
+                empID=empID,
+                redis_client=redis_client
+            )
+
+            # Minimal metadata save to DB to enable links in accreditation view
+            try:
+                from app.models import Document, Criteria, Program
+                file_name = request.form.get('fileName') or file.filename
+                file_type = request.form.get('fileType') or 'application/pdf'
+                criteria_id = request.form.get('criteriaID')
+
+                # Fallback: extract criteriaID from final_path (…/<criteriaID>/<filename>)
+                if not criteria_id:
+                    try:
+                        import re
+                        m = re.search(r"/(\d+)/[^/]+$", final_path)
+                        if m:
+                            criteria_id = m.group(1)
+                    except Exception:
+                        pass
+
+                # Normalize stored path identical to final_path
+                doc_path = final_path
+
+                # Always create a new Document record for chunked uploads
+                doc = Document(
+                    docName=file_name,
+                    docType=file_type,
+                    docPath=doc_path,
+                    employeeID=empID
+                )
+                db.session.add(doc)
+                db.session.flush()
+
+                # Link to criteria if provided
+                affected_program_code = None
+                if criteria_id:
+                    crit = Criteria.query.get(int(criteria_id))
+                    if crit:
+                        crit.docID = doc.docID
+                        try:
+                            # Join to get program code for cache invalidation
+                            from app.models import Subarea, Area, Program
+                            sub = Subarea.query.get(crit.subareaID)
+                            if sub:
+                                area = Area.query.get(sub.areaID)
+                                if area and area.programID:
+                                    prog = Program.query.get(area.programID)
+                                    if prog:
+                                        affected_program_code = prog.programCode
+                        except Exception:
+                            pass
+                db.session.commit()
+
+                # Invalidate accreditation cache for this program and preview cache for file
+                try:
+                    if affected_program_code:
+                        redis_client.delete(f"accr:program:{affected_program_code}")
+                    redis_client.delete(f"preview_cache:{doc.docPath}")
+                except Exception:
+                    pass
+            except Exception as meta_err:
+                current_app.logger.error(f"Post-upload metadata save failed: {meta_err}")
+
+            return jsonify({
+                'success': True,
+                'message': 'Upload complete',
+                'progress_key': f'upload_status:{empID}:{file.filename}',
+                'result': move_resp.status_code
+            }), 200
+        except Exception as e:
+            return jsonify({'success': False, 'message': 'Upload failed', 'details': str(e)}), 500
+
+    @app.route('/api/upload/progress', methods=['GET'])
+    @jwt_required()
+    def upload_progress():
+        empID = get_jwt_identity()
+        filename = request.args.get('filename')
+        key = f'upload_status:{empID}:{filename}'
+        prog = redis_client.get(key)
+        if prog is None:
+            return jsonify({'progress': None}), 200
+        try:
+            value = int(prog)
+            return jsonify({'progress': value}), 200
+        except Exception:
+            return jsonify({'progress': prog.decode()}), 200
 

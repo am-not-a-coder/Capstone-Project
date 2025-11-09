@@ -44,7 +44,7 @@ const Dashboard = () => {
     const fetchAnnouncements = async () => {
         try {
             setAnnouncementsLoading(true);
-            console.log('📢 Fetching announcements...');
+            
             const response = await fetch(`${API_URL}/api/announcements`, {
                 method: 'GET',
                 credentials: 'include',
@@ -52,17 +52,14 @@ const Dashboard = () => {
                     'Content-Type': 'application/json',
                 }
             });
-            console.log('📢 Response status:', response.status);
-            console.log('📢 Response ok:', response.ok);
+            
             const data = await response.json();
-            console.log('📢 Announcements response:', data);
-            console.log('📢 Is array?', Array.isArray(data));
-            console.log('📢 Data length:', data ? data.length : 'no data');
+            
             if (data && Array.isArray(data)) {
                 setAnnouncements(data);
-                console.log('📢 Announcements set:', data);
+                
             } else {
-                console.log('📢 No announcements or invalid response');
+               
                 setAnnouncements([]);
             }
         } catch (error) {
@@ -103,7 +100,7 @@ const Dashboard = () => {
     }, [])
 
       const handleCreateAnnouncement = async (announcement) => {
-      console.log("New announcement:", announcement);
+     
       // Here you can push it to state, API call, etc.
         
         try {
@@ -136,9 +133,9 @@ const Dashboard = () => {
         }        
     
         try {
-            console.log('🗑️ Deleting announcement:', announcementId);
+            
             const response = await apiDelete(`/api/announcement/delete/${announcementId}`);
-            console.log('🗑️ Delete response:', response);
+            
             
             if (response.success) {
                 toast.success('Announcement deleted successfully');
@@ -220,7 +217,7 @@ const Dashboard = () => {
                 </div>)}
                 
                 <div className="p-4 transition-all duration-500 rounded-lg bg-neutral-300 dark:bg-gray-950/50">
-                    {console.log('📊 Dashboard render - announcements:', announcements, 'loading:', announcementsLoading)}
+                    
                     {announcementsLoading ? (
                         <p className="p-5 font-light text-center text-gray-700 transition-all duration-500 dark:text-white">Loading announcements...</p>
                     ) : announcements && announcements.length > 0 ? (
