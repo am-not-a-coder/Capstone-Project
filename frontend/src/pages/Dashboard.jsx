@@ -419,7 +419,7 @@ return (
 	{showAnnounceModal && (<AnnouncementModal setShowModal={setShowAnnounceModal} onCreate={handleCreateAnnouncement}/>)}
 
 	{/* Area Progress */}
-		<section className="relative grid grid-cols-2 gap-3 p-1 min-h-[220px]">
+		<section className="relative grid grid-cols-2 md:cols-span-2 cols-span-1 gap-3 p-1 min-h-[220px]">
 			<div className={`relative p-3 md:p-5 text-neutral-800 border-1 dark:border-gray-700 border-gray-300 rounded-3xl shadow-xl transition-all duration-500 inset-shadow-sm inset-shadow-gray-400 dark:shadow-md dark:shadow-zuccini-900 dark:bg-gray-900`}>
 				<div className="mb-4">
 					<h1 className="text-2xl font-semibold text-zuccini-700/80">
@@ -796,7 +796,7 @@ return (
 							<div className="flex items-center justify-center w-10 h-10 rounded-lg bg-zuccini-100 dark:bg-zuccini-900/30">
 								<FontAwesomeIcon icon={faCalendarPlus} className="text-zuccini-600 dark:text-zuccini-500" />
 							</div>
-							<h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+							<h1 className="text-xl font-semibold text-gray-200">
 								Create Submission Deadline
 							</h1>
 						</div>
