@@ -115,81 +115,105 @@ const UploadModal = ({ onClose, showModal, programCode, areaName, subareaName, c
     }
   };
 
-  const handleUpload = async () => {
-    setIsUploading(true);
-    setUploadProgress(0);
+const handleUpload = async () => {
+  setIsUploading(true);
+  setUploadProgress(0);
 
-    // Build final path (same structure as backend upload route)
-    const safe = (s) => (s || 'General').replaceAll('/', '-');
-    const finalPath = `UDMS_Repository/Accreditation/Programs/${safe(programCode)}/${safe(areaName)}/${safe(subareaName)}/${safe(criteriaType)}/${criteriaID}/${fileName}`;
+  try {
+    const formData = new FormData();
+    
+    // CRITICAL: Match the exact field names your backend expects
+    formData.append('uploadedFile', uploadedFile.file);  // Backend expects 'uploadedFile'
+    formData.append('fileType', fileType || 'application/pdf');
+    formData.append('fileName', fileName);
+    formData.append('criteriaID', String(criteriaID || ''));
+    formData.append('programCode', programCode || '');
+    formData.append('areaName', areaName || '');
+    formData.append('subareaName', subareaName || '');
+    formData.append('criteriaType', criteriaType || '');
 
-    try {
-      const formData = new FormData();
-      formData.append('file', uploadedFile.file);
-      formData.append('final_path', finalPath);
-      // send metadata so backend can link document to criteria
-      formData.append('criteriaID', String(criteriaID || ''));
-      formData.append('fileName', fileName);
-      formData.append('fileType', fileType || 'application/pdf');
+    // Read CSRF token
+    const getCookie = (name) => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+      return undefined;
+    };
+    const csrf = getCookie('csrf_access_token');
 
-      // Read CSRF token set by backend in cookie when using JWT cookies
-      const getCookie = (name) => {
-        const value = `; ${document.cookie}`;
-        const parts = value.split(`; ${name}=`);
-        if (parts.length === 2) return parts.pop().split(';').shift();
-        return undefined;
-      };
-      const csrf = getCookie('csrf_access_token');
+    // Start chunked upload (do not await yet)
+    const uploadPromise = fetch('/api/accreditation/upload', {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+      headers: csrf ? { 'X-CSRF-TOKEN': csrf } : undefined
+    });
 
-      // Start chunked upload (do not await yet)
-      const uploadPromise = fetch('/api/upload/chunked', {
-        method: 'POST',
-        body: formData,
-        credentials: 'include',
-        headers: csrf ? { 'X-CSRF-TOKEN': csrf } : undefined
-      });
-
-      // Start polling immediately in parallel
-      let stopped = false;
-      const poll = async () => {
-        if (stopped) return;
-        try {
-          const pr = await fetch(`/api/upload/progress?filename=${encodeURIComponent(fileName)}`, { credentials: 'include' });
-          const pj = await pr.json();
-          if (typeof pj.progress === 'number') setUploadProgress(pj.progress);
-          if (pj.progress === 100) { stopped = true; return; }
-          if (typeof pj.progress === 'string' && pj.progress.startsWith('Failed')) {
-            stopped = true; throw new Error(pj.progress);
-          }
-        } catch (_e) {
-          // ignore, continue polling at a slower rate
+    // Start polling immediately in parallel
+    let stopped = false;
+    const poll = async () => {
+      if (stopped) return;
+      try {
+        const pr = await fetch(`/api/upload/progress?filename=${encodeURIComponent(fileName)}`, { 
+          credentials: 'include' 
+        });
+        const pj = await pr.json();
+        if (typeof pj.progress === 'number') {
+          setUploadProgress(pj.progress);
         }
-        if (!stopped) setTimeout(poll, 700);
-      };
-      poll();
+        if (pj.progress === 100) { 
+          stopped = true; 
+          return; 
+        }
+        if (typeof pj.progress === 'string' && pj.progress.startsWith('Failed')) {
+          stopped = true; 
+          throw new Error(pj.progress);
+        }
+      } catch (_e) {
+        // ignore, continue polling at a slower rate
+      }
+      if (!stopped) setTimeout(poll, 700);
+    };
+    poll();
 
-      // Now await the upload result
-      const res = await uploadPromise;
-      const data = await res.json();
-      if (!data.success) throw new Error(data.message || 'Upload failed');
-
-      // Ensure progress shows 100 and stop polling
-      stopped = true;
-      setUploadProgress(100);
-      setStatusMessage('File uploaded successfully!');
-      setStatusType('success');
-      setIsUploading(false);
-      setShowStatusModal(true);
-      resetUpload();
-      if (onUploadSuccess) onUploadSuccess();
-    } catch (err) {
-      setStatusMessage('File upload failed. Please try again.');
-      setStatusType('error');
-      setIsUploading(false);
-      setUploadProgress(0);
-      setShowStatusModal(true);
+    // Now await the upload result
+    const res = await uploadPromise;
+    const data = await res.json();
+    
+    if (!data.success) {
+      throw new Error(data.message || 'Upload failed');
     }
+
+    // Ensure progress shows 100 and stop polling
+    stopped = true;
+    setUploadProgress(100);
+    
+    // Show success with ML predictions if available
+    let successMsg = 'File uploaded successfully!';
+    if (data.predict_rating) {
+      successMsg += `\n\nPredicted Rating: ${data.predict_rating}`;
+      if (data.probability_of_approval) {
+        successMsg += `\nApproval Probability: ${(data.probability_of_approval * 100).toFixed(1)}%`;
+      }
+    }
+    
+    setStatusMessage(successMsg);
+    setStatusType('success');
+    setIsUploading(false);
+    setShowStatusModal(true);
+    resetUpload();
+    
+    if (onUploadSuccess) onUploadSuccess();
+    
+  } catch (err) {
+    console.error('Upload error:', err);
+    setStatusMessage(`File upload failed: ${err.message}`);
+    setStatusType('error');
+    setIsUploading(false);
+    setUploadProgress(0);
+    setShowStatusModal(true);
   }
+}
 
    const refreshAreas = async (programCode) => {
         try {

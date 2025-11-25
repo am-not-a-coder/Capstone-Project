@@ -72,57 +72,93 @@ import toast, { Toaster } from 'react-hot-toast'
   // Chunked upload progress (Nextcloud)
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  // Backend-powered chunked upload using /api/upload/chunked with progress polling
-  const uploadChunked = async (file, finalPath, onProgress) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('final_path', finalPath);
+  const uploadChunked = async (file, uploadData, onProgress) => {
+  const formData = new FormData();
+  formData.append('uploadedFile', file);
+  formData.append('fileType', uploadData.fileType || 'application/pdf');
+  formData.append('fileName', uploadData.fileName || file.name);
+  formData.append('criteriaID', uploadData.criteriaID);
+  formData.append('programCode', uploadData.programCode);
+  formData.append('areaName', uploadData.areaName);
+  formData.append('subareaName', uploadData.subareaName);
+  formData.append('criteriaType', uploadData.criteriaType);
 
-    const res = await fetch('/api/documents/upload', {
-      method: 'POST',
-      body: formData,
-      credentials: 'include'
-    });
-    const data = await res.json();
-    if (!data.success) throw new Error(data.message || 'Upload failed');
+  const res = await fetch('/api/accreditation/upload', {
+    method: 'POST',
+    body: formData,
+    credentials: 'include'
+  });
+  
+  const data = await res.json();
+  if (!data.success) throw new Error(data.message || 'Upload failed');
 
-    const filename = file.name;
-    return new Promise((resolve, reject) => {
-      const poll = async () => {
-        try {
-          const progressRes = await fetch(`/api/upload/progress?filename=${encodeURIComponent(filename)}`, { credentials: 'include' });
-          const progressData = await progressRes.json();
-          const val = progressData.progress;
-          if (onProgress) onProgress(typeof val === 'number' ? val : 0);
-          if (val === 100) return resolve(undefined);
-          if (typeof val === 'string' && val.startsWith('Failed')) return reject(val);
-          setTimeout(poll, 700);
-        } catch {
-          setTimeout(poll, 1200);
-        }
-      };
-      poll();
-    });
+  const filename = file.name;
+  return new Promise((resolve, reject) => {
+    const poll = async () => {
+      try {
+        const progressRes = await fetch(
+          `/api/upload/progress?filename=${encodeURIComponent(filename)}`, 
+          { credentials: 'include' }
+        );
+        const progressData = await progressRes.json();
+        const val = progressData.progress;
+        if (onProgress) onProgress(typeof val === 'number' ? val : 0);
+        if (val === 100) return resolve(data);
+        if (typeof val === 'string' && val.startsWith('Failed')) return reject(val);
+        setTimeout(poll, 700);
+      } catch {
+        setTimeout(poll, 1200);
+      }
+    };
+    poll();
+  });
+};
+
+  
+const handleDocUpload = async (file, criteriaID, criteriaType) => {
+  if (!file) return;
+  if (!selectedProgram || !selectedArea || !selectedSubarea) {
+    toast.error('Please select a program, area, and subarea first');
+    return;
+  }
+
+  setUploadProgress(0);
+
+  const uploadData = {
+    programCode: selectedProgram.programCode,
+    areaName: selectedArea.areaName,
+    subareaName: selectedSubarea.subareaName,
+    criteriaType: criteriaType,
+    criteriaID: criteriaID,
+    fileName: file.name,
+    fileType: 'application/pdf'
   };
 
-  const handleDocUpload = async (file) => {
-    if (!file) return;
-    setUploadProgress(0);
-    // Compute a reasonable final path in Nextcloud based on current selection
-    const programCode = selectedProgram?.programCode || 'General';
-    const areaFolder = (selectedArea?.areaName || 'General').replaceAll('/', '-');
-    const subFolder = (selectedSubarea?.subareaName || 'General').replaceAll('/', '-');
-    const finalPath = `UDMS_Repository/Accreditation/Programs/${programCode}/${areaFolder}/${subFolder}/${file.name}`;
-    try {
-      await uploadChunked(file, finalPath, (p) => setUploadProgress(p));
-      setUploadProgress(100);
+  try {
+    const result = await uploadChunked(file, uploadData, (p) => setUploadProgress(p));
+    setUploadProgress(100);
+    
+    // Show prediction results if available
+    if (result.predict_rating) {
+      toast.success(
+        `Upload complete! Predicted Rating: ${result.predict_rating}${
+          result.probability_of_approval 
+            ? `, Approval Probability: ${(result.probability_of_approval * 100).toFixed(1)}%` 
+            : ''
+        }`,
+        { duration: 5000 }
+      );
+    } else {
       toast.success('Upload complete');
-      // Optionally refresh areas/doc list here
-    } catch (err) {
-      setUploadProgress(0);
-      toast.error(`Upload failed: ${err}`);
     }
-  };
+    
+    // Refresh the areas to show the newly uploaded document
+    await refreshAreas(selectedProgram.programCode);
+  } catch (err) {
+    setUploadProgress(0);
+    toast.error(`Upload failed: ${err}`);
+  }
+};
 
   // Fetch programs
   const fetchPrograms = async () => {

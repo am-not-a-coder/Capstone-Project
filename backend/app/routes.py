@@ -1834,6 +1834,7 @@ def register_routes(app):
             
             if is_admin or has_program_crud:
                 # Full access - return all programs
+               
                 programs = Program.query.all()
                 access_level = 'full'
             else:
@@ -2554,7 +2555,7 @@ def register_routes(app):
                     'docPath': row.docPath,
                     'predicted_rating': row.predicted_rating,
                     'predicted_probability': row.predicted_probability,
-                    "similar_docs": row.similar_docs,
+                    'similar_docs': row.similar_docs,
                     'isApproved': row.isApproved,
                     'rating': row.rating
                 }
@@ -2573,14 +2574,14 @@ def register_routes(app):
 
         payload = list(result.values())
         # Cache for 5 minutes to speed up UI loads
-        try:
+        try :
             if program_code:
                 cache_key = f"accr:program:{program_code}"
                 redis_client.setex(cache_key, 300, json.dumps(payload))
         except Exception:
             pass
         return jsonify(payload) 
-    
+        
     
     
     # ===== Load Models for Document Processing =====
@@ -2595,15 +2596,13 @@ def register_routes(app):
     @app.route('/api/accreditation/upload', methods=["POST"])
     @jwt_required()        
     def upload_file():        
-
-       # ==== Get and Validate Form Data ====
-        # Get form data
+        # ==== Get and Validate Form Data ====
         data = request.form
         file = request.files.get("uploadedFile")
         file_type = request.form.get("fileType")
         file_name = request.form.get("fileName")
         criteria_id = request.form.get("criteriaID")
-               
+            
         program_code = data.get("programCode")
         area_name = data.get("areaName")
         subarea_name = data.get("subareaName")
@@ -2613,22 +2612,18 @@ def register_routes(app):
         if not file:
             return jsonify({'success': False, 'message': 'No file provided'}), 400
 
-        # Make sure filename exists
         if not getattr(file, "filename", None):
             return jsonify({'success': False, 'message': 'Invalid file: no filename detected'}), 400
 
-        # Ensure filename has an extension
         if '.' not in file.filename:
             return jsonify({'success': False, 'message': 'Invalid file name (missing extension)'}), 400
 
-        # Extract extension safely
         file_extension = file.filename.rsplit('.', 1)[-1].lower()
         allowed_extensions = {'pdf'}
 
         if file_extension not in allowed_extensions:
             return jsonify({'success': False, 'message': 'Invalid file format. Only PDF files are allowed.'}), 400
 
-        # Generate a secure filename
         filename = secure_filename(file.filename)
         if not filename:
             return jsonify({'success': False, 'message': 'Invalid filename'}), 400
@@ -2643,20 +2638,13 @@ def register_routes(app):
         except Exception as e:
             return jsonify({'success': False, 'message': 'Authentication error'}), 400
         
-        # ==== Save File ====
-
-        # Gets the file url
+        # ==== Save File Using Chunked Upload ====
         path = f"UDMS_Repository/Accreditation/Programs/{program_code}/{area_name}/{subarea_name}/{criteria_type}/{criteria_id}"
         normalized_path = normalize_path(path)    
+        final_path = f"{normalized_path}/{filename}"
 
-        # Generates a secure filename
-        filename = secure_filename(file.filename)
-
-        if not filename:
-            return jsonify({'success': False, 'message': 'Invalid filename'}), 400
-                       
         try:
-            # === Ensures that the directory exists in Nextcloud ===
+            # === Ensure directories exist ===
             print(f"[upload_file] ensure_directories for path: {path}")
             if not ensure_directories(path):
                 print("[upload_file] ensure_directories returned False")
@@ -2665,13 +2653,17 @@ def register_routes(app):
                     'message': 'Failed to create directory structure in Nextcloud'
                 }), 400
 
-            # === Save file to Nextcloud ===
-            print(f"[upload_file] calling upload_to_nextcloud for: {filename} -> {path}")
-            response = upload_to_nextcloud(file, path)
-            print(f"[upload_file] upload_to_nextcloud response: {getattr(response, 'status_code', None)}")
-            if hasattr(response, 'text'):
-                print(f"[upload_file] upload response text: {response.text}")
-
+            # === Upload using chunked upload ===
+            print(f"[upload_file] calling upload_to_nextcloud_chunked for: {filename} -> {final_path}")
+            response = upload_to_nextcloud_chunked(
+                file,
+                final_path,
+                empID=uploader.employeeID,
+                redis_client=redis_client
+            )
+            
+            print(f"[upload_file] upload_to_nextcloud_chunked response: {getattr(response, 'status_code', None)}")
+            
             if response.status_code not in (200, 201, 204):
                 print(f"[upload_file] Nextcloud responded with non-success: {response.status_code}")
                 return jsonify({
@@ -2681,10 +2673,12 @@ def register_routes(app):
                     'details': getattr(response, 'text', '')
                 }), 400
 
-            # === Extract the text from file ===
+            # === Extract text from file ===
             temp_path = f"/tmp/{filename}"
             print(f"[upload_file] saving temp file -> {temp_path}")
+            file.seek(0)  # Reset file pointer after chunked upload
             file.save(temp_path)
+            
             try:
                 extracted_text = extract_pdf(temp_path)
                 file_size = os.path.getsize(temp_path)
@@ -2697,7 +2691,6 @@ def register_routes(app):
             print("[upload_file] generating rule-based tags")
             tags = set(rule_based_tag(extracted_text))
 
-            # Fetch all documents in the DB
             all_docs = [d.content for d in Document.query.with_entities(Document.content).all()]
             all_docs.append(extracted_text)
 
@@ -2723,7 +2716,7 @@ def register_routes(app):
 
             if doc:
                 print(f"[upload_file] updating existing Document id={doc.docID}")
-                doc.docPath = f"{normalized_path}/{filename}"
+                doc.docPath = final_path
                 doc.docName = file_name
                 doc.content = extracted_text
                 doc.tags = list(tags)
@@ -2739,14 +2732,14 @@ def register_routes(app):
                 doc = Document(
                     docName=file_name,
                     docType=file_type,
-                    docPath=f"{path}/{filename}",
+                    docPath=final_path,
                     content=extracted_text,
                     employeeID=uploader.employeeID,
                     tags=list(tags),
                     embedding=embedding
                 )
                 db.session.add(doc)
-                db.session.flush()  # Assign docID before linking
+                db.session.flush()
 
                 new_log = AuditLog(
                     employeeID = uploader.employeeID,
@@ -2775,7 +2768,7 @@ def register_routes(app):
                 {"doc_id": doc.docID}
             )
 
-            # compute features and predict
+            # ==== Compute features and predict ====
             print("[upload_file] computing features for rating prediction")
             if not hasattr(criteria, "deadlines") or not criteria.deadlines:
                 days_until_deadline = 0
@@ -2804,38 +2797,18 @@ def register_routes(app):
             X_new = pd.concat([df_input, emb], axis=1)
 
             print(f"[upload_file] running model.predict with X_new shape: {X_new.shape}")
-            # Diagnostic logs: inspect the model object and its predict attribute
+            
             try:
-                print(f"[upload_file] xgb_model type: {type(xgb_model)}")
-                print(f"[upload_file] xgb_model has attribute 'predict'? {hasattr(xgb_model, 'predict')}")
-                if hasattr(xgb_model, 'predict'):
-                    print(f"[upload_file] xgb_model.predict type: {type(xgb_model.predict)}, callable: {callable(xgb_model.predict)}")
-                else:
-                    print("[upload_file] xgb_model.predict not found")
-            except Exception as _log_e:
-                print(f"[upload_file] Error inspecting xgb_model: {_log_e}")
-
-            try:
-                predicted_rating = float(xgb_model.predict(X_new)[0])
-                doc.predicted_rating = predicted_rating
+                proba = float(xgb_model.predict_proba(X_new)[:, 1][0])
+                doc.predicted_probability = proba
+                doc.predicted_rating = None  # Remove rating
+                print(f"[upload_file] predicted_probability: {proba}")
             except Exception as pred_e:
-                # Log detailed info about the predict attribute to help debug 'bool' object is not callable
-                try:
-                    pred_attr = getattr(xgb_model, 'predict', None)
-                    print(f"[upload_file] Exception during model.predict: {pred_e}")
-                    print(f"[upload_file] type(pred_attr): {type(pred_attr)}")
-                    print(f"[upload_file] repr(pred_attr): {repr(pred_attr)}")
-                    print(f"[upload_file] callable(pred_attr): {callable(pred_attr)}")
-                except Exception as _inner:
-                    print(f"[upload_file] Error while logging predict attr: {_inner}")
-                # Print full traceback here to capture where the error occurred, then re-raise
-                try:
-                    import traceback as _tb
-                    _tb.print_exc()
-                except Exception:
-                    pass
-                # Re-raise to be handled by outer exception handler (so we still rollback and return 500)
-                raise
+                print(f"[upload_file] Exception during model.predict_proba: {pred_e}")
+                import traceback as _tb
+                _tb.print_exc()
+                doc.predicted_probability = None
+                doc.predicted_rating = None
 
             # ==== Compare past documents and Predict Probability ====
             past_docs_query = Document.query.with_entities(
@@ -2849,10 +2822,10 @@ def register_routes(app):
 
             new_doc_data = {
                 "file_size": file_size,
-                "Criteria_Completion_Score": criteria_completion_score,
-                "Days_Until_Deadline": days_until_deadline,
+                "Criteria_Completion_Score": 0,
+                "Days_Until_Deadline": 0,
                 "docType": "application/pdf",
-                "programID": programID,
+                "programID": None,
                 "embedding": embedding
             }
 
@@ -2860,12 +2833,9 @@ def register_routes(app):
             prob_approval, top_similar_docs = compare_documents(new_doc_data, past_docs, xgb_model)
             
             if prob_approval is None:
-                # Fallback: if compare_documents couldn't compute probability (no past docs
-                # or model predict failed), derive probability from the model-predicted rating
+                # Fallback: derive probability from predicted rating if available
                 try:
-                    pr = getattr(doc, 'predicted_rating', None)
-                    if pr is None and 'predicted_rating' in locals():
-                        pr = predicted_rating
+                    pr = predicted_rating
                     if pr is not None:
                         prob_approval = float(1 / (1 + np.exp(-2.0 * (pr - 3))))
                         print(f"[upload_file] Fallback probability from predicted_rating={pr}: {prob_approval}")
@@ -2883,531 +2853,8 @@ def register_routes(app):
                 else []
             )
 
-            print(f"[DEBUG] Probability: {doc.predicted_probability}")
-            print(f"[DEBUG] Similar Docs count: {len(doc.similar_docs)}")
-
-            # Final commit
-            db.session.commit()
-            print(f"[upload_file] commit successful for docID={doc.docID}")
-
-            return jsonify({
-                'success': True,
-                'message': 'File uploaded successfully!',
-                'filePath': f"{normalized_path}/{filename}",
-                'predict_rating': round(predicted_rating, 2),
-                'probability_of_approval': round(prob_approval, 4) if prob_approval is not None else None,
-                'status': response.status_code
-            }), 200
-
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            db.session.rollback()  # Rollback on error
-            print(f"[upload_file] Exception: {str(e)}")
-            return jsonify({'success': False, 'message': f'Failed to upload file: {str(e)}'}), 500
-        
-
-    # Preview file
-    @app.route('/api/accreditation/preview/<filename>', methods=["GET"])   
-    @jwt_required()   
-    def preview_file(filename):                       
-        doc = Document.query.filter_by(docName=filename).first()
-        if not doc:
-            return jsonify({'success': False, 'message': 'File not found.'}), 404    
-
-        # Small-object cache in Redis (<=5MB)
-        cache_key = f"preview_cache:{doc.docPath}"
-        try:
-            cached = redis_client.get(cache_key)
-            if cached:
-                return Response(cached, content_type="application/pdf", headers={
-                    "Content-Disposition": f'inline; filename="{filename}"',
-                    "Cache-Control": "public, max-age=300"
-                })
-        except Exception:
-            pass
-
-        # Fetch from Nextcloud using the full docPath
-        print(f"[preview_file] Fetching from Nextcloud: {doc.docPath}")
-        response = preview_from_nextcloud(doc.docPath)
-        
-        if response.status_code == 200:
-            # Try to cache small files
-            try:
-                length = response.headers.get("Content-Length")
-                content_bytes = response.content if response.content else None
-                if content_bytes is not None:
-                    if not length:
-                        length = len(content_bytes)
-                    if int(length) <= 5_000_000:  # 5 MB
-                        redis_client.setex(cache_key, 300, content_bytes)
-                        return Response(content_bytes, content_type=response.headers.get("Content-Type", "application/pdf"), headers={
-                            "Content-Disposition": f'inline; filename="{filename}"',
-                            "Cache-Control": "public, max-age=300"
-                        })
-            except Exception as cache_err:
-                print(f"[preview_file] Cache error: {cache_err}")
-
-            # Fallback: stream without caching
-            return Response(
-                response.iter_content(chunk_size=8192),
-                content_type = response.headers.get("Content-Type", "application/octet-stream"),
-                headers={
-                    "Content-Disposition": f'inline; filename="{filename}"',
-                    "Cache-Control": "public, max-age=120"
-                }
-            ) 
-        else:
-            print(f"[preview_file] Nextcloud error: {response.status_code} - {getattr(response, 'text', 'No text')}")
-            return jsonify({
-                'success': False,
-                'status': response.status_code,
-                'detail': getattr(response, 'text', 'Unknown error')
-            }), response.status_code 
-
-
-
-       
-    # ============================================ Documents Routes ============================================
-    
-    def filter_folders_by_access(tree, allowed_programs):
-        """
-        Filter the folder tree to show all Accreditation contents,
-        but only Programs that the user has access to.
-        """
-        import copy
-        
-        # Navigate to Accreditation if it exists
-        if 'folders' in tree and 'Accreditation' in tree['folders']:
-            accreditation = copy.deepcopy(tree['folders']['Accreditation'])
-            
-            # Filter Program folders based on allowed_programs
-            if 'folders' in accreditation and 'Programs' in accreditation['folders']:
-                programs_folder = accreditation['folders']['Programs']
-                if 'folders' in programs_folder:
-                    filtered_programs = {
-                        program_code: program_data
-                        for program_code, program_data in programs_folder['folders'].items()
-                        if program_code in allowed_programs
-                    }
-                    programs_folder['folders'] = filtered_programs
-            
-            # Return the entire Accreditation folder (includes Programs + other files/folders)
-            return accreditation
-        
-        # If Accreditation folder not found, return empty structure
-        return {"files": [], "folders": {}}
-
-    # display all the documents inside nextcloud repo
-    @app.route('/api/documents', methods=["GET"])
-    @jwt_required()
-    def list_files():
-        try:
-            current_user_id = get_jwt_identity()
-            user = Employee.query.filter_by(employeeID=current_user_id).first()
-            
-            if not user:
-                return jsonify({"error": "User not found"}), 404
-            
-            # Get full folder tree from Nextcloud
-            tree = list_files_from_nextcloud()
-            
-            # If admin, return everything starting from Programs folder
-            if user.isAdmin:
-                if 'folders' in tree and 'Accreditation' in tree['folders']:
-                    return jsonify(tree['folders']['Accreditation'])
-                return jsonify(tree)
-            
-            # Get user's program codes (not names - folder names match program codes like BSIT, BSED)
-            user_program_ids = [ep.programID for ep in user.employee_programs]
-            user_programs = Program.query.filter(Program.programID.in_(user_program_ids)).all()
-            user_program_codes = [p.programCode for p in user_programs]
-            
-            # Get user's optional folder access
-            optional_folder_paths = [ef.folderPath for ef in user.employee_folders]
-            
-            # Extract program codes from optional folder paths
-            # Support both formats: 
-            # - UDMS_Repository/Accreditation/Programs/{ProgramCode}
-            # - UDMS_Repository/Programs/{ProgramCode}
-            optional_program_codes = []
-            for path in optional_folder_paths:
-                parts = path.split('/')
-                if len(parts) >= 3 and parts[0] == 'UDMS_Repository':
-                    if len(parts) >= 4 and parts[1] == 'Accreditation' and parts[2] == 'Programs':
-                        # Format: UDMS_Repository/Accreditation/Programs/{ProgramCode}
-                        optional_program_codes.append(parts[3])
-                    elif len(parts) >= 3 and parts[1] == 'Programs':
-                        # Format: UDMS_Repository/Programs/{ProgramCode}
-                        optional_program_codes.append(parts[2])
-            
-            # Combine all allowed program codes
-            allowed_programs = set(user_program_codes + optional_program_codes)
-            
-            # Debug logging
-            print(f"User {user.employeeID} - Program codes: {user_program_codes}")
-            print(f"User {user.employeeID} - Optional folder paths: {optional_folder_paths}")
-            print(f"User {user.employeeID} - Optional program codes: {optional_program_codes}")
-            print(f"User {user.employeeID} - Allowed programs: {allowed_programs}")
-            
-            # Filter the folder tree
-            filtered_tree = filter_folders_by_access(tree, allowed_programs)
-            
-            return jsonify(filtered_tree)
-            
-        except Exception as e:
-            return jsonify({"Error": str(e)}), 500
-
-    @app.route('/api/documents/preview/', defaults={'file_path': None}, methods=["GET"])
-    @app.route('/api/documents/preview/<path:file_path>', methods=["GET"])
-    def preview_file_documents(file_path):
-        if not file_path:
-            return {"error": "File path required"}, 400
-        return preview_file_nextcloud(file_path)
-
-    
-    @app.route('/api/documents/download/<path:file_path>', methods=["GET"])
-    @jwt_required()
-    def download_file_documents(file_path):
-        # Audit downloaded file
-        user = Employee.query.filter_by(employeeID=get_jwt_identity()).first()
-        file_name = file_path.split("/")[-1]
-        new_log = AuditLog(
-            employeeID = user.employeeID,
-            action = f"{user.lName}, {user.fName} {user.suffix} Downloaded {file_name}"
-        )
-        db.session.add(new_log)
-        db.session.commit()
-
-        return download_file_nextcloud(file_path)
-    
-    
-    @app.route('/api/documents/delete_file/<int:docID>', methods=["DELETE"])
-    @jwt_required()
-    def delete_file(docID):
-        current_user_id = get_jwt_identity()
-        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
-        if not admin_user or not admin_user.isAdmin:
-            return jsonify({'success': False, 'message': 'Admins only'}), 403
-        try:
-            # Check if metadata exists first
-            doc = Document.query.get(docID)
-            if not doc:
-                return jsonify({
-                    'success': False,
-                    'message': 'Document not found.'
-                }), 404
-
-            file_path = doc.docPath
-            print(f"Deleting docID = {docID}, path = {file_path}")
-            if file_path.startswith('UDMS_Repository'):
-                file_path = file_path.replace("UDMS_Repository", "", 1)
-
-            # Delete from Nextcloud
-            response = delete_from_nextcloud(file_path)
-
-            if response.status_code not in (200, 204):
-                return jsonify({
-                    'success': False,
-                    'message': 'Nextcloud deletion failed.',
-                    'status': response.status_code,
-                    'details': response.text
-                }), 400
-
-            # Delete metadata from DB only if Nextcloud deletion succeeded
-            db.session.delete(doc)
-
-            # Audit deleted doc
-            new_log = AuditLog(
-                employeeID = admin_user.employeeID,
-                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} Deleted a file: {doc.docName}"
-            )
-            db.session.add(new_log)
-            db.session.commit()
-
-            return jsonify({
-                'success': True,
-                'message': 'File deleted successfully.'
-            }), 200
-
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({
-                'success': False,
-                'message': f'Failed to delete document: {str(e)}'
-            }), 500
-
-
-
-    @app.route('/api/documents/rename', methods=["PUT"])
-    @jwt_required()
-    def rename_file():
-        data = request.get_json()
-        old_path = data.get("oldPath")
-        new_path = data.get("newPath")
-
-        try:
-            response = rename_file_nextcloud(old_path, new_path)
-
-            if response.status_code in (200, 201, 204, 207):
-                # Skip folders                
-                if os.path.splitext(new_path)[1] == "":
-                    return jsonify({
-                        'success': True,
-                        'message': 'Folder renamed in Nextcloud but not tracked in DB.'
-                    }), 200
-                
-                display_name = unquote(new_path)
-                # Update DB only if it's a file
-                doc = Document.query.filter_by(docPath=old_path).first()
-                if doc:
-                    doc.docPath = display_name
-                    user = Employee.query.filter_by(employeeID=get_jwt_identity()).first()
-                    # Audit rename path
-                    new_log = AuditLog(
-                        employeeID = user.employeeID,
-                        action = f"{user.lName}, {user.fName} {user.suffix} Renamed a file {doc.docName}"
-                    )
-                    db.session.add(new_log)
-                    db.session.commit()
-                else:                 
-                    return jsonify({'success': True, 'message': 'File renamed successfully.'}), 200
-                
-            else:
-                return jsonify({
-                    'success': False,
-                    'message': 'Nextcloud rename failed. Please try again.',
-                    'status': response.status_code,
-                    'details': response.text
-                }), 400
-        except Exception as e:
-            return jsonify({'success': False, 'message': f'Failed to rename document {str(e)}'}), 500
-
-    @app.route('/api/documents/upload', methods=["POST"])
-    @jwt_required()
-    def upload_documents():
-        file = request.files.get('uploadedFile')
-        data = request.form
-        file_type = data.get("fileType")
-        file_name = data.get("fileName")
-        directory = data.get("directory", "").strip('/')
-
-        base_path = "UDMS_Repository/Accreditation"
-
-        if not directory:
-            directory = base_path
-        else:
-            directory = f"{base_path}/{directory}"
-
-        if not file:
-            return jsonify({'success': False, 'message': 'No file provided'}), 400        
-
-        if not file.filename or '.' not in file.filename:
-            return jsonify({'success': False, 'message': 'Invalid file name'}), 400
-
-        # Get uploader info
-        uploader = Employee.query.filter_by(employeeID=get_jwt_identity()).first()
-        if not uploader:
-            return jsonify({'success': False, 'message': 'User not found'}), 400
-        
-        filename = secure_filename(file.filename)
-
-        try:
-            print(f"Ensuring directory exists: {directory}")
-            # Make sure the directory exists before uploading
-            ensure_result = ensure_directories(directory)
-            if not ensure_result:
-                return jsonify({
-                    "success": False,
-                    "message": "Failed to create directory structure in Nextcloud"
-                }), 500
-                
-            print(f"Starting Nextcloud upload for file: {filename}")
-            print(f"Directory path: {directory}")
-            
-            # Upload to Nextcloud
-            response = upload_to_nextcloud(file, directory)
-            print(f"Nextcloud upload response: {response.status_code}")
-            print(f"Nextcloud response text: {response.text}")
-
-            # Only create audit log if upload was successful
-            if response.status_code in (200, 201, 204):
-                new_log = AuditLog(
-                    employeeID = uploader.employeeID,
-                    action = f"{uploader.lName}, {uploader.fName} {uploader.suffix} Uploaded a file: {filename}"
-                )
-                db.session.add(new_log)
-                db.session.commit()
-                print("Audit log created successfully")
-            else:
-                print(f"Nextcloud upload failed with status code: {response.status_code}")
-                print(f"Response text: {response.text}")
-                return jsonify({
-                    "success": False,
-                    "message": f"Upload failed: {response.status_code} - {response.text}"
-                }), 500
-        except Exception as e:
-            print(f"Error in upload/audit process: {str(e)}")
-            return jsonify({
-                "success": False,
-                "message": f"Upload process failed: {str(e)}"
-            }), 500
-
-        # === Extract text ===
-        extracted_text = ""
-        file_size = 0
-        temp_path = f"/tmp/{filename}"
-        try:
-            file.save(temp_path) 
-            file_size = os.path.getsize(temp_path)
-
-            file_extension = filename.rsplit('.', 1)[-1].lower()
-            if file_extension == 'pdf':
-                extracted_text = extract_pdf(temp_path)
-            elif file_extension in ('docx', 'doc'):
-                extracted_text = extract_docs(temp_path)
-            elif file_extension in ('xls', 'xlsx'):
-                extracted_text = extract_excel(temp_path)
-            elif file_extension in ('jpg', 'png', 'jpeg'):
-                extracted_text = extract_image(temp_path) 
-            else:
-                extracted_text = ""
-            
-            print(f"[upload_documents] Extracted text length: {len(extracted_text)}, file_size: {file_size}")
-
-        except Exception as e:
-            print(f"[upload_documents] Text extraction failed: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            return jsonify({'success': False, 'message': f'Text extraction failed: {str(e)}'}), 500
-        finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-        
-        # === Generate Tags === 
-        print("[upload_documents] Generating rule-based tags")
-        tags = set(rule_based_tag(extracted_text))
-        
-        # Fetch all documents in the DB
-        all_docs = [d.content for d in Document.query.with_entities(Document.content).all()]
-        all_docs.append(extracted_text)
-
-        tfidf_tags = extract_global_tfid_tags(all_docs, len(all_docs) - 1)
-        if tfidf_tags:
-            from itertools import chain
-            if any(isinstance(tag, list) for tag in tfidf_tags):
-                flat_tags = list(chain.from_iterable(tfidf_tags))
-                tags.update(flat_tags)
-            else:
-                tags.update(tfidf_tags)
-        print(f"[upload_documents] Total tags: {len(tags)}")
-
-        # === Generate Embedding ===
-        print("[upload_documents] Generating embedding")
-        embedding = embedding_model.encode(extracted_text, normalize_embeddings=True)
-        embedding = np.array(embedding, dtype=np.float32).tolist()
-        print(f"[upload_documents] Embedding length: {len(embedding)}")
-        
-        # === Save record to DB ===
-        try:
-            print(f"[upload_documents] Creating document record: name={file_name}, type={file_type}, path={directory}/{filename}")
-            
-            doc = Document(
-                docName=file_name,
-                docType=file_type,
-                docPath=f"{directory}/{filename}",
-                content=extracted_text,
-                employeeID=uploader.employeeID,
-                tags=list(tags),
-                embedding=embedding
-            )
-            
-            db.session.add(doc)
-            db.session.flush()  # Assign docID
-            print(f"[upload_documents] Got docID: {doc.docID}")
-
-            # ==== Update search vector ====
-            print("[upload_documents] Updating search vector")
-            db.session.execute(
-                text("""
-                    UPDATE document
-                    SET search_vector = to_tsvector('english', "docName" || ' ' || content)
-                    WHERE "docID" = :doc_id
-                """), 
-                {"doc_id": doc.docID}
-            )
-
-            # ==== Compute predicted rating and probability ====
-            print("[upload_documents] Computing model predictions")
-            
-            # Build feature dataframe for rating prediction
-            df_input = pd.DataFrame([{
-                "file_size": file_size,
-                "Criteria_Completion_Score": 0,  # Not available in documents endpoint
-                "Days_Until_Deadline": 0,
-                "isApproved": False,
-                "docType": file_type,
-                "programID": None
-            }])
-
-            emb = pd.DataFrame([embedding])
-            emb.columns = [f"emb_{i}" for i in range(len(emb.columns))]
-            X_new = pd.concat([df_input, emb], axis=1)
-
-            predicted_rating = None
-            try:
-                predicted_rating = float(xgb_model.predict(X_new)[0])
-                doc.predicted_rating = predicted_rating
-                print(f"[upload_documents] Predicted rating: {predicted_rating}")
-            except Exception as pred_e:
-                print(f"[upload_documents] Warning: model prediction failed: {pred_e}")
-                predicted_rating = None
-
-            # ==== Compare past documents and compute probability ====
-            past_docs_query = Document.query.with_entities(
-                Document.docName, Document.embedding, Document.isApproved
-            ).filter(Document.embedding.isnot(None)).all()
-
-            past_docs = pd.DataFrame([
-                {"docName": d.docName, "embedding": d.embedding, "isApproved": d.isApproved}
-                for d in past_docs_query
-            ])
-
-            new_doc_data = {
-                "file_size": file_size,
-                "Criteria_Completion_Score": 0,
-                "Days_Until_Deadline": 0,
-                "docType": file_type,
-                "programID": None,
-                "embedding": embedding
-            }
-
-            print(f"[upload_documents] past_docs count: {len(past_docs) if hasattr(past_docs, '__len__') else 'unknown'}")
-            prob_approval, top_similar_docs = compare_documents(new_doc_data, past_docs, xgb_model)
-            
-            if prob_approval is None:
-                # Fallback: derive probability from predicted rating if available
-                try:
-                    pr = predicted_rating
-                    if pr is not None:
-                        prob_approval = float(1 / (1 + np.exp(-2.0 * (pr - 3))))
-                        print(f"[upload_documents] Fallback probability from predicted_rating={pr}: {prob_approval}")
-                    else:
-                        prob_approval = 0.0
-                        print("[upload_documents] No predicted_rating available; falling back to 0.0")
-                except Exception as _pf:
-                    print(f"[upload_documents] Error computing fallback probability: {_pf}")
-                    prob_approval = 0.0
-
-            doc.predicted_probability = float(prob_approval)
-            doc.similar_docs = (
-                top_similar_docs.to_dict(orient='records')
-                if hasattr(top_similar_docs, "to_dict")
-                else []
-            )
-
-            print(f"[upload_documents] Probability: {doc.predicted_probability}")
-            print(f"[upload_documents] Similar Docs count: {len(doc.similar_docs)}")
+            print(f"[upload_file] Probability: {doc.predicted_probability}")
+            print(f"[upload_file] Similar Docs count: {len(doc.similar_docs)}")
 
             # Create audit log for successful upload
             new_log = AuditLog(
@@ -3418,14 +2865,13 @@ def register_routes(app):
             
             # Commit all changes
             db.session.commit()
-            print("[upload_documents] Database transaction committed successfully")
+            print("[upload_file] Database transaction committed successfully")
 
             return jsonify({
                 'success': True,
                 'message': 'File uploaded successfully!',
-                'docPath': f"{directory}/{filename}",
-                'predicted_rating': round(predicted_rating, 2) if predicted_rating else None,
-                'probability_of_approval': round(prob_approval, 4) if prob_approval else None
+                'docPath': final_path,
+                'probability_of_approval': round(prob_approval * 100, 2) if prob_approval else None  # Show as percentage
             }), 200
 
         except Exception as e:
@@ -3634,7 +3080,14 @@ def register_routes(app):
         subarea.rating = rating
 
         db.session.add(subarea)
+
+        # Audit rated subarea
+        new_log = AuditLog(
+            employeeID = admin_user.employeeID,
+            action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} Rated the subarea {subarea.subareaName}"
+        )
         db.session.commit()
+
         return jsonify({'success': True, 'message': 'Subarea rating saved!' }), 200
 
 
@@ -4306,14 +3759,14 @@ def register_routes(app):
             if row.criteriaBlueprintID and row.criteriaType:
                 crit_type = row.criteriaType.lower()
                 criteria_entry = {
-                    "criteriaID": row.criteriaBlueprintID,
+                    "criteriaID": row.criteriaID,
                     "criteriaContent": row.criteriaContent,
                     "criteriaType": row.criteriaType,
                 }
                 
                 def add_unique_criteria(array):
                     # Only add if criteriaID not already in array
-                    if not any(c["criteriaID"] == row.criteriaBlueprintID for c in array):
+                    if not any(c["criteriaID"] == row.criteriaID for c in array):
                         array.append(criteria_entry)
                 
                 if "input" in crit_type:
@@ -4367,13 +3820,13 @@ def register_routes(app):
 
             created_areas = []
 
-            for area in areas:
+            for area_data in areas:
                 # Parse the area name                                
             
                 area_bp = AreaBlueprint(
                     templateID=new_template.templateID,
-                    areaName=area.get("areaName"),
-                    areaNum=area.get("areaNum")            
+                    areaName=area_data.get("areaName"),
+                    areaNum=area_data.get("areaNum")            
                 )
 
                 db.session.add(area_bp)
@@ -4381,7 +3834,7 @@ def register_routes(app):
 
                 created_subareas = []
 
-                for sub in area.get("subareas", []):
+                for sub in area_data.get("subareas", []):
                     subarea_bp = SubareaBlueprint(
                         areaBlueprintID=area_bp.areaBlueprintID,
                         subareaName=sub.get("subareaName")
@@ -4454,6 +3907,8 @@ def register_routes(app):
             
             if not programIDs:
                 return jsonify({"success": False, "message": "No programs selected"}), 400
+
+           
 
             # Get the template
             template = Template.query.filter_by(templateID=templateID).first()
@@ -4582,7 +4037,7 @@ def register_routes(app):
                     area_bp.areaNum = area_data.get("areaNum", area_bp.areaNum)
                 else:
                     area_bp = AreaBlueprint(
-                        templateID=templateID,
+                        templateID=new_template.templateID,
                         areaName=area_data.get("areaName"),
                         areaNum=area_data.get("areaNum")
                     )
@@ -4871,99 +4326,99 @@ def register_routes(app):
                 'message': 'Failed to unblock IP'
             }), 500
 
-    @app.route('/api/upload/chunked', methods=['POST'])
-    @jwt_required()
-    def upload_chunked():
-        empID = get_jwt_identity()
-        from app.models import Employee
-        user = Employee.query.filter_by(employeeID=empID).first()
+    # @app.route('/api/upload/chunked', methods=['POST'])
+    # @jwt_required()
+    # def upload_chunked():
+    #     empID = get_jwt_identity()
+    #     from app.models import Employee
+    #     user = Employee.query.filter_by(employeeID=empID).first()
 
-        if 'file' not in request.files:
-            return jsonify({'success': False, 'message': 'No file part in request'}), 400
-        file = request.files['file']
-        final_path = request.form.get('final_path')
-        if not final_path:
-            return jsonify({'success': False, 'message': 'Missing final_path'}), 400
+    #     if 'file' not in request.files:
+    #         return jsonify({'success': False, 'message': 'No file part in request'}), 400
+    #     file = request.files['file']
+    #     final_path = request.form.get('final_path')
+    #     if not final_path:
+    #         return jsonify({'success': False, 'message': 'Missing final_path'}), 400
 
-        try:
-            move_resp = upload_to_nextcloud_chunked(
-                file,
-                final_path,
-                empID=empID,
-                redis_client=redis_client
-            )
+    #     try:
+    #         move_resp = upload_to_nextcloud_chunked(
+    #             file,
+    #             final_path,
+    #             empID=empID,
+    #             redis_client=redis_client
+    #         )
 
-            # Minimal metadata save to DB to enable links in accreditation view
-            try:
-                from app.models import Document, Criteria, Program
-                file_name = request.form.get('fileName') or file.filename
-                file_type = request.form.get('fileType') or 'application/pdf'
-                criteria_id = request.form.get('criteriaID')
+    #         # Minimal metadata save to DB to enable links in accreditation view
+    #         try:
+    #             from app.models import Document, Criteria, Program
+    #             file_name = request.form.get('fileName') or file.filename
+    #             file_type = request.form.get('fileType') or 'application/pdf'
+    #             criteria_id = request.form.get('criteriaID')
 
-                # Fallback: extract criteriaID from final_path (…/<criteriaID>/<filename>)
-                if not criteria_id:
-                    try:
-                        import re
-                        m = re.search(r"/(\d+)/[^/]+$", final_path)
-                        if m:
-                            criteria_id = m.group(1)
-                    except Exception:
-                        pass
+    #             # Fallback: extract criteriaID from final_path (…/<criteriaID>/<filename>)
+    #             if not criteria_id:
+    #                 try:
+    #                     import re
+    #                     m = re.search(r"/(\d+)/[^/]+$", final_path)
+    #                     if m:
+    #                         criteria_id = m.group(1)
+    #                 except Exception:
+    #                     pass
 
-                # Normalize stored path identical to final_path
-                doc_path = final_path
+    #             # Normalize stored path identical to final_path
+    #             doc_path = final_path
 
-                # Always create a new Document record for chunked uploads
-                doc = Document(
-                    docName=file_name,
-                    docType=file_type,
-                    docPath=doc_path,
-                    employeeID=empID
-                )
-                db.session.add(doc)
-                db.session.flush()
+    #             # Always create a new Document record for chunked uploads
+    #             doc = Document(
+    #                 docName=file_name,
+    #                 docType=file_type,
+    #                 docPath=doc_path,
+    #                 employeeID=empID
+    #             )
+    #             db.session.add(doc)
+    #             db.session.flush()
 
-                # Link to criteria if provided
-                affected_program_code = None
-                if criteria_id:
-                    crit = Criteria.query.get(int(criteria_id))
-                    if crit:
-                        crit.docID = doc.docID
-                        try:
-                            # Join to get program code for cache invalidation
-                            from app.models import Subarea, Area, Program
-                            sub = Subarea.query.get(crit.subareaID)
-                            if sub:
-                                area = Area.query.get(sub.areaID)
-                                if area and area.programID:
-                                    prog = Program.query.get(area.programID)
-                                    if prog:
-                                        affected_program_code = prog.programCode
-                        except Exception:
-                            pass
-                db.session.commit()
+    #             # Link to criteria if provided
+    #             affected_program_code = None
+    #             if criteria_id:
+    #                 crit = Criteria.query.get(int(criteria_id))
+    #                 if crit:
+    #                     crit.docID = doc.docID
+    #                     try:
+    #                         # Join to get program code for cache invalidation
+    #                         from app.models import Subarea, Area, Program
+    #                         sub = Subarea.query.get(crit.subareaID)
+    #                         if sub:
+    #                             area = Area.query.get(sub.areaID)
+    #                             if area and area.programID:
+    #                                 prog = Program.query.get(area.programID)
+    #                                 if prog:
+    #                                     affected_program_code = prog.programCode
+    #                     except Exception:
+    #                         pass
+    #             db.session.commit()
 
-                # Invalidate accreditation cache for this program and preview cache for file
-                try:
-                    if affected_program_code:
-                        redis_client.delete(f"accr:program:{affected_program_code}")
-                    redis_client.delete(f"preview_cache:{doc.docPath}")
-                except Exception:
-                    pass
-            except Exception as meta_err:
-                current_app.logger.error(f"Post-upload metadata save failed: {meta_err}")
+    #             # Invalidate accreditation cache for this program and preview cache for file
+    #             try:
+    #                 if affected_program_code:
+    #                     redis_client.delete(f"accr:program:{affected_program_code}")
+    #                 redis_client.delete(f"preview_cache:{doc.docPath}")
+    #             except Exception:
+    #                 pass
+    #         except Exception as meta_err:
+    #             current_app.logger.error(f"Post-upload metadata save failed: {meta_err}")
 
-            return jsonify({
-                'success': True,
-                'message': 'Upload complete',
-                'progress_key': f'upload_status:{empID}:{file.filename}',
-                'result': move_resp.status_code
-            }), 200
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            current_app.logger.error(f"upload_chunked failed: {e}")
-            return jsonify({'success': False, 'message': 'Upload failed', 'details': str(e)}), 500
+    #         return jsonify({
+    #             'success': True,
+    #             'message': 'Upload complete',
+    #             'progress_key': f'upload_status:{empID}:{file.filename}',
+    #             'result': move_resp.status_code
+    #         }), 200
+    #     except Exception as e:
+    #         import traceback
+    #         traceback.print_exc()
+    #         current_app.logger.error(f"upload_chunked failed: {e}")
+    #         return jsonify({'success': False, 'message': 'Upload failed', 'details': str(e)}), 500
 
     @app.route('/api/upload/progress', methods=['GET'])
     @jwt_required()

@@ -134,7 +134,7 @@ export const SidebarContext = createContext();
 				{/* Title and Logo */}
 				<div className={`flex items-center justify-between pt-3 pb-2 ${expanded ? 'pr-10 pl-2' : 'pl-1'}  transition-all duration-500`}>
 					<img src={udmsLogo} alt="UDMS Logo" className={`${expanded ? 'm-2' : ''} h-10 rounded-full w-10 transition-all duration-500`}/>
-					<h4 className={`overflow-hidden transition-all m-1 line-clamp-2 font-semibold text-neutral-950 ${expanded ? 'w-42 opacity-100 ml-2' : 'w-0 opacity-0 ml-0'} dark:text-white transition-all duration-500`}>University Document Management System</h4>
+					<h4 className={` transition-all m-1 overflow-hidden font-semibold text-neutral-950 ${expanded ? 'w-42 opacity-100 ml-2' : 'w-0 opacity-0 ml-0'} dark:text-white transition-all duration-500`}>UDM Document Management System for Accreditation</h4>
 					
 				</div>
 
