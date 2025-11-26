@@ -2799,16 +2799,29 @@ def register_routes(app):
             print(f"[upload_file] running model.predict with X_new shape: {X_new.shape}")
             
             try:
-                proba = float(xgb_model.predict_proba(X_new)[:, 1][0])
-                doc.predicted_probability = proba
-                doc.predicted_rating = None  # Remove rating
-                print(f"[upload_file] predicted_probability: {proba}")
+                print(f"[upload_file] xgb_model type: {type(xgb_model)}")
+                print(f"[upload_file] xgb_model has attribute 'predict'? {hasattr(xgb_model, 'predict')}")
+                if hasattr(xgb_model, 'predict'):
+                    print(f"[upload_file] xgb_model.predict type: {type(xgb_model.predict)}, callable: {callable(xgb_model.predict)}")
+            except Exception as _log_e:
+                print(f"[upload_file] Error inspecting xgb_model: {_log_e}")
+
+            try:
+                predicted_rating = float(xgb_model.predict(X_new)[0])
+                doc.predicted_rating = predicted_rating
             except Exception as pred_e:
-                print(f"[upload_file] Exception during model.predict_proba: {pred_e}")
+                try:
+                    pred_attr = getattr(xgb_model, 'predict', None)
+                    print(f"[upload_file] Exception during model.predict: {pred_e}")
+                    print(f"[upload_file] type(pred_attr): {type(pred_attr)}")
+                    print(f"[upload_file] repr(pred_attr): {repr(pred_attr)}")
+                    print(f"[upload_file] callable(pred_attr): {callable(pred_attr)}")
+                except Exception as _inner:
+                    print(f"[upload_file] Error while logging predict attr: {_inner}")
+                
                 import traceback as _tb
                 _tb.print_exc()
-                doc.predicted_probability = None
-                doc.predicted_rating = None
+                raise
 
             # ==== Compare past documents and Predict Probability ====
             past_docs_query = Document.query.with_entities(
@@ -2822,10 +2835,10 @@ def register_routes(app):
 
             new_doc_data = {
                 "file_size": file_size,
-                "Criteria_Completion_Score": 0,
-                "Days_Until_Deadline": 0,
+                "Criteria_Completion_Score": criteria_completion_score,
+                "Days_Until_Deadline": days_until_deadline,
                 "docType": "application/pdf",
-                "programID": None,
+                "programID": programID,
                 "embedding": embedding
             }
 
@@ -2833,9 +2846,10 @@ def register_routes(app):
             prob_approval, top_similar_docs = compare_documents(new_doc_data, past_docs, xgb_model)
             
             if prob_approval is None:
-                # Fallback: derive probability from predicted rating if available
                 try:
-                    pr = predicted_rating
+                    pr = getattr(doc, 'predicted_rating', None)
+                    if pr is None and 'predicted_rating' in locals():
+                        pr = predicted_rating
                     if pr is not None:
                         prob_approval = float(1 / (1 + np.exp(-2.0 * (pr - 3))))
                         print(f"[upload_file] Fallback probability from predicted_rating={pr}: {prob_approval}")
@@ -2853,37 +2867,37 @@ def register_routes(app):
                 else []
             )
 
-            print(f"[upload_file] Probability: {doc.predicted_probability}")
-            print(f"[upload_file] Similar Docs count: {len(doc.similar_docs)}")
+            print(f"[DEBUG] Probability: {doc.predicted_probability}")
+            print(f"[DEBUG] Similar Docs count: {len(doc.similar_docs)}")
 
-            # Create audit log for successful upload
-            new_log = AuditLog(
-                employeeID=uploader.employeeID,
-                action=f"{uploader.lName}, {uploader.fName} {uploader.suffix} Uploaded a file: {filename}"
-            )
-            db.session.add(new_log)
-            
-            # Commit all changes
+            # ==== Invalidate cache ====
+            try:
+                if program_code:
+                    redis_client.delete(f"accr:program:{program_code}")
+                redis_client.delete(f"preview_cache:{doc.docPath}")
+            except Exception as cache_err:
+                print(f"[upload_file] Cache invalidation warning: {cache_err}")
+
+            # Final commit
             db.session.commit()
-            print("[upload_file] Database transaction committed successfully")
+            print(f"[upload_file] commit successful for docID={doc.docID}")
 
             return jsonify({
                 'success': True,
                 'message': 'File uploaded successfully!',
-                'docPath': final_path,
-                'probability_of_approval': round(prob_approval * 100, 2) if prob_approval else None  # Show as percentage
+                'filePath': final_path,
+                'predict_rating': round(predicted_rating, 2),
+                'probability_of_approval': round(prob_approval, 4) if prob_approval is not None else None,
+                'status': response.status_code
             }), 200
 
         except Exception as e:
-            print(f"[upload_documents] Database error: {str(e)}")
             import traceback
             traceback.print_exc()
             db.session.rollback()
-            return jsonify({
-                'success': False, 
-                'message': f'Database save failed: {str(e)}'
-            }), 500
-
+            print(f"[upload_file] Exception: {str(e)}")
+            return jsonify({'success': False, 'message': f'Failed to upload file: {str(e)}'}), 500
+            
     @app.route('/api/documents/tags', methods=["GET"])
     def get_tags():
 
