@@ -2897,7 +2897,547 @@ def register_routes(app):
             db.session.rollback()
             print(f"[upload_file] Exception: {str(e)}")
             return jsonify({'success': False, 'message': f'Failed to upload file: {str(e)}'}), 500
+        
+
+    # Preview file
+    @app.route('/api/accreditation/preview/<filename>', methods=["GET"])   
+    @jwt_required()   
+    def preview_file(filename):                       
+        doc = Document.query.filter_by(docName=filename).first()
+        if not doc:
+            return jsonify({'success': False, 'message': 'File not found.'}), 404    
+
+        # Small-object cache in Redis (<=5MB)
+        cache_key = f"preview_cache:{doc.docPath}"
+        try:
+            cached = redis_client.get(cache_key)
+            if cached:
+                return Response(cached, content_type="application/pdf", headers={
+                    "Content-Disposition": f'inline; filename="{filename}"',
+                    "Cache-Control": "public, max-age=300"
+                })
+        except Exception:
+            pass
+
+        # Fetch from Nextcloud using the full docPath
+        print(f"[preview_file] Fetching from Nextcloud: {doc.docPath}")
+        response = preview_from_nextcloud(doc.docPath)
+        
+        if response.status_code == 200:
+            # Try to cache small files
+            try:
+                length = response.headers.get("Content-Length")
+                content_bytes = response.content if response.content else None
+                if content_bytes is not None:
+                    if not length:
+                        length = len(content_bytes)
+                    if int(length) <= 5_000_000:  # 5 MB
+                        redis_client.setex(cache_key, 300, content_bytes)
+                        return Response(content_bytes, content_type=response.headers.get("Content-Type", "application/pdf"), headers={
+                            "Content-Disposition": f'inline; filename="{filename}"',
+                            "Cache-Control": "public, max-age=300"
+                        })
+            except Exception as cache_err:
+                print(f"[preview_file] Cache error: {cache_err}")
+
+            # Fallback: stream without caching
+            return Response(
+                response.iter_content(chunk_size=8192),
+                content_type = response.headers.get("Content-Type", "application/octet-stream"),
+                headers={
+                    "Content-Disposition": f'inline; filename="{filename}"',
+                    "Cache-Control": "public, max-age=120"
+                }
+            ) 
+        else:
+            print(f"[preview_file] Nextcloud error: {response.status_code} - {getattr(response, 'text', 'No text')}")
+            return jsonify({
+                'success': False,
+                'status': response.status_code,
+                'detail': getattr(response, 'text', 'Unknown error')
+            }), response.status_code 
+
+
+
+       
+    # ============================================ Documents Routes ============================================
+    
+    def filter_folders_by_access(tree, allowed_programs):
+        """
+        Filter the folder tree to show all Accreditation contents,
+        but only Programs that the user has access to.
+        """
+        import copy
+        
+        # Navigate to Accreditation if it exists
+        if 'folders' in tree and 'Accreditation' in tree['folders']:
+            accreditation = copy.deepcopy(tree['folders']['Accreditation'])
             
+            # Filter Program folders based on allowed_programs
+            if 'folders' in accreditation and 'Programs' in accreditation['folders']:
+                programs_folder = accreditation['folders']['Programs']
+                if 'folders' in programs_folder:
+                    filtered_programs = {
+                        program_code: program_data
+                        for program_code, program_data in programs_folder['folders'].items()
+                        if program_code in allowed_programs
+                    }
+                    programs_folder['folders'] = filtered_programs
+            
+            # Return the entire Accreditation folder (includes Programs + other files/folders)
+            return accreditation
+        
+        # If Accreditation folder not found, return empty structure
+        return {"files": [], "folders": {}}
+
+    # display all the documents inside nextcloud repo
+    @app.route('/api/documents', methods=["GET"])
+    @jwt_required()
+    def list_files():
+        try:
+            current_user_id = get_jwt_identity()
+            user = Employee.query.filter_by(employeeID=current_user_id).first()
+            
+            if not user:
+                return jsonify({"error": "User not found"}), 404
+            
+            # Get full folder tree from Nextcloud
+            tree = list_files_from_nextcloud()
+            
+            # If admin, return everything starting from Programs folder
+            if user.isAdmin:
+                if 'folders' in tree and 'Accreditation' in tree['folders']:
+                    return jsonify(tree['folders']['Accreditation'])
+                return jsonify(tree)
+            
+            # Get user's program codes (not names - folder names match program codes like BSIT, BSED)
+            user_program_ids = [ep.programID for ep in user.employee_programs]
+            user_programs = Program.query.filter(Program.programID.in_(user_program_ids)).all()
+            user_program_codes = [p.programCode for p in user_programs]
+            
+            # Get user's optional folder access
+            optional_folder_paths = [ef.folderPath for ef in user.employee_folders]
+            
+            # Extract program codes from optional folder paths
+            # Support both formats: 
+            # - UDMS_Repository/Accreditation/Programs/{ProgramCode}
+            # - UDMS_Repository/Programs/{ProgramCode}
+            optional_program_codes = []
+            for path in optional_folder_paths:
+                parts = path.split('/')
+                if len(parts) >= 3 and parts[0] == 'UDMS_Repository':
+                    if len(parts) >= 4 and parts[1] == 'Accreditation' and parts[2] == 'Programs':
+                        # Format: UDMS_Repository/Accreditation/Programs/{ProgramCode}
+                        optional_program_codes.append(parts[3])
+                    elif len(parts) >= 3 and parts[1] == 'Programs':
+                        # Format: UDMS_Repository/Programs/{ProgramCode}
+                        optional_program_codes.append(parts[2])
+            
+            # Combine all allowed program codes
+            allowed_programs = set(user_program_codes + optional_program_codes)
+            
+            # Debug logging
+            print(f"User {user.employeeID} - Program codes: {user_program_codes}")
+            print(f"User {user.employeeID} - Optional folder paths: {optional_folder_paths}")
+            print(f"User {user.employeeID} - Optional program codes: {optional_program_codes}")
+            print(f"User {user.employeeID} - Allowed programs: {allowed_programs}")
+            
+            # Filter the folder tree
+            filtered_tree = filter_folders_by_access(tree, allowed_programs)
+            
+            return jsonify(filtered_tree)
+            
+        except Exception as e:
+            return jsonify({"Error": str(e)}), 500
+
+    @app.route('/api/documents/preview/', defaults={'file_path': None}, methods=["GET"])
+    @app.route('/api/documents/preview/<path:file_path>', methods=["GET"])
+    def preview_file_documents(file_path):
+        if not file_path:
+            return {"error": "File path required"}, 400
+
+        decoded_path = unquote(file_path).strip('/')
+        if decoded_path and not decoded_path.startswith('UDMS_Repository'):
+            decoded_path = f"UDMS_Repository/{decoded_path}"
+
+        return preview_file_nextcloud(decoded_path)
+
+    
+    @app.route('/api/documents/download/<path:file_path>', methods=["GET"])
+    @jwt_required()
+    def download_file_documents(file_path):
+        decoded_path = unquote(file_path).strip('/')
+        if decoded_path and not decoded_path.startswith('UDMS_Repository'):
+            decoded_path = f"UDMS_Repository/{decoded_path}"
+
+        # Audit downloaded file
+        user = Employee.query.filter_by(employeeID=get_jwt_identity()).first()
+        file_name = decoded_path.split("/")[-1]
+        new_log = AuditLog(
+            employeeID = user.employeeID,
+            action = f"{user.lName}, {user.fName} {user.suffix} Downloaded {file_name}"
+        )
+        db.session.add(new_log)
+        db.session.commit()
+
+        return download_file_nextcloud(decoded_path)
+    
+    
+    @app.route('/api/documents/delete_file/<int:docID>', methods=["DELETE"])
+    @jwt_required()
+    def delete_file(docID):
+        current_user_id = get_jwt_identity()
+        admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+        if not admin_user or not admin_user.isAdmin:
+            return jsonify({'success': False, 'message': 'Admins only'}), 403
+        try:
+            # Check if metadata exists first
+            doc = Document.query.get(docID)
+            if not doc:
+                return jsonify({
+                    'success': False,
+                    'message': 'Document not found.'
+                }), 404
+
+            file_path = (doc.docPath or "").strip('/')
+            print(f"Deleting docID = {docID}, path = {file_path}")
+            # Delete from Nextcloud
+            response = delete_from_nextcloud(file_path)
+
+            if response.status_code not in (200, 204):
+                return jsonify({
+                    'success': False,
+                    'message': 'Nextcloud deletion failed.',
+                    'status': response.status_code,
+                    'details': response.text
+                }), 400
+
+            # Delete metadata from DB only if Nextcloud deletion succeeded
+            db.session.delete(doc)
+
+            # Audit deleted doc
+            new_log = AuditLog(
+                employeeID = admin_user.employeeID,
+                action = f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} Deleted a file: {doc.docName}"
+            )
+            db.session.add(new_log)
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': 'File deleted successfully.'
+            }), 200
+
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({
+                'success': False,
+                'message': f'Failed to delete document: {str(e)}'
+            }), 500
+
+
+
+    @app.route('/api/documents/rename', methods=["PUT"])
+    @jwt_required()
+    def rename_file():
+        data = request.get_json()
+        old_path = data.get("oldPath")
+        new_path = data.get("newPath")
+
+        try:
+            response = rename_file_nextcloud(old_path, new_path)
+
+            if response.status_code in (200, 201, 204, 207):
+                # Skip folders                
+                if os.path.splitext(new_path)[1] == "":
+                    return jsonify({
+                        'success': True,
+                        'message': 'Folder renamed in Nextcloud but not tracked in DB.'
+                    }), 200
+                
+                display_name = unquote(new_path)
+                new_filename = os.path.basename(display_name)
+                # Update DB only if it's a file
+                doc = Document.query.filter_by(docPath=old_path).first()
+                if doc:
+                    doc.docPath = display_name
+                    if new_filename:
+                        doc.docName = new_filename
+                    user = Employee.query.filter_by(employeeID=get_jwt_identity()).first()
+                    # Audit rename path
+                    new_log = AuditLog(
+                        employeeID = user.employeeID,
+                        action = f"{user.lName}, {user.fName} {user.suffix} Renamed a file {doc.docName}"
+                    )
+                    db.session.add(new_log)
+                    db.session.commit()
+                return jsonify({'success': True, 'message': 'File renamed successfully.'}), 200
+                
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': 'Nextcloud rename failed. Please try again.',
+                    'status': response.status_code,
+                    'details': response.text
+                }), 400
+        except Exception as e:
+            return jsonify({'success': False, 'message': f'Failed to rename document {str(e)}'}), 500
+
+    @app.route('/api/documents/upload', methods=["POST"])
+    @jwt_required()
+    def upload_documents():
+        file = request.files.get('uploadedFile')
+        data = request.form
+        file_type = data.get("fileType")
+        file_name = data.get("fileName")
+        directory = data.get("directory", "").strip('/')
+
+        base_path = "UDMS_Repository/Accreditation"
+
+        if not directory:
+            directory = base_path
+        else:
+            directory = f"{base_path}/{directory}"
+
+        if not file:
+            return jsonify({'success': False, 'message': 'No file provided'}), 400        
+
+        if not file.filename or '.' not in file.filename:
+            return jsonify({'success': False, 'message': 'Invalid file name'}), 400
+
+        # Get uploader info
+        uploader = Employee.query.filter_by(employeeID=get_jwt_identity()).first()
+        if not uploader:
+            return jsonify({'success': False, 'message': 'User not found'}), 400
+        
+        filename = secure_filename(file.filename)
+
+        try:
+            print(f"Ensuring directory exists: {directory}")
+            # Make sure the directory exists before uploading
+            ensure_result = ensure_directories(directory)
+            if not ensure_result:
+                return jsonify({
+                    "success": False,
+                    "message": "Failed to create directory structure in Nextcloud"
+                }), 500
+                
+            print(f"Starting Nextcloud upload for file: {filename}")
+            print(f"Directory path: {directory}")
+            
+            # Upload to Nextcloud
+            response = upload_to_nextcloud(file, directory)
+            print(f"Nextcloud upload response: {response.status_code}")
+            print(f"Nextcloud response text: {response.text}")
+
+            # Only create audit log if upload was successful
+            if response.status_code in (200, 201, 204):
+                new_log = AuditLog(
+                    employeeID = uploader.employeeID,
+                    action = f"{uploader.lName}, {uploader.fName} {uploader.suffix} Uploaded a file: {filename}"
+                )
+                db.session.add(new_log)
+                db.session.commit()
+                print("Audit log created successfully")
+            else:
+                print(f"Nextcloud upload failed with status code: {response.status_code}")
+                print(f"Response text: {response.text}")
+                return jsonify({
+                    "success": False,
+                    "message": f"Upload failed: {response.status_code} - {response.text}"
+                }), 500
+        except Exception as e:
+            print(f"Error in upload/audit process: {str(e)}")
+            return jsonify({
+                "success": False,
+                "message": f"Upload process failed: {str(e)}"
+            }), 500
+
+        # === Extract text ===
+        extracted_text = ""
+        file_size = 0
+        temp_path = f"/tmp/{filename}"
+        try:
+            file.save(temp_path) 
+            file_size = os.path.getsize(temp_path)
+
+            file_extension = filename.rsplit('.', 1)[-1].lower()
+            if file_extension == 'pdf':
+                extracted_text = extract_pdf(temp_path)
+            elif file_extension in ('docx', 'doc'):
+                extracted_text = extract_docs(temp_path)
+            elif file_extension in ('xls', 'xlsx'):
+                extracted_text = extract_excel(temp_path)
+            elif file_extension in ('jpg', 'png', 'jpeg'):
+                extracted_text = extract_image(temp_path) 
+            else:
+                extracted_text = ""
+            
+            print(f"[upload_documents] Extracted text length: {len(extracted_text)}, file_size: {file_size}")
+
+        except Exception as e:
+            print(f"[upload_documents] Text extraction failed: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'success': False, 'message': f'Text extraction failed: {str(e)}'}), 500
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        
+        # === Generate Tags === 
+        print("[upload_documents] Generating rule-based tags")
+        tags = set(rule_based_tag(extracted_text))
+        
+        # Fetch all documents in the DB
+        all_docs = [d.content for d in Document.query.with_entities(Document.content).all()]
+        all_docs.append(extracted_text)
+
+        tfidf_tags = extract_global_tfid_tags(all_docs, len(all_docs) - 1)
+        if tfidf_tags:
+            from itertools import chain
+            if any(isinstance(tag, list) for tag in tfidf_tags):
+                flat_tags = list(chain.from_iterable(tfidf_tags))
+                tags.update(flat_tags)
+            else:
+                tags.update(tfidf_tags)
+        print(f"[upload_documents] Total tags: {len(tags)}")
+
+        # === Generate Embedding ===
+        print("[upload_documents] Generating embedding")
+        embedding = embedding_model.encode(extracted_text, normalize_embeddings=True)
+        embedding = np.array(embedding, dtype=np.float32).tolist()
+        print(f"[upload_documents] Embedding length: {len(embedding)}")
+        
+        # === Save record to DB ===
+        try:
+            print(f"[upload_documents] Creating document record: name={file_name}, type={file_type}, path={directory}/{filename}")
+            
+            doc = Document(
+                docName=file_name,
+                docType=file_type,
+                docPath=f"{directory}/{filename}",
+                content=extracted_text,
+                employeeID=uploader.employeeID,
+                tags=list(tags),
+                embedding=embedding
+            )
+            
+            db.session.add(doc)
+            db.session.flush()  # Assign docID
+            print(f"[upload_documents] Got docID: {doc.docID}")
+
+            # ==== Update search vector ====
+            print("[upload_documents] Updating search vector")
+            db.session.execute(
+                text("""
+                    UPDATE document
+                    SET search_vector = to_tsvector('english', "docName" || ' ' || content)
+                    WHERE "docID" = :doc_id
+                """), 
+                {"doc_id": doc.docID}
+            )
+
+            # ==== Compute predicted rating and probability ====
+            print("[upload_documents] Computing model predictions")
+            
+            # Build feature dataframe for rating prediction
+            df_input = pd.DataFrame([{
+                "file_size": file_size,
+                "Criteria_Completion_Score": 0,  # Not available in documents endpoint
+                "Days_Until_Deadline": 0,
+                "isApproved": False,
+                "docType": file_type,
+                "programID": None
+            }])
+
+            emb = pd.DataFrame([embedding])
+            emb.columns = [f"emb_{i}" for i in range(len(emb.columns))]
+            X_new = pd.concat([df_input, emb], axis=1)
+
+            predicted_rating = None
+            try:
+                predicted_rating = float(xgb_model.predict(X_new)[0])
+                doc.predicted_rating = predicted_rating
+                print(f"[upload_documents] Predicted rating: {predicted_rating}")
+            except Exception as pred_e:
+                print(f"[upload_documents] Warning: model prediction failed: {pred_e}")
+                predicted_rating = None
+
+            # ==== Compare past documents and compute probability ====
+            past_docs_query = Document.query.with_entities(
+                Document.docName, Document.embedding, Document.isApproved
+            ).filter(Document.embedding.isnot(None)).all()
+
+            past_docs = pd.DataFrame([
+                {"docName": d.docName, "embedding": d.embedding, "isApproved": d.isApproved}
+                for d in past_docs_query
+            ])
+
+            new_doc_data = {
+                "file_size": file_size,
+                "Criteria_Completion_Score": 0,
+                "Days_Until_Deadline": 0,
+                "docType": file_type,
+                "programID": None,
+                "embedding": embedding
+            }
+
+            print(f"[upload_documents] past_docs count: {len(past_docs) if hasattr(past_docs, '__len__') else 'unknown'}")
+            prob_approval, top_similar_docs = compare_documents(new_doc_data, past_docs, xgb_model)
+            
+            if prob_approval is None:
+                # Fallback: derive probability from predicted rating if available
+                try:
+                    pr = predicted_rating
+                    if pr is not None:
+                        prob_approval = float(1 / (1 + np.exp(-2.0 * (pr - 3))))
+                        print(f"[upload_documents] Fallback probability from predicted_rating={pr}: {prob_approval}")
+                    else:
+                        prob_approval = 0.0
+                        print("[upload_documents] No predicted_rating available; falling back to 0.0")
+                except Exception as _pf:
+                    print(f"[upload_documents] Error computing fallback probability: {_pf}")
+                    prob_approval = 0.0
+
+            doc.predicted_probability = float(prob_approval)
+            doc.similar_docs = (
+                top_similar_docs.to_dict(orient='records')
+                if hasattr(top_similar_docs, "to_dict")
+                else []
+            )
+
+            print(f"[upload_documents] Probability: {doc.predicted_probability}")
+            print(f"[upload_documents] Similar Docs count: {len(doc.similar_docs)}")
+
+            # Create audit log for successful upload
+            new_log = AuditLog(
+                employeeID=uploader.employeeID,
+                action=f"{uploader.lName}, {uploader.fName} {uploader.suffix} Uploaded a file: {filename}"
+            )
+            db.session.add(new_log)
+            
+            # Commit all changes
+            db.session.commit()
+            print("[upload_documents] Database transaction committed successfully")
+
+            return jsonify({
+                'success': True,
+                'message': 'File uploaded successfully!',
+                'docPath': f"{directory}/{filename}",
+                'predicted_rating': round(predicted_rating, 2) if predicted_rating else None,
+                'probability_of_approval': round(prob_approval, 4) if prob_approval else None
+            }), 200
+
+        except Exception as e:
+            print(f"[upload_documents] Database error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            db.session.rollback()
+            return jsonify({
+                'success': False, 
+                'message': f'Database save failed: {str(e)}'
+            }), 500
+
     @app.route('/api/documents/tags', methods=["GET"])
     def get_tags():
 
