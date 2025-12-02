@@ -346,55 +346,41 @@ const Users = () => {
     if (!isAdmin && !isCoAdmin) return
 
     setUsersLoading(true)
-      try {
+      try {                
           // Get the users
-          const res = await apiGet('/api/users');
+          const res = await apiGet('/api/users');            
 
-          // Defensive: support multiple response shapes
-          let usersPayload = [];
-          if (res) {
-              if (Array.isArray(res.data?.users)) {
-                  usersPayload = res.data.users;
-              } else if (Array.isArray(res.users)) {
-                  usersPayload = res.users;
-              } else if (Array.isArray(res.data)) {
-                  usersPayload = res.data;
-              } else {
-                  // final fallback: try top-level data property if it's an object with 'users'
-                  try {
-                      const parsed = res.data || res;
-                      if (Array.isArray(parsed?.users)) usersPayload = parsed.users;
-                  } catch (_) {
-                      usersPayload = [];
-                  }
-              }
-          }
-
-          if (!Array.isArray(usersPayload)) usersPayload = [];
-
-          // Get profile pictures for each user (if any)
-          const usersWithPics = await Promise.all(
-              usersPayload.map(async (user) => {
-                  try {
-                      if (user.profilePic) {
-                          const picRes = await apiGetBlob(`/api/user/profile-pic/${user.employeeID}`);
-                          if (picRes && picRes.success && picRes.data) {
-                              const objectURL = URL.createObjectURL(picRes.data);
-                              return { ...user, profilePicUrl: objectURL };
-                          } else {
-                              console.error(`Failed to load profile pic for ${user.employeeID}:`, picRes?.error ?? picRes);
-                              return { ...user, profilePicUrl: null };
+          if (Array.isArray(res.data.users)) {
+              // Get profile pictures for each user
+              const usersWithPics = await Promise.all(
+                  res.data.users.map(async (user) => {
+                      try {
+                          if (user.profilePic) {
+                              const picRes = await apiGetBlob(`/api/user/profile-pic/${user.employeeID}`);
+                              
+                              // Check if the request was successful
+                              if (picRes && picRes.success && picRes.data) {
+                                  
+                                  const objectURL = URL.createObjectURL(picRes.data);
+                                  return { ...user, profilePicUrl: objectURL };
+                              } else {
+                                  console.error(`Failed to load profile pic for ${user.employeeID}:`, picRes.error);
+                                  return { ...user, profilePicUrl: null };
+                              }
                           }
-                      }
-                      return { ...user, profilePicUrl: null };
-                  } catch (error) {
-                      console.error(`Error loading profile pic for ${user.employeeID}:`, error);
-                      return { ...user, profilePicUrl: null };
-                  }
-              })
-          );
+                          return { ...user, profilePicUrl: null };
 
-          setSubmittedUsers(usersWithPics);
+                      } catch (error) {
+                          console.error(`Error loading profile pic for ${user.employeeID}:`, error);
+                          return { ...user, profilePicUrl: null };
+                      } 
+                  })          
+              );  
+              
+              setSubmittedUsers(usersWithPics);
+          } else {
+              setSubmittedUsers([]);
+          }
       } catch (err) {
           console.error("Error occurred during user fetching", err);
           setSubmittedUsers([]); // Set empty array on error
@@ -405,6 +391,7 @@ const Users = () => {
 
   fetchUsers();
 }, [isAdmin, isCoAdmin]);
+
  
 useEffect(() => {
   if (!isAdmin && !isCoAdmin) return 
