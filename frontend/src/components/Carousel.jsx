@@ -43,7 +43,7 @@ import LoginFigure3 from '../assets/login-figure-3.svg';
 
   return (
       //carousel wrapper
-     <div className="w-[80%] h-[85%] mt-14 ml-26 bg-transparent p-2 rounded-4xl"> 
+     <div className="w-[85%] h-[85%] mt-12 ml-10 bg-transparent rounded-4xl"> 
          {/* slides container */}
         <div className=" px-2 h-full w-full text-center border-3 border-neutral-900  backdrop-blur-md shadow-2xl/60 rounded-3xl ">
          <Slider {...settings}>
@@ -51,12 +51,12 @@ import LoginFigure3 from '../assets/login-figure-3.svg';
                   return(
                      <div key={index} className="flex flex-col justify-center h-full">
                         <div className="flex flex-1 items-center justify-center">
-                        <img src={slide.figure} className="h-full max-h-[400px] w-full object-contain"/>
+                        <img src={slide.figure} className="h-full max-h-[390px] w-full object-contain"/>
                         </div>
                         {/* caption */}
                         <div>
                            <h1 className="text-emerald-300 text-3xl text-shadow-lg text-shadow-gray-900 font-semibold">{slide.title}</h1>
-                           <h2 className="line-clamp-3 text-lg font-extralight">{slide.subTitle}</h2>
+                           <h2 className="line-clamp-3 text-md font-extralight">{slide.subTitle}</h2>
                         </div>
                      </div>)    
                      })

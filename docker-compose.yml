@@ -29,10 +29,27 @@ services:
       watch:
       - path: ./backend
         target: /app
-        action: sync        
+        action: sync
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: udmcapstone1!
+      POSTGRES_DB: capstone_local_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
 
   redis:
-    image: redis:alpine
-    ports:
-      - '6379:6379'
-    command: redis-server --appendonly yes
+      image: redis:alpine
+      ports:
+        - '6379:6379'
+      command: redis-server --appendonly yes
+
+volumes:
+  pgdata:

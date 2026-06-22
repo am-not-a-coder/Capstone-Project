@@ -844,7 +844,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
                     {/* Programs Breadcrumb */}
                     <span 
                       onClick={() => backToPrograms()} 
-                      className="flex items-center flex-shrink-0 transition-all cursor-pointer duration-250 hover:text-zuccini-500"
+                      className="flex items-center shrink-0 transition-all cursor-pointer duration-250 hover:text-zuccini-500"
                       title="Programs"
                     >
                       Programs
@@ -853,7 +853,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
                     {/* Program Name Breadcrumb */}
                     {selectedProgram && (
                       <>
-                        <span className="flex-shrink-0 text-gray-400 dark:text-gray-500">/</span>
+                        <span className="shrink-0 text-gray-400 dark:text-gray-500">/</span>
                         <span 
                           onClick={() => {
                             // Stay in areas view but clear area/subarea selections
@@ -878,7 +878,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
                     {/* Area Name Breadcrumb */}
                     {selectedArea && (
                       <>
-                        <span className="flex-shrink-0 text-gray-400 dark:text-gray-500">/</span>
+                        <span className="shrink-0 text-gray-400 dark:text-gray-500">/</span>
                         <span 
                           onClick={() => {        
                             setSelectedSubarea(null);
@@ -900,7 +900,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
                     {/* Subarea Name Breadcrumb */}
                     {selectedSubarea && (
                       <>
-                        <span className="flex-shrink-0 text-gray-400 dark:text-gray-500">/</span>
+                        <span className="shrink-0 text-gray-400 dark:text-gray-500">/</span>
                         <span 
                           className="flex items-center min-w-0 truncate transition-all duration-200 hover:text-zuccini-500 text-zuccini-600 dark:text-zuccini-400"
                           title={selectedSubarea.subareaName}
@@ -982,7 +982,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
                   <div className={`flex flex-col transition-all duration-500 ${showPreview ? 'w-1/2' : 'w-full'}`}>
                     
                     {/* Program Cards Section */}
-                    <div className={`${visible == "programs" ? 'block' : 'hidden'} flex flex-wrap gap-4`}>
+                    <div className={`${visible == "programs" ? 'block' : 'hidden'} flex flex-wrap gap-x-6 gap-4`}>
                   <PermissionGate requires={'crudProgramEnable'}>
                     <CreateCard form={form} handleChange={handleChange} setShowForm={setShowForm} title="Program" />
                   </PermissionGate>

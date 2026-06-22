@@ -3,11 +3,12 @@ import {
     faBookOpen,
     faCalendar,
     faClock,
-    faBook
+    faBook,
+    faTrash
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
-const DeadlineModal = ({id, programName, programCode, area, criteria, date, color = "#3B82F6", content, onClick, showModal}) => {
+const DeadlineModal = ({id, programName, programCode, area, criteria, date, color = "#3B82F6", content, onClick, onDelete, showModal}) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center  justify-center bg-black/50 backdrop-blur-sm">
       <div className={`relative overflow-y-scroll bg-gray-200 dark:bg-gray-900 rounded-2xl shadow-2xl max-w-5xl w-full mx-4 max-h-[90vh] overflow-hidden ${showModal ? 'fade-in' : 'fade-out'}`}>
@@ -22,6 +23,11 @@ const DeadlineModal = ({id, programName, programCode, area, criteria, date, colo
         icon={faCircleXmark} 
         className="absolute p-2 text-gray-400 transition-all duration-200 rounded-full top-4 right-4 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800" 
         onClick={onClick} 
+    />
+        <FontAwesomeIcon 
+        icon={faTrash} 
+        className="absolute p-2 text-gray-400 transition-all duration-200 rounded-full top-4 right-16 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-300 hover:bg-gray-100 dark:hover:bg-gray-800" 
+        onClick={onDelete} 
     />
 
         <div className="p-8">

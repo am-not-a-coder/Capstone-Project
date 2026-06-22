@@ -185,47 +185,47 @@ const Documents = () => {
   };
   
   const handleResultClick = (doc) => {
-    let pathArray = doc.docPath.split('/').filter(Boolean);
-    
-
-    if(pathArray.length > 0 && pathArray[0] === "UDMS_Repository"){
-      pathArray = pathArray.slice(1);
-      console.log("Path removed udms: ", pathArray)
-    }
-
-    pathArray = pathArray.map(decodeURIComponent);
-
-    let folderPath = directory;
-    let filePath = []
-
-    for (const pathPart of pathArray){
-      if(folderPath?.folders?.[pathPart]){
-        folderPath = folderPath.folders[pathPart]
-        filePath.push(pathPart)
-      } else{
-         console.warn(`Path part '${pathPart}' not found. Using valid portion: [${filePath.join(', ')}]`);
-      break;
-      }
-    }
-
-    const folderPaths = filePath.map((_, i) => filePath.slice(0, i + 1).join('/')); 
-
-    // Expand all folders
-    setExpandedFolders (prev => Array.from(new Set([...prev, ...folderPaths])))
-    
-    // Navigate to result directory
-    setCurrentPath(filePath);
-
-    // Highligh search file
-    setHighlightedFile(doc.docID);
-
-    setQuery("")
-
-    // clear highlighted file after 3s
-    setTimeout(() => {
-      setHighlightedFile(null)
-    }, 3000);
+  if (!directory) {
+    console.warn('No directory loaded yet');
+    return;
   }
+
+  let pathArray = doc.docPath.split('/').filter(Boolean);
+
+  if (pathArray.length > 0 && pathArray[0] === 'UDMS_Repository') {
+    pathArray = pathArray.slice(1);
+  }
+
+  pathArray = pathArray.map(decodeURIComponent);
+
+  // Try to find proper root object (some API shapes return { folders: {...} }, others return plain map)
+  let folder = directory;
+  if (!folder?.folders && folder?.UDMS_Repository) folder = folder.UDMS_Repository;
+
+  const filePath = [];
+  for (const part of pathArray) {
+    // prefer `.folders` map, fall back to direct keys
+    const next =
+      folder?.folders && folder.folders[part] ? folder.folders[part] :
+      (folder && folder[part] ? folder[part] : null);
+
+    if (!next) {
+      console.warn(`Path part '${part}' not found. Using valid portion: [${filePath.join(', ')}]`);
+      break;
+    }
+
+    folder = next;
+    filePath.push(part);
+  }
+
+  const folderPaths = filePath.map((_, i) => filePath.slice(0, i + 1).join('/'));
+  setExpandedFolders(prev => Array.from(new Set([...prev, ...folderPaths])));
+  setCurrentPath(filePath);
+  setHighlightedFile(doc.docID);
+  setQuery('');
+
+  setTimeout(() => setHighlightedFile(null), 3000);
+}
 
   const refreshDirectory = async () => {
     // Refresh directory

@@ -263,7 +263,7 @@ const Login = () => {
                             />
                         </div>
 
-                        <div className='relative mb-6 w-[90%]'>
+                        <div className='relative mb-3 w-[90%]'>
                             <label htmlFor='password' className='block text-sm font-medium text-gray-700'>Password</label>
                             <FontAwesomeIcon icon={faKey} className='absolute top-9.5 left-2 text-md text-gray-400' />
                             <div className='absolute top-8.5 left-8 h-6 border-l border-gray-400'></div>  
@@ -277,7 +277,7 @@ const Login = () => {
                             onClick={() => {setShowPassword((current) => !current)}}
                             className='absolute cursor-pointer top-9 right-3 text-neutral-400'/>
                             {error && (
-                                <div className={`mt-2 p-3 rounded-md ${
+                                <div className={`pb-2 rounded-md ${
                                     error.includes('blocked') || error.includes('IP') 
                                     ? 'bg-red-100 border border-red-400' 
                                     : ''
@@ -296,7 +296,7 @@ const Login = () => {
                                             Please try again in 30 minutes or contact an administrator.
                                         </div>
                                     )}
-                                </div>
+                                    </div>
                             )}
                         </div><br />
                     

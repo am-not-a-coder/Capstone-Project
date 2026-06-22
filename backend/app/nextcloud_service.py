@@ -351,8 +351,7 @@ def list_files_from_nextcloud():
                 ext = os.path.splitext(part)[1].lower().lstrip(".")
                 if ext in file_ext:
                     # Add UDMS_Repository to match DB docPath                    
-                    db_doc = db_docs.get(f"UDMS_Repository/{path}")     
-                    print(f"Looking for: UDMS_Repository/{path}")                    
+                    db_doc = db_docs.get(f"UDMS_Repository/{path}")                      
 
                     file_obj = {
                         "name": unquote(part),

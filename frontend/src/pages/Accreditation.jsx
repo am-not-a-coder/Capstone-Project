@@ -275,60 +275,11 @@ const handleSubareaSelect = (subarea) => {
     }
   }, [selectedProgram, area, isAdmin]);
   
-  //Navigate to program of pending document from dashboard
-  const location = useLocation()
-  const state = location.state
-  useEffect(()=> {
-    const navigateToProgram = async ()=> {
-      const res = await apiGet('/api/program')
-      const programs = res.data.programs
-      const program = programs.find(p => p.programCode === state.programCode)
-      setSelectedProgram(program)
-      setVisible("areas")
-      fetchAreasForProgram(program.programCode)
-      console.log('selected program: ', selectedProgram)
-    }
-    navigateToProgram()
-  }, [state])
-
-  // Navigate to area of pending document from dashboard
-  let pendingDocArea = []
-  useEffect(()=> {
-    const navigateToArea = async ()=> {
-      const res = await apiGet('/api/area')
-      const areas = res.data.area
-      pendingDocArea = areas.find(a => a.areaName === state.areaName)
-      setSelectedArea(pendingDocArea)
-      console.log('selected pending doc area: ', pendingDocArea)
-      setExpandedAreaIndex(pendingDocArea.areaID)
-      console.log('expanded area:', expandedAreaIndex)
-    }
-    navigateToArea()
-  }, [state])
-
-  // Navigate to subarea of pending document from dashboard
-  // useEffect(()=> {
-  //   const navigateToSubarea = async ()=> {
-  //     const res = await apiGet('/api/subarea')
-  //     const subareas = res.data
-  //     console.log('subareas: ', subareas)
-  //     console.log('selected area for subarea: ', pendingDocArea)
-  //     if(expandedAreaIndex === pendingDocArea.areaID) {
-  //       const pendingDocSubarea = subareas.find(sa => sa.subareaName === state.subareaName && sa.areaID === pendingDocArea.areaID)
-  //       console.log('pending doc subarea: ', pendingDocSubarea)
-  //       setSelectedSubarea(pendingDocSubarea)
-  //     } else {console.log('No expanded area')}
-  //     console.log('Selected subarea from dash: ', selectedSubarea)
-  //   }
-  //   navigateToSubarea()
-  // }, [state])
-  // console.log('Selected subarea: ', selectedSubarea)
-              
     return(
     <>
         <div className="relative flex flex-row justify-around border border-neutral-300 rounded-[20px] w-full min-h-[85%] shadow-md inset-shadow-sm inset-shadow-gray-400 p-3 bg-neutral-200 dark:bg-gray-900 dark:inset-shadow-zuccini-800">
           <div className='relative flex flex-col w-full p-3' >
-            <div className='flex flex-row md:w-full scale-85 -ml-8 md:-ml-0 md:scale-100 gap-5 mb-5 mt-15 md:mt-0'>
+            <div className='flex flex-row md:w-full scale-85 -ml-8 md:ml-0 md:scale-100 gap-5 mb-5 mt-15 md:mt-0'>
                          
               <FontAwesomeIcon icon={faHouse}
                onClick={() => {backToPrograms()}}
@@ -345,7 +296,7 @@ const handleSubareaSelect = (subarea) => {
                   {/* Programs Breadcrumb */}
                   <span 
                     onClick={() => backToPrograms()} 
-                    className="flex items-center flex-shrink-0 transition-all cursor-pointer duration-250 hover:text-zuccini-500"
+                    className="flex items-center shrink-0 transition-all cursor-pointer duration-250 hover:text-zuccini-500"
                     title="Programs"
                   >
                     Programs
@@ -354,7 +305,7 @@ const handleSubareaSelect = (subarea) => {
                   {/* Program Name Breadcrumb */}
                   {selectedProgram && (
                     <>
-                      <span className="flex-shrink-0 text-gray-400 dark:text-gray-500">/</span>
+                      <span className="shrink-0 text-gray-400 dark:text-gray-500">/</span>
                       <span 
                         onClick={() => {
                           // Stay in areas view but clear area/subarea selections
@@ -379,7 +330,7 @@ const handleSubareaSelect = (subarea) => {
                   {/* Area Name Breadcrumb */}
                   {selectedArea && (
                     <>
-                      <span className="flex-shrink-0 text-gray-400 dark:text-gray-500">/</span>
+                      <span className="shrink-0 text-gray-400 dark:text-gray-500">/</span>
                       <span 
                         onClick={() => {        
                           setSelectedSubarea(null);
@@ -401,7 +352,7 @@ const handleSubareaSelect = (subarea) => {
                   {/* Subarea Name Breadcrumb */}
                   {selectedSubarea && (
                     <>
-                      <span className="flex-shrink-0 text-gray-400 dark:text-gray-500">/</span>
+                      <span className="shrink-0 text-gray-400 dark:text-gray-500">/</span>
                       <span 
                         className="flex items-center min-w-0 truncate transition-all duration-200 hover:text-zuccini-500 text-zuccini-600 dark:text-zuccini-400"
                         title={selectedSubarea.subareaName}
@@ -606,7 +557,7 @@ const handleSubareaSelect = (subarea) => {
                             setDocs([]);
                             setError(null);
                           }}
-                          className="absolute z-10 text-2xl transition-all duration-300 border-black rounded-full cursor-pointer text-white/50 border-1 top-3 right-4 hover:text-red-400"
+                          className="absolute z-10 text-2xl transition-all duration-300 border-black rounded-full cursor-pointer text-white/50 border top-3 right-4 hover:text-red-400"
                         /> 
                         
                         {/* View Full Document Button */}

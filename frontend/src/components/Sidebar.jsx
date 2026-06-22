@@ -134,7 +134,7 @@ export const SidebarContext = createContext();
 				{/* Title and Logo */}
 				<div className={`flex items-center justify-between pt-3 pb-2 ${expanded ? 'pr-10 pl-2' : 'pl-1'}  transition-all duration-500`}>
 					<img src={udmsLogo} alt="UDMS Logo" className={`${expanded ? 'm-2' : ''} h-10 rounded-full w-10 transition-all duration-500`}/>
-					<h4 className={` transition-all overflow-hidden m-1 font-semibold text-neutral-950 ${expanded ? 'w-42 opacity-100 ml-2' : 'w-0 opacity-0 ml-0'} dark:text-white transition-all duration-500`}>UDM Document Management System for Accreditation</h4>
+					<h4 className={`overflow-hidden transition-all m-1 line-clamp-2 font-semibold text-neutral-950 ${expanded ? 'w-42 opacity-100 ml-2' : 'w-0 opacity-0 ml-0'} dark:text-white transition-all duration-500`}>University Document Management System</h4>
 					
 				</div>
 
@@ -186,7 +186,7 @@ export const SidebarContext = createContext();
 
 					{/* Nav Links */}
 					<SidebarContext.Provider value={{expanded}}>
-					<ul className={`flex flex-col gap-y-3 py-1 flex-1 ml-1 mt-1 ${expanded ? 'items-end' : ''}`}>{children}</ul> 
+					<ul className={`flex flex-col gap-y-1 py-1 flex-1 ml-1 mt-1 ${expanded ? 'items-end' : ''}`}>{children}</ul> 
 					</SidebarContext.Provider>
 					{/* SidebarLinks is are generated below */}
 
@@ -208,7 +208,7 @@ export const SidebarLinks = ({children, icon, text, active, alert, onClick, isBu
   //Sidebar Contents
   const content = (
     <>
-      <span className={`${expanded ? 'ml-2 mr-3' : 'mx-auto'} ${active ? 'text-white' : 'text-zuccini-800'} transition-all duration-500 flex-shrink-0`}>
+      <span className={`${expanded ? 'ml-2 mr-3' : 'mx-auto'} ${active ? 'text-white' : 'text-zuccini-800'} transition-all duration-500 shrink-0`}>
           <FontAwesomeIcon icon={icon} className='mr-1 text-center transition-all duration-500 shadow-xl' />
       </span>
 

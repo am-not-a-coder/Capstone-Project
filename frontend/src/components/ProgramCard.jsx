@@ -3,7 +3,7 @@ export default function ProgramCard({ program, onClick, className = "" }) {
 
   return (
     <div 
-      className={`${className} group relative flex flex-col cursor-pointer h-56 overflow-hidden rounded-xl border border-gray-200 bg-gray-200 shadow-sm transition-all duration-300 hover:shadow-xl hover:scale-105 hover:border-gray-300 dark:bg-gray-900 dark:border-gray-700 dark:hover:border-gray-600 sm:w-1/2 md:w-1/3 lg:w-1/5`}
+      className={`${className} group relative flex flex-col cursor-pointer h-56 overflow-hidden rounded-xl border border-gray-200 bg-gray-200 shadow-sm transition-all duration-300 hover:shadow-xl hover:scale-105 hover:border-gray-300 dark:bg-gray-900 dark:border-gray-700 dark:hover:border-gray-600 sm:w-1/2 md:w-1/2 lg:w-1/4 xl:w-1/5`}
       onClick={onClick}
     >
       {/* Header Image/Color Section */}
@@ -16,7 +16,7 @@ export default function ProgramCard({ program, onClick, className = "" }) {
               alt={`${program.code} logo`}
               className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-110"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+            <div className="absolute inset-0 bg-linear-to-t from-black/20 to-transparent"></div>
           </div>
         ) : (
           // Program cards with color
@@ -24,7 +24,7 @@ export default function ProgramCard({ program, onClick, className = "" }) {
             style={{ backgroundColor: program.programColor }} 
             className="relative w-full h-full transition-all duration-300 group-hover:brightness-110"
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent"></div>
+            <div className="absolute inset-0 bg-linear-to-br from-white/10 to-transparent"></div>
             <div className="absolute w-8 h-8 rounded-full bottom-2 right-2 bg-white/20 backdrop-blur-sm"></div>
           </div>
         )}
@@ -45,7 +45,7 @@ export default function ProgramCard({ program, onClick, className = "" }) {
         {/* Head/Facilitator Info */}
         <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
           <div className="flex items-center space-x-2">
-            <div className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full"></div>
+            <div className="shrink-0 w-2 h-2 bg-blue-500 rounded-full"></div>
             <div className="text-sm text-gray-700 truncate dark:text-gray-300">
               <span className="font-medium">
                 {program.instituteHead ? 'Head: ' : 'Facilitator: '}
@@ -59,7 +59,7 @@ export default function ProgramCard({ program, onClick, className = "" }) {
       </div>
 
       {/* Hover Effect Overlay */}
-      <div className="absolute inset-0 transition-opacity duration-300 opacity-0 pointer-events-none bg-gradient-to-t from-blue-500/5 to-transparent group-hover:opacity-100"></div>
+      <div className="absolute inset-0 transition-opacity duration-300 opacity-0 pointer-events-none bg-linear-to-t from-blue-500/5 to-transparent group-hover:opacity-100"></div>
     </div>
   );
 }

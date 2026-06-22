@@ -1649,6 +1649,8 @@ def register_routes(app):
                     redis_client.delete(f'programs:inst:{old_inst_id}')
                 if program.instID and program.instID != old_inst_id:
                     redis_client.delete(f'programs:inst:{program.instID}')
+                # Invalidate the current user's program list cache
+                redis_client.delete(f'programs:user:{current_user_id}')
             except Exception:
                 pass
 
@@ -1719,6 +1721,7 @@ def register_routes(app):
             try:
                 if new_program.instID:
                     redis_client.delete(f'programs:inst:{new_program.instID}')
+                    redis_client.delete(f'programs:user:{current_user_id}')
             except Exception:
                 pass
             
@@ -1764,11 +1767,12 @@ def register_routes(app):
             employees_updated = EmployeeProgram.query.filter_by(programID=programID).delete()
             updated_counts['employees'] = employees_updated
             
-            areas_updated = Area.query.filter_by(programID=programID).update({'programID': None})
-            updated_counts['areas'] = areas_updated
+            # Delete related areas and deadlines because programID is non-nullable on those tables
+            areas_deleted = Area.query.filter_by(programID=programID).delete(synchronize_session=False)
+            updated_counts['areas'] = areas_deleted
             
-            deadlines_updated = Deadline.query.filter_by(programID=programID).update({'programID': None})
-            updated_counts['deadlines'] = deadlines_updated
+            deadlines_deleted = Deadline.query.filter_by(programID=programID).delete(synchronize_session=False)
+            updated_counts['deadlines'] = deadlines_deleted
         
             db.session.delete(programs)
 
@@ -1784,12 +1788,13 @@ def register_routes(app):
             try:
                 if programs.instID:
                     redis_client.delete(f'programs:inst:{programs.instID}')
+                    redis_client.delete(f'programs:user:{current_user_id}')
             except Exception:
                 pass
             
             return jsonify({
                 'success': True,
-                'message': f'Program deleted successfully. {employees_updated} employees, {areas_updated} areas, and {deadlines_updated} deadlines are now unlinked.',
+                'message': f'Program deleted successfully. {employees_updated} employee-program links removed, {areas_deleted} areas deleted, and {deadlines_deleted} deadlines deleted.',
                 'deletedID': programID,
                 'updated_counts': updated_counts
             }), 200
@@ -2384,6 +2389,47 @@ def register_routes(app):
         except Exception as e:
             db.session.rollback()
             return jsonify({'success': False, 'message': f'Failed to create deadline: {str(e)}'}), 500
+
+    #Delete deadline by ID
+    @app.route('/api/deadline/<int:deadlineID>', methods=['DELETE'])
+    @jwt_required()
+    def delete_deadline(deadlineID):
+        try:
+            current_user_id = get_jwt_identity()
+            admin_user = Employee.query.filter_by(employeeID=current_user_id).first()
+            if not admin_user or not admin_user.isAdmin:
+                return jsonify({'success': False, 'message': 'Admins only'}), 403
+
+            deadline = Deadline.query.filter_by(deadlineID=deadlineID).first()
+            if not deadline:
+                return jsonify({'error': 'Deadline not found'}), 404
+
+            # Delete associated DeadlineCriteria entries
+            criteria_deleted = DeadlineCriteria.query.filter_by(deadlineID=deadlineID).delete()
+
+            # Delete the deadline
+            db.session.delete(deadline)
+
+            # Audit deleted deadline
+            new_log = AuditLog(
+                employeeID=admin_user.employeeID,
+                action=f"{admin_user.lName}, {admin_user.fName} {admin_user.suffix} Deleted a deadline: {deadlineID}"
+            )
+            db.session.add(new_log)
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': f'Deadline deleted successfully. {criteria_deleted} criteria associations removed.',
+                'deletedID': deadlineID
+            }), 200
+
+        except Exception as e:
+            db.session.rollback()
+            current_app.logger.error(f"Delete deadline error: {str(e)}")
+            return jsonify({'error': 'Database error occurred'}), 500
+
+
 
 
     # ============================================ Tasks Route ============================================
@@ -4313,14 +4359,14 @@ def register_routes(app):
             if row.criteriaBlueprintID and row.criteriaType:
                 crit_type = row.criteriaType.lower()
                 criteria_entry = {
-                    "criteriaID": row.criteriaID,
+                    "criteriaID": row.criteriaBlueprintID,
                     "criteriaContent": row.criteriaContent,
                     "criteriaType": row.criteriaType,
                 }
                 
                 def add_unique_criteria(array):
                     # Only add if criteriaID not already in array
-                    if not any(c["criteriaID"] == row.criteriaID for c in array):
+                    if not any(c["criteriaID"] == row.criteriaBlueprintID for c in array):
                         array.append(criteria_entry)
                 
                 if "input" in crit_type:
