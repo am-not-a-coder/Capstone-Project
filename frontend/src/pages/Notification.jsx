@@ -15,7 +15,7 @@ const Notification = () => {
   const fetchNotifications = async () => {
     try {
       setLoading(true);
-      const response = await apiGet('/api/notifications');
+      const response = await apiGet('/notifications');
       if (response && response.success) {
         const notifications = response.data?.notifications || response.notifications || [];
         setNotifications(notifications);
@@ -34,7 +34,7 @@ const Notification = () => {
   // Fetch unread count
   const fetchUnreadCount = async () => {
     try {
-      const response = await apiGet('/api/notifications/unread-count');
+      const response = await apiGet('/notifications/unread-count');
       if (response && response.success) {
         const count = (response?.data?.count ?? response?.count ?? 0);
         console.log('Unread notifications:', count);
@@ -50,7 +50,7 @@ const Notification = () => {
   // Mark notification as read
   const markAsRead = async (notificationId) => {
     try {
-      const response = await apiPut(`/api/notifications/${notificationId}/read`, {});
+      const response = await apiPut(`/notifications/${notificationId}/read`, {});
       if (response.success) {
         setNotifications(prev => 
           prev.map(notif => 
@@ -68,7 +68,7 @@ const Notification = () => {
   // Delete single notification
   const handleDelete = async (notificationId) => {
     try {
-      const response = await apiDelete(`/api/notifications/${notificationId}`);
+      const response = await apiDelete(`/notifications/${notificationId}`);
       if (response.success) {
         setNotifications(prev => 
           prev.filter(notif => notif.notificationID !== notificationId)
@@ -82,7 +82,7 @@ const Notification = () => {
   // Delete all notifications
   const handleDeleteAll = async () => {
     try {
-      const response = await apiDelete('/api/notifications');
+      const response = await apiDelete('/notifications');
       if (response.success) {
         setNotifications([]);
         setConfirmDelete(false);

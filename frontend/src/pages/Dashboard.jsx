@@ -217,7 +217,7 @@ const key = user?.employeeID ? `welcomeShown:${user.employeeID}` : 'WelcomeShown
 const fetchAnnouncements = async () => {
 	try {
 		setAnnouncementsLoading(true)
-		const response = await fetch(`${API_URL}/api/announcements`, {
+		const response = await fetch(`${API_URL}/announcements`, {
 			method: 'GET',
 			credentials: 'include',
 			headers: {'Content-Type': 'application/json'}
@@ -240,7 +240,7 @@ const fetchAnnouncements = async () => {
 		const fetchCounts = async () => {
 			try{
 				setCountLoading(true)
-				const response = await apiGet('/api/count')
+				const response = await apiGet('/count')
 				if (response.success) {setCount(response.data)} 
 				else {
 					console.error("Failed fetching counts", response.error)
@@ -267,7 +267,7 @@ const fetchAnnouncements = async () => {
 		console.log("New announcement:", announcement)
 		// Here you can push it to state, API call, etc.
 		try {
-			const response = await apiPost('/api/announcement/post', {
+			const response = await apiPost('/announcement/post', {
 				title: announcement.title, 
 				message: announcement.message, 
 				duration: announcement.duration,            
@@ -294,7 +294,7 @@ const fetchAnnouncements = async () => {
 		}        
 	
 		try {
-			const response = await apiDelete(`/api/announcement/delete/${announcementId}`)
+			const response = await apiDelete(`/announcement/delete/${announcementId}`)
 			console.log('🗑️ Delete response:', response)
 			if (response.success) {
 					toast.success('Announcement deleted successfully')
@@ -314,7 +314,7 @@ const fetchAnnouncements = async () => {
 	useEffect(()=> {
 		const fetchLogs = async ()=> {
 			try {
-				const response = await apiGet('/api/auditLogs')
+				const response = await apiGet('/auditLogs')
 				const logsData = response?.data?.logs || response?.data?.data?.logs || []
 				setLogs(Array.isArray(logsData) ? logsData : [])
 			} 
@@ -333,7 +333,7 @@ useEffect(() => {
 	const fetchArea = async () => {
 		try{
 			setAreaProgressLoading(true);
-			const res = await apiGet('/api/area', {withCredentials: true})
+			const res = await apiGet('/area', {withCredentials: true})
 			Array.isArray(res.data.area) ? setAllAreas(res.data.area) : setAllAreas([]);
 			Array.isArray(res.data.area) ? setAreaProgressList(res.data.area) : setAreaProgressList([]);
 		} catch(err) {
@@ -362,7 +362,7 @@ const [programOption, setProgramOption] = useState([])
 useEffect(() => {
 	const fetchProgram = async () => {
 		try{
-			const res = await apiGet('/api/program', {withCredentials: true})
+			const res = await apiGet('/program', {withCredentials: true})
 			Array.isArray(res.data.programs) ? setProgramOption(res.data.programs) : setProgramOption([]);
 		} catch(err) {console.error("Error occurred when fetching program", err)}
 	}
@@ -385,7 +385,7 @@ const handleCreateDeadline = async (e) => {
     formData.append("content", content)
     try{
         //create deadline api
-        const res = await apiPostForm('/api/deadline', formData, {withCredentials: true}) 
+        const res = await apiPostForm('/deadline', formData, {withCredentials: true}) 
         setStatusMessage(res.data.message)
         setShowStatusModal(true)
         setStatusType("success")
@@ -396,10 +396,10 @@ const handleCreateDeadline = async (e) => {
 
 		setShowCreateDeadline(false)
         // refetch deadline data
-		const deadlineRes = await apiGet("/api/deadlines", {withCredentials: true})
+		const deadlineRes = await apiGet("/deadlines", {withCredentials: true})
         Array.isArray(deadlineRes.deadline) ? setDeadLines(deadlineRes.deadline) : setDeadLines([])  
         // refetch event data
-        const eventRes = await apiGet("/api/events", {withCredentials: true})
+        const eventRes = await apiGet("/events", {withCredentials: true})
         Array.isArray(eventRes.data) ? setEvent(eventRes.data) : setEvent([])
     }
     catch(err) {
@@ -416,7 +416,7 @@ useEffect(() => {
 	const fetchDeadline = async () => {
 		try{
 			setDeadlineLoading(true);
-			const res = await apiGet("/api/deadlines", {withCredentials: true})
+			const res = await apiGet("/deadlines", {withCredentials: true})
 			Array.isArray(res.data.deadline) ? setDeadLines(res.data.deadline) : setDeadLines([])
 		} catch (err){
 			console.error("Error occurred when fetching deadlines! ", err)
@@ -432,7 +432,7 @@ const [event, setEvent] = useState([])
 useEffect(() => {
 	const fetchEvents = async () => {
 		try{
-			const res = await apiGet("/api/events", {withCredentials: true})
+			const res = await apiGet("/events", {withCredentials: true})
 			Array.isArray(res.data) ? setEvent(res.data) : setEvent([]) 
 		} catch (err){console.error("Error occurred when fetching events! ", err)}
 	}
@@ -472,7 +472,7 @@ const handleDeleteDeadline = async () => {
     if (!selectedDeadline?.id) return
     
     try {
-        const response = await apiDelete(`/api/deadline/${selectedDeadline.id}`)
+        const response = await apiDelete(`/deadline/${selectedDeadline.id}`)
         
         if (response.success) {
             toast.success(response.data?.message || 'Deadline deleted successfully!')
@@ -482,7 +482,7 @@ const handleDeleteDeadline = async () => {
             setSelectedDeadline(null)
             
             // Refresh the deadlines list
-            const deadlinesResponse = await apiGet('/api/deadlines')
+            const deadlinesResponse = await apiGet('/deadlines')
             if (deadlinesResponse.success) {
                 setDeadLines(deadlinesResponse.data?.deadline || [])
             }

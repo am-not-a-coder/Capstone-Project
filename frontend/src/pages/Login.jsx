@@ -87,7 +87,7 @@ const Login = () => {
         try {
             
             // This automatically handles headers, error formatting, etc.
-            const response = await apiPost('/api/login', {
+            const response = await apiPost('/login', {
                 employeeID: employeeID.trim(),
                 password: password.trim()
             });
@@ -158,7 +158,7 @@ const Login = () => {
         setOtpLoading(true);
         setOtpError('');
         try {
-          const response = await apiPost('/api/verify-otp', {
+          const response = await apiPost('/verify-otp', {
             employeeID: employeeID.trim(),
             otp
           });
@@ -181,7 +181,7 @@ const Login = () => {
         if (resendCooldown > 0) return;
         try {
             setOtpError('');
-            const res = await apiPost('/api/login', {
+            const res = await apiPost('/login', {
             employeeID: employeeID.trim(),
             password: password.trim()
             });

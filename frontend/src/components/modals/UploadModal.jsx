@@ -142,7 +142,7 @@ const handleUpload = async () => {
     const csrf = getCookie('csrf_access_token');
 
     // Start chunked upload (do not await yet)
-    const uploadPromise = fetch('/api/accreditation/upload', {
+    const uploadPromise = fetch('/accreditation/upload', {
       method: 'POST',
       body: formData,
       credentials: 'include',
@@ -154,7 +154,7 @@ const handleUpload = async () => {
     const poll = async () => {
       if (stopped) return;
       try {
-        const pr = await fetch(`/api/upload/progress?filename=${encodeURIComponent(fileName)}`, { 
+        const pr = await fetch(`/upload/progress?filename=${encodeURIComponent(fileName)}`, { 
           credentials: 'include' 
         });
         const pj = await pr.json();
@@ -217,7 +217,7 @@ const handleUpload = async () => {
 
    const refreshAreas = async (programCode) => {
         try {
-           const response = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`, {withCredentials: true})
+           const response = await apiGet(`/accreditation?programCode=${encodeURIComponent(programCode)}`, {withCredentials: true})
           Array.isArray(response.data) ? setAreas(response.data) : setAreas([]);
         } catch(err) {
           console.error('Error refreshing areas:', err);

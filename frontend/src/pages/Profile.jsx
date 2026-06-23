@@ -71,7 +71,7 @@ useEffect(() => {
     const loadProfile = async () => {
         try {
             // Call backend API to get profile for currently logged-in user
-            const response = await apiGet(`/api/profile/${currentUser.employeeID}`)
+            const response = await apiGet(`/profile/${currentUser.employeeID}`)
             
             if (response.success && response.data.status === 'success') {
                 const { data } = response.data
@@ -146,7 +146,7 @@ const [form, setForm] = useState({
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const resp = await apiPost('/api/profile', {
+            const resp = await apiPost('/profile', {
                 suffix: form.suffix,
                 email: form.email,
                 experience: form.experience,

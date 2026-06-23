@@ -31,7 +31,7 @@ const CreateModal = ({onClick, onCreate, setShowCreateModal}) => {
     useEffect(() => {
         const fetchProgram = async () => {
             try{
-                const res = await apiGet('/api/program', {withCredentials: true})
+                const res = await apiGet('/program', {withCredentials: true})
                 Array.isArray(res.data.programs) ? setProgramOption(res.data.programs) : setProgramOption([]);
                 console.log(res.data.programs)
             } catch (err){
@@ -43,7 +43,7 @@ const CreateModal = ({onClick, onCreate, setShowCreateModal}) => {
     
     const fetchSubAreas = async (programCode) =>{
         try{
-            const res = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`,{withCredentials: true})
+            const res = await apiGet(`/accreditation?programCode=${encodeURIComponent(programCode)}`,{withCredentials: true})
 
             const allSubareas = [];
                 if (Array.isArray(res.data)) {res.data.forEach(area => {
@@ -66,7 +66,7 @@ const CreateModal = ({onClick, onCreate, setShowCreateModal}) => {
 
     const fetchStaticAreas = async () => {
         try{
-            const res = await apiGet(`/api/area/option`, {withCredentials: true})
+            const res = await apiGet(`/area/option`, {withCredentials: true})
             Array.isArray(res.data) ? setStaticAreaOption(res.data) : setStaticAreaOption([]);
         } catch(err){
             console.error("Error occurred when fetching area", err)
@@ -77,7 +77,7 @@ const CreateModal = ({onClick, onCreate, setShowCreateModal}) => {
 
     const fetchAreas = async (programCode) => {
         try{
-            const res = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`,{withCredentials: true})
+            const res = await apiGet(`/accreditation?programCode=${encodeURIComponent(programCode)}`,{withCredentials: true})
             Array.isArray(res.data) ? setAreaOption(res.data) : setAreaOption([]);
         } catch(err){
             console.error("Error occurred when fetching area", err)
@@ -93,7 +93,7 @@ const CreateModal = ({onClick, onCreate, setShowCreateModal}) => {
             formData.append("areaName", areaName)
 
         try{
-            const response = await apiPostForm('/api/accreditation/create_area', formData, {withCredentials: true});
+            const response = await apiPostForm('/accreditation/create_area', formData, {withCredentials: true});
             setShowStatusModal(true)
             setStatusMessage(response.data.message)
             setStatusType("success")    
@@ -112,7 +112,7 @@ const CreateModal = ({onClick, onCreate, setShowCreateModal}) => {
             formData.append("subAreaName", subAreaName)
             
         try{
-            const response = await apiPostForm('/api/accreditation/create_subarea', formData, {withCredentials: true});                   
+            const response = await apiPostForm('/accreditation/create_subarea', formData, {withCredentials: true});                   
             setShowStatusModal(true)
             setStatusMessage(response.data.message)
             setStatusType("success")
@@ -133,7 +133,7 @@ const CreateModal = ({onClick, onCreate, setShowCreateModal}) => {
         formData.append("criteria", criteria)
 
         try{
-            const response = await apiPostForm('/api/accreditation/create_criteria', formData, {withCredentials: true});
+            const response = await apiPostForm('/accreditation/create_criteria', formData, {withCredentials: true});
             setShowStatusModal(true)
             setStatusMessage(response.data.message)
             setStatusType("success")

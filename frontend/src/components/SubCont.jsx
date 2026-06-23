@@ -80,7 +80,7 @@ const SubCont = ({title, subareaID, criteria, programCode, areaName, subareaName
 
     const handleApprove = async (docID) => {
         try{
-           const res = await apiPut('/api/program/approve', {docID})
+           const res = await apiPut('/program/approve', {docID})
 
             setShowStatusModal(true)
             setStatusMessage(res.data.message)
@@ -96,7 +96,7 @@ const SubCont = ({title, subareaID, criteria, programCode, areaName, subareaName
 
     const handleReject = async (docID) => {
         try{
-           const res = await apiPut('/api/program/reject', {docID})
+           const res = await apiPut('/program/reject', {docID})
 
             setShowStatusModal(true)
             setStatusMessage(res.data.message)

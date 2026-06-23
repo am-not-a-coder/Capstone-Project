@@ -34,7 +34,7 @@ export const SidebarContext = createContext();
     useEffect(() => {
         const fetchDirectory = async () => {
             try {
-                const res = await apiGet('/api/documents');
+                const res = await apiGet('/documents');
                 setDirectory(res.data);
             } catch (err) {
                 console.error("Failed to fetch directory:", err);
@@ -53,7 +53,7 @@ export const SidebarContext = createContext();
       setLoading(true)
       const delayDebounce = setTimeout(async () => {
         try {
-          const res = await apiGet(`/api/search?q=${encodeURIComponent(query)}`);
+          const res = await apiGet(`/search?q=${encodeURIComponent(query)}`);
     
           Array.isArray(res.data) ? setResults(res.data) : setResults([]);
           console.log(res.data); // should log Array(2)
@@ -72,7 +72,7 @@ export const SidebarContext = createContext();
         e.preventDefault()
         if(!query.trim()) return
         try{
-            const res = await apiGet(`/api/search?q=${encodeURIComponent(query)}`)     
+            const res = await apiGet(`/search?q=${encodeURIComponent(query)}`)     
             Array.isArray(res.data) ? setResults(res.data) : setResults([])
             console.log(res.data)
 			} catch(err){console.error("Search failed: ", err)}

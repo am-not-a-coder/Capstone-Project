@@ -109,7 +109,7 @@ const Messages = () => {
     const fetchConversations = async () => {
       try {
         setLoading(true)
-        const res = await apiGet('/api/conversations')
+        const res = await apiGet('/conversations')
         if (!mounted) return
         if (res?.success) {
           const msgs = (res.data.conversations || []).map(c => ({
@@ -142,7 +142,7 @@ const Messages = () => {
     const loadUsers = async () => {
       if (!showNewMsgModal) return
       try {
-        const res = await apiGet('/api/users')
+        const res = await apiGet('/users')
         if (!mounted || !res?.success) return
         const list = (res.data?.users || []).map(u => ({
           id: String(u.employeeID),
@@ -162,7 +162,7 @@ const Messages = () => {
     let mounted = true
     const seedPresence = async () => {
       try {
-        const res = await apiGet('/api/users/online-status')
+        const res = await apiGet('/users/online-status')
         if (!mounted || !res?.success) return
         const ids = new Set((res.data?.users || [])
           .filter(u => u.online_status)
@@ -246,7 +246,7 @@ const Messages = () => {
 
   const fetchMessages = async (conversationId) => {
     try {
-      const res = await apiGet(`/api/conversations/${conversationId}/message`)
+      const res = await apiGet(`/conversations/${conversationId}/message`)
       if (res?.success) {
         const currentId = getCurrentUser()?.employeeID
         const otherPic =
@@ -284,7 +284,7 @@ const Messages = () => {
     const socket = getSocket()
     socket.emit('leave_conversation', { conversationID: conversationId })
   
-    const res = await apiDelete(`/api/conversations/${conversationId}`)
+    const res = await apiDelete(`/conversations/${conversationId}`)
     if (res?.success) {
       // remove from left list
       setMessages(prev => prev.filter(m => m.conversationId !== conversationId))
@@ -377,7 +377,7 @@ const Messages = () => {
     setNewMessage("")
   
     try {
-      await apiPost(`/api/conversations/${conversationId}/message`, { content: optimistic.message })
+      await apiPost(`/conversations/${conversationId}/message`, { content: optimistic.message })
       // Recipient will get WS new_message; this tab is already updated optimistically
     } catch (e) {
       console.error('Send failed:', e)
@@ -581,7 +581,7 @@ const Messages = () => {
                             onClick={async () => {
                               if (!window.confirm('Delete this message for you only?')) return
                               try {
-                                const res = await apiDelete(`/api/messages/${msg.id}`)
+                                const res = await apiDelete(`/messages/${msg.id}`)
                                 if (res && res.success) {
                                   const convId = selectedConversation?.conversationId
                                   if (!convId) return
@@ -712,7 +712,7 @@ const Messages = () => {
                         return
                       }
                       try {
-                        const res = await apiPost('/api/conversations/start', { participantID: u.id })
+                        const res = await apiPost('/conversations/start', { participantID: u.id })
                         if (res && res.success && res.data && res.data.conversationID) {
                           const newConvId = String(res.data.conversationID)
                           const item = {

@@ -55,7 +55,7 @@ const Accreditation = () => {
 
       try {
         // Use our centralized API utility - no manual token handling!
-        const response = await apiGet('/api/program');
+        const response = await apiGet('/program');
   
             if (response.success) {
               Array.isArray(response.data.programs) ? setPrograms(response.data.programs) : setPrograms([]);
@@ -78,7 +78,7 @@ const Accreditation = () => {
     //Fetch areas from specific programs
       const fetchAreasForProgram = async (programCode) => {
         try {
-          const response = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`)
+          const response = await apiGet(`/accreditation?programCode=${encodeURIComponent(programCode)}`)
           Array.isArray(response.data) ? setArea(response.data) : setArea([]);
         } catch(err){
           console.log(err.response?.data || err.message);
@@ -88,7 +88,7 @@ const Accreditation = () => {
       
   const refreshAreas = async (programCode) => {
     try {
-      const response = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`, 
+      const response = await apiGet(`/accreditation?programCode=${encodeURIComponent(programCode)}`, 
       {withCredentials: true})
       Array.isArray(response.data) ? setArea(response.data) : setArea([]);
       console.log("Refreshing areas...")
@@ -109,7 +109,7 @@ const handleFilePreview = useCallback(async (docName, docPath) => {
     // apiGetBlob should return a Blob; if it returns JSON with error, catch it
     let resp;
     try {
-      resp = await apiGetBlob(`/api/accreditation/preview/${encodeURIComponent(docName)}`);
+      resp = await apiGetBlob(`/accreditation/preview/${encodeURIComponent(docName)}`);
     } catch (blobErr) {
       console.error('Blob fetch error:', blobErr);
       setError(`Failed to load document: ${blobErr.message || 'Network error'}`);
@@ -217,7 +217,7 @@ const handleSubareaSelect = (subarea) => {
 
     const fetchAreaRating = async (programCode, areaID) => {
     try {
-      const res = await apiGet(`/api/accreditation/rate/subarea/${programCode}/${areaID}`);
+      const res = await apiGet(`/accreditation/rate/subarea/${programCode}/${areaID}`);
 
       let total = 0;
       let count = 0;

@@ -121,8 +121,8 @@ const Users = () => {
         // Get detailed program and area information for the Select components
         try {
             // Fetch all programs and areas to match with user's assigned ones
-            const programsRes = await apiGet('/api/program')
-            const areasRes = await apiGet('/api/area')
+            const programsRes = await apiGet('/program')
+            const areasRes = await apiGet('/area')
 
             if (programsRes.success && areasRes.success) {
                 // Map user program names to program objects
@@ -277,7 +277,7 @@ const Users = () => {
           setLoading(true)
 
           //Post request
-          const res = await apiPostForm('/api/user', formData, {withCredentials: true});
+          const res = await apiPostForm('/user', formData, {withCredentials: true});
 
           
           setStatusMessage(res.data.message);
@@ -296,7 +296,7 @@ const Users = () => {
                   name: `${fName} ${lName} ${suffix}`,
                   email,
                   contactNum,
-                  profilePic: profilePic?.file ? `/api/user/profile-pic/${employeeID}` : null,
+                  profilePic: profilePic?.file ? `/user/profile-pic/${employeeID}` : null,
                   programID,
                   areaID,
                   programName: selectedProgramName,
@@ -348,7 +348,7 @@ const Users = () => {
     setUsersLoading(true)
       try {                
           // Get the users
-          const res = await apiGet('/api/users');            
+          const res = await apiGet('/users');            
 
           if (Array.isArray(res.data.users)) {
               // Get profile pictures for each user
@@ -356,7 +356,7 @@ const Users = () => {
                   res.data.users.map(async (user) => {
                       try {
                           if (user.profilePic) {
-                              const picRes = await apiGetBlob(`/api/user/profile-pic/${user.employeeID}`);
+                              const picRes = await apiGetBlob(`/user/profile-pic/${user.employeeID}`);
                               
                               // Check if the request was successful
                               if (picRes && picRes.success && picRes.data) {
@@ -397,7 +397,7 @@ useEffect(() => {
   if (!isAdmin && !isCoAdmin) return 
   const fetchProgram = async () =>{
 
-      const res = await apiGet('/api/program', 
+      const res = await apiGet('/program', 
           {withCredentials: true}
       )
 
@@ -414,7 +414,7 @@ useEffect(() => {
 
   useEffect(() => {
   const fetchArea = async () => {
-     const res = await apiGet('/api/area', 
+     const res = await apiGet('/area', 
           {withCredentials: true}
      )
      try{
@@ -430,7 +430,7 @@ useEffect(() => {
   useEffect(() => {
     const fetchAreaReference = async () => {
       try {
-        const res = await apiGet('/api/area/option', {withCredentials: true})
+        const res = await apiGet('/area/option', {withCredentials: true})
         
         const areaOptions = res.data.map((area, index) => ({
           value: index + 1, // Using index as value since AreaReference might not have areaID
@@ -469,7 +469,7 @@ useEffect(() => {
 
       try{
 
-          const res = await apiDelete(`/api/user/${id}`,
+          const res = await apiDelete(`/user/${id}`,
               {withCredentials: true});
 
           
@@ -479,7 +479,7 @@ useEffect(() => {
           removeAndClose();
 
           // Refresh Users
-          const userRes = await apiGet('/api/users');
+          const userRes = await apiGet('/users');
           setSubmittedUsers(userRes.data);
 
       } catch(err){
@@ -506,7 +506,7 @@ useEffect(() => {
   useEffect(() => {
     const fetchFolders = async () => {
         try {
-            const res = await apiGet('/api/documents')
+            const res = await apiGet('/documents')
            
             
             // Based on your console output, the structure is:

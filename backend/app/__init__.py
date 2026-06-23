@@ -53,10 +53,10 @@ def create_app():
     mail.init_app(app)
 
     # Initialize CORS
-    CORS(app, origins=['http://localhost:5173', 'http://localhost:3000', 'http://localhost:8080'], supports_credentials=True)
+    CORS(app, origins=['http://localhost:5173', 'http://localhost:3000', 'http://localhost:8080', "https://desktop-243tu81.taile39756.ts.net/"], supports_credentials=True)
 
     # Initialize SocketIO with CORS settings
-    socketio.init_app(app, cors_allowed_origins=["http://localhost:5173", "http://localhost:3000", "http://localhost:8080"], 
+    socketio.init_app(app, cors_allowed_origins=["http://localhost:5173", "http://localhost:3000", "http://localhost:8080", "https://desktop-243tu81.taile39756.ts.net/"], 
                       async_mode='threading', logger=True, engineio_logger=True)
 
     from app.routes import register_routes

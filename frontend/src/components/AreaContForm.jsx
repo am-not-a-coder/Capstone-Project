@@ -23,7 +23,7 @@ export default function AreaContForm({title, onClick, isExpanded, onIconClick, s
    
     const saveRating = async () => {
         try{
-            await apiPost('/api/accreditation/rate/area', {
+            await apiPost('/accreditation/rate/area', {
                 areaID: areaID,
                 rating: areaRating
             })

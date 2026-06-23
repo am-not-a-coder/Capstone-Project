@@ -25,7 +25,7 @@ const CollegeInfoModal = ({ college, isOpen, onClose }) => {
     const fetchPrograms = async () => {
       setLoading(true);
       try {
-        const response = await apiGet(`/api/institute/programs?instID=${college.instID}`);
+        const response = await apiGet(`/institute/programs?instID=${college.instID}`);
 
         if (response.success && Array.isArray(response.data.programs)) {
           setPrograms(response.data.programs);

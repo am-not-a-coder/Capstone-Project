@@ -83,7 +83,7 @@ import toast, { Toaster } from 'react-hot-toast'
   formData.append('subareaName', uploadData.subareaName);
   formData.append('criteriaType', uploadData.criteriaType);
 
-  const res = await fetch('/api/accreditation/upload', {
+  const res = await fetch('/accreditation/upload', {
     method: 'POST',
     body: formData,
     credentials: 'include'
@@ -97,7 +97,7 @@ import toast, { Toaster } from 'react-hot-toast'
     const poll = async () => {
       try {
         const progressRes = await fetch(
-          `/api/upload/progress?filename=${encodeURIComponent(filename)}`, 
+          `/upload/progress?filename=${encodeURIComponent(filename)}`, 
           { credentials: 'include' }
         );
         const progressData = await progressRes.json();
@@ -166,7 +166,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
     setProgramLoading(true)
 
     try {
-      const response = await apiGet(`/api/program`);
+      const response = await apiGet(`/program`);
 
       if (response?.success || response?.data?.success) {
         const programsArr = response.data?.programs ?? response.programs ?? [];
@@ -198,7 +198,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
     useEffect(() => {
       const fetchInstitutes = async () => {
         try {
-          const response = await apiGet('/api/institute');
+          const response = await apiGet('/institute');
           
           if (response?.success || response?.data?.success) {
             const institutesArr = response.data?.institutes ?? response.institutes ?? [];
@@ -226,7 +226,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
       const fetchEmployees = async () => {
         try {
          
-          const response = await apiGet('/api/users');
+          const response = await apiGet('/users');
           
           if (response.success) {
           Array.isArray(response.data.users) ? setEmployees(response.data.users) : setEmployees([]);
@@ -246,7 +246,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
       const fetchInstitutes = async () => {
         try {
          
-          const response = await apiGet('/api/institute');
+          const response = await apiGet('/institute');
           
           if (response.success) {
           Array.isArray(response.data.institutes) ? setInstituteOption(response.data.institutes) : setInstituteOption([]);
@@ -267,7 +267,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
     useEffect(() => {
       const fetchCriteria = async () => {
         try {
-          const response = await apiGet("/api/criteria");
+          const response = await apiGet("/criteria");
           setCriteria(response.data);
 
           // Build done state from DB values
@@ -288,7 +288,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
     //Fetch areas from specific programs
         const fetchAreasForProgram = async (programCode) => {
           try {
-            const response = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`)
+            const response = await apiGet(`/accreditation?programCode=${encodeURIComponent(programCode)}`)
 
             if(Array.isArray(response.data)) { 
               setAreas(response.data)
@@ -305,7 +305,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
 
     const refreshAreas = async (programCode) => {      
       try {
-        const response = await apiGet(`/api/accreditation?programCode=${encodeURIComponent(programCode)}`, {withCredentials: true})
+        const response = await apiGet(`/accreditation?programCode=${encodeURIComponent(programCode)}`, {withCredentials: true})
         Array.isArray(response.data) ? setAreas(response.data) : setAreas([]);
       } catch(err) {
         console.error('Error refreshing areas:', err);
@@ -383,7 +383,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
 
       try {
         
-        const response = await apiPost(`/api/program`, payload);
+        const response = await apiPost(`/program`, payload);
 
         const success = !!(response?.success || response?.data?.success);
         const message = response?.message || response?.data?.message || 'Program Created Successfully!';
@@ -431,7 +431,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
         const programId = programs[editIndex].programID;
 
         // Send PUT request
-        const response = await apiPut(`/api/program/${programId}`, payload);
+        const response = await apiPut(`/program/${programId}`, payload);
 
         const success = !!(response?.success || response?.data?.success);
         const message = response?.message || response?.data?.message || 'Program updated successfully!'
@@ -473,7 +473,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
         const programId = programs[editIndex].programID;
 
         // Send DELETE request
-        const response = await apiDelete(`/api/program/${programId}`);
+        const response = await apiDelete(`/program/${programId}`);
 
         // Response handling
         const success = !!response?.success;
@@ -619,7 +619,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
       setDocs([]);
       setShowPreview(true);
 
-      const blobRes = await apiGetBlob(`/api/accreditation/preview/${encodeURIComponent(docName)}`);
+      const blobRes = await apiGetBlob(`/accreditation/preview/${encodeURIComponent(docName)}`);
 
       if (!blobRes.success || !(blobRes.data instanceof Blob)) {
         throw new Error('File preview failed or file is not a valid Blob.');
@@ -679,7 +679,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
   const toggleDone = async (criteriaID) => {
     const newStatus = !done[criteriaID];
     try {
-      await apiPut(`/api/criteria/${criteriaID}/done`, { isDone: newStatus });
+      await apiPut(`/criteria/${criteriaID}/done`, { isDone: newStatus });
       setDone(prev => ({
         ...prev,
         [criteriaID]: newStatus
@@ -696,7 +696,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
   // ================ Edit ================
  const handleEditArea = async (areaID, areaName, areaNum) => {
     try {
-      const res = await apiPut(`/api/areas/${areaID}/edit`, {
+      const res = await apiPut(`/areas/${areaID}/edit`, {
         areaNum,
         areaName,
       });
@@ -716,7 +716,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
 
   const handleEditSubarea = async (subareaID, subareaName) => {
     try {
-      const res = await apiPut(`/api/subareas/${subareaID}/edit`, {
+      const res = await apiPut(`/subareas/${subareaID}/edit`, {
         subareaName,
       });
 
@@ -734,7 +734,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
 
   const handleEditCriteria = async (criteriaID, criteriaContent) => {
     try {
-      const res = await apiPut(`/api/criterias/${criteriaID}/edit`, {
+      const res = await apiPut(`/criterias/${criteriaID}/edit`, {
         criteriaContent,
       });
 
@@ -753,7 +753,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
   // ================ Delete ================
   const handleDeleteArea = async (areaID) => {
     try{
-      const res = await apiDelete(`/api/areas/${areaID}/delete`)
+      const res = await apiDelete(`/areas/${areaID}/delete`)
       if(res.success){
         toast.success(res.data.message || 'Area deleted!')
         await refreshAreas(selectedProgram.programCode)
@@ -768,7 +768,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
 
   const handleDeleteSubarea = async (subareaID) => {
     try{
-      const res = await apiDelete(`/api/subareas/${subareaID}/delete`)
+      const res = await apiDelete(`/subareas/${subareaID}/delete`)
       if(res.success){
         toast.success(res.data.message || 'Subarea deleted!')
         await refreshAreas(selectedProgram.programCode)
@@ -783,7 +783,7 @@ const handleDocUpload = async (file, criteriaID, criteriaType) => {
 
   const handleDeleteCriteria = async (criteriaID) => {
     try{
-      const res = await apiDelete(`/api/criterias/${criteriaID}/delete`)
+      const res = await apiDelete(`/criterias/${criteriaID}/delete`)
       if(res.success){
         toast.success(res.data.message || 'Criteria deleted!')
         await refreshAreas(selectedProgram.programCode)

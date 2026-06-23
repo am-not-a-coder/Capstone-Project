@@ -129,7 +129,7 @@ const Documents = () => {
     
   const fetchTags = async () => {
       try{
-        const res = await apiGet('/api/documents/tags')
+        const res = await apiGet('/documents/tags')
 
         setTags(Array.isArray(res.data) ? res.data : [])        
       } catch (err) {
@@ -144,7 +144,7 @@ const Documents = () => {
   useEffect(() => {
     const fetchDirectory = async () => {
       try{
-        const res = await apiGet('/api/documents');
+        const res = await apiGet('/documents');
         setDirectory(res.data)
         console.log("Directories fetched...", res.data)
       } catch (err){
@@ -229,7 +229,7 @@ const Documents = () => {
 
   const refreshDirectory = async () => {
     // Refresh directory
-    const updatedRes = await apiGet('/api/documents');
+    const updatedRes = await apiGet('/documents');
     setDirectory(updatedRes.data);
   }  
 
@@ -258,18 +258,18 @@ const Documents = () => {
 
   const handlePreview = (file) => {
     const encodedPath = buildFullRepoPath(currentPath, file.name);
-    window.open(`${API_URL}/api/documents/preview/${encodedPath}`, "_blank");
+    window.open(`${API_URL}/documents/preview/${encodedPath}`, "_blank");
   }
 
   const handleDownload = (file) => {
     const encodedPath = buildFullRepoPath(currentPath, file.name);
-    window.location.href = `${API_URL}/api/documents/download/${encodedPath}`;
+    window.location.href = `${API_URL}/documents/download/${encodedPath}`;
   }
 
   const handleDelete = async (docID) => {
   setIsLoading(true);  
   try {
-    const res = await apiDelete(`/api/documents/delete_file/${docID}`);
+    const res = await apiDelete(`/documents/delete_file/${docID}`);
     console.log("Deleted: ", res.data)
     setShowStatusModal(true);
     setStatusMessage(res.data.message);
@@ -280,7 +280,7 @@ const Documents = () => {
     
 
     // Refresh document files
-   const updatedRes = await apiGet('/api/documents');
+   const updatedRes = await apiGet('/documents');
    setDirectory(updatedRes.data);
 
   } catch (err) {
@@ -382,7 +382,7 @@ const handleRename = async (target) => {
   const newPath = `${BASE_PATH}/${relativeNewPath}`;
 
   try {
-    await apiPut("/api/documents/rename", { oldPath, newPath });
+    await apiPut("/documents/rename", { oldPath, newPath });
     await refreshDirectory();
 
   } catch (err) {
@@ -404,7 +404,7 @@ useEffect(() => {
   setLoading(true)
   const delayDebounce = setTimeout(async () => {
     try {
-      const res = await apiGet(`/api/search?q=${encodeURIComponent(query)}`);
+      const res = await apiGet(`/search?q=${encodeURIComponent(query)}`);
 
       Array.isArray(res.data) ? setResults(res.data) : setResults([]);
       console.log(res.data); // should log Array(2)
@@ -423,7 +423,7 @@ useEffect(() => {
     e.preventDefault();
     if(!query.trim()) return;
     try{
-        const res = await apiGet(`/api/search?q=${encodeURIComponent(query)}`);      
+        const res = await apiGet(`/search?q=${encodeURIComponent(query)}`);      
 
         Array.isArray(res.data) ? setResults(res.data) : setResults([]);
         console.log(res.data); 
@@ -450,7 +450,7 @@ useEffect(() => {
   
   const filterDocByTag = async (tag) => {
     try{
-      const res = await apiGet(`/api/documents/filter?tag=${encodeURIComponent(tag)}`)
+      const res = await apiGet(`/documents/filter?tag=${encodeURIComponent(tag)}`)
       console.log("Filtered docs structure:", res.data);
       setFilteredDocs(res.data);
       setActiveTags([tag]);

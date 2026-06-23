@@ -1,5 +1,6 @@
 // Base API URL from environment variables for flexibility
-export const API_URL = import.meta.env.VITE_APP_API_URL || 'http://localhost:5000'
+// export const API_URL = import.meta.env.VITE_APP_API_URL
+export const API_URL = "/api"
 
 const getCookie = (name) => {
     const m = document.cookie.match(new RegExp('(^|; )' + name + '=([^;]+)'))
@@ -39,7 +40,7 @@ export const MakeApiCalls = async (endpoint, options = {}) => {
         // Handle 401 Unauthorized - try to refresh token once
         if (response.status === 401 && !endpoint.includes('/login') && !endpoint.includes('/refresh-token')) {
             try {
-                const refreshResponse = await fetch(`${API_URL}/api/refresh-token`, {
+                const refreshResponse = await fetch(`${API_URL}/refresh-token`, {
                     method: 'POST',
                     credentials: 'include',
                     headers: {
@@ -146,7 +147,7 @@ const refreshAccessToken = async () => {
     }
 
     try {
-        const response = await fetch(`${API_URL}/api/refresh-token`, {
+        const response = await fetch(`${API_URL}/refresh-token`, {
             method: 'POST',
             credentials: 'include',
             headers: {

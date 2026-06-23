@@ -108,7 +108,7 @@ export default function TemplateBuilder({onClose, template = null}) {
   useEffect(() => {
     const fetchAreaOption = async () => {
       try{
-        const res = await apiGet(`/api/area/option`);
+        const res = await apiGet(`/area/option`);
 
         Array.isArray(res.data) ? setAreaOption(res.data) : setAreaOption([]);
       } catch (err) {
@@ -339,8 +339,8 @@ export default function TemplateBuilder({onClose, template = null}) {
       };      
 
       const endpoint = isEditMode 
-      ? `/api/templates/edit/${template.templateID}`
-      : "/api/templates/create"
+      ? `/templates/edit/${template.templateID}`
+      : "/templates/create"
 
       const res = isEditMode ? await apiPut(endpoint, data) : await apiPost(endpoint, data);
                 

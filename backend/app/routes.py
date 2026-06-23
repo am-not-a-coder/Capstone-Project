@@ -342,7 +342,7 @@ def register_routes(app):
         return session_id
 
     #Audit session expired
-    @app.route('/api/session-expired', methods=["POST"])
+    @app.route('/session-expired', methods=["POST"])
     def sessionExpired():
         try:
             data = request.get_json() or {}
@@ -379,7 +379,7 @@ def register_routes(app):
             return jsonify({'success': False, 'error': str(e)}), 500
         
     # Audit Logout
-    @app.route('/api/logout', methods=["POST"])
+    @app.route('/logout', methods=["POST"])
     @jwt_required()
     def logout():
         try:
@@ -1203,7 +1203,7 @@ def register_routes(app):
                 'name': f"{user.fName} {user.lName} {user.suffix or ''}",
                 'email': user.email,
                 'contactNum': user.contactNum,
-                'profilePic': f"/api/user/profile-pic/{user.employeeID}" if user.profilePic else None,
+                'profilePic': f"/user/profile-pic/{user.employeeID}" if user.profilePic else None,
                 'isAdmin': user.isAdmin,
                 'isCoAdmin': user.isCoAdmin,
                 'isRating': user.isRating,
@@ -1908,7 +1908,7 @@ def register_routes(app):
 
         return jsonify({'success': True, 'message': 'Criteria marked as done'}), 200
 
-    @app.route('/api/area/progress', methods=["PUT"])
+    @app.route('/area/progress', methods=["PUT"])
     def save_area_progress():
         data = request.get_json()
         areaID = data.get("areaID")
@@ -1928,7 +1928,7 @@ def register_routes(app):
 
         return jsonify({'success': True, 'message': 'Area progress saved!'}), 200
 
-    @app.route('/api/area/option', methods=["GET"])
+    @app.route('/area/option', methods=["GET"])
     def get_area_option():
 
         area_options = AreaReference.query.all()
@@ -3499,7 +3499,7 @@ def register_routes(app):
         return jsonify(sorted_tags), 200
 
 
-    @app.route('/api/documents/filter', methods=["GET"])
+    @app.route('/documents/filter', methods=["GET"])
     def filter_by_tags():
         tag = request.args.get('tag', "").strip()
 
@@ -3528,7 +3528,7 @@ def register_routes(app):
 
 
     # Smart Searching Feature
-    @app.route('/api/search', methods=["GET"])
+    @app.route('/search', methods=["GET"])
     def search_document():
         query = request.args.get('q', '').strip()
         if not query:
@@ -4252,7 +4252,7 @@ def register_routes(app):
     
     # ============================================ Template Routes ============================================
 
-    @app.route('/api/templates', methods=["GET"])
+    @app.route('/templates', methods=["GET"])
     @jwt_required()
     def get_templates():
         data = (
@@ -4391,7 +4391,7 @@ def register_routes(app):
 
 
 
-    @app.route('/api/templates/create', methods=["POST"])
+    @app.route('/templates/create', methods=["POST"])
     @jwt_required()
     def create_template():
         import traceback
@@ -4496,7 +4496,7 @@ def register_routes(app):
             return jsonify({"success": False, "message": f"Failed to save template: {str(e)}"}), 500
 
 
-    @app.route('/api/programs/apply-template/<int:templateID>', methods=["POST"])
+    @app.route('/programs/apply-template/<int:templateID>', methods=["POST"])
     @jwt_required()
     def apply_template(templateID): 
         userID = get_jwt_identity()
@@ -4597,7 +4597,7 @@ def register_routes(app):
 
 
 
-    @app.route("/api/templates/edit/<int:templateID>", methods=["PUT"])
+    @app.route("/templates/edit/<int:templateID>", methods=["PUT"])
     @jwt_required()
     def edit_template(templateID):
         data = request.get_json()
@@ -4770,7 +4770,7 @@ def register_routes(app):
 
 
 
-    @app.route('/api/templates/delete/<int:templateID>', methods=["DELETE"])
+    @app.route('/templates/delete/<int:templateID>', methods=["DELETE"])
     @jwt_required()
     def delete_template(templateID):
         userID = get_jwt_identity()
@@ -4833,7 +4833,7 @@ def register_routes(app):
 
     # =================================== SECURITY DASHBOARD ROUTES ===================================
     
-    @app.route('/api/security/dashboard', methods=['GET'])
+    @app.route('/security/dashboard', methods=['GET'])
     @jwt_required()
     def security_dashboard():
         """Get security dashboard data - Admin only"""
@@ -4872,7 +4872,7 @@ def register_routes(app):
                 'message': 'Failed to load security dashboard'
             }), 500
     
-    @app.route('/api/security/unblock-ip', methods=['POST'])
+    @app.route('/security/unblock-ip', methods=['POST'])
     @jwt_required()
     def unblock_ip():
         """Manually unblock an IP address - Admin only"""
@@ -4926,7 +4926,7 @@ def register_routes(app):
                 'message': 'Failed to unblock IP'
             }), 500
 
-    # @app.route('/api/upload/chunked', methods=['POST'])
+    # @app.route('/upload/chunked', methods=['POST'])
     # @jwt_required()
     # def upload_chunked():
     #     empID = get_jwt_identity()
@@ -5020,7 +5020,7 @@ def register_routes(app):
     #         current_app.logger.error(f"upload_chunked failed: {e}")
     #         return jsonify({'success': False, 'message': 'Upload failed', 'details': str(e)}), 500
 
-    @app.route('/api/upload/progress', methods=['GET'])
+    @app.route('/upload/progress', methods=['GET'])
     @jwt_required()
     def upload_progress():
         empID = get_jwt_identity()

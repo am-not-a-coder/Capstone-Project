@@ -110,7 +110,7 @@ function App() {
          
           
           // Validate existing session
-          const validationResponse = await apiPost('/api/validate-session', { 
+          const validationResponse = await apiPost('/validate-session', { 
             session_id: existingSessionId 
           })
 
@@ -120,7 +120,7 @@ function App() {
             // Audit session expiration BEFORE clearing storage
             if (user) {
               try {
-                  apiPost('/api/session-expired', {
+                  apiPost('/session-expired', {
                   employeeID: user.employeeID,
                   session_id: existingSessionId
                 })

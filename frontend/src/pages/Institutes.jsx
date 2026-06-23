@@ -32,7 +32,7 @@ const Institutes = () => {
 
             try {
               console.log("Fetching institutes...");
-              const response = await apiGet('/api/institute');
+              const response = await apiGet('/institute');
 
               if (response.success && response.data.institutes) {
 
@@ -42,7 +42,7 @@ const Institutes = () => {
               if (Array.isArray(instituteData)) {
                   const mappedInstitutes = instituteData.map((inst) => {
                   const logoUrl = inst.instPic
-                    ? `${API_URL}/api/institute/logos/${inst.instCode}`
+                    ? `${API_URL}/institute/logos/${inst.instCode}`
                     : "../assets/UDM-logo.png";
 
                   return {
@@ -78,7 +78,7 @@ const Institutes = () => {
         useEffect(() => {
           const fetchEmployees = async () => {
             try{
-              const res = await apiGet('/api/users')
+              const res = await apiGet('/users')
 
               Array.isArray(res.data.users) ? setEmployees(res.data.users) : setEmployees([]);
               
@@ -117,7 +117,7 @@ const Institutes = () => {
           
           console.log("Submitting Form: ", form)
           try {
-            const response = await apiPostForm('/api/institutes', formData);
+            const response = await apiPostForm('/institutes', formData);
 
             setShowStatusModal(true);
             setStatusMessage(response.data.message);
@@ -164,7 +164,7 @@ const Institutes = () => {
             formData.append("instPic", form.instPic); // optional
 
             // Send POST request with FormData
-            response = await apiPutForm(`/api/institute/${instituteToEdit.instID}`, formData);
+            response = await apiPutForm(`/institute/${instituteToEdit.instID}`, formData);
 
           } else {
             // No new logo file — do a JSON PUT (only changed fields)
@@ -173,7 +173,7 @@ const Institutes = () => {
             if (form.instName) instituteData.instName = form.instName;
             if (form.employeeID) instituteData.employeeID = form.employeeID;
             // Send PUT request
-            response = await apiPut(`/api/institute/${instituteToEdit.instID}`, instituteData);
+            response = await apiPut(`/institute/${instituteToEdit.instID}`, instituteData);
           }
 
           if (response.success) {
@@ -214,7 +214,7 @@ const Institutes = () => {
 
           try {
             // Send DELETE request
-            const response = await apiDelete(`/api/institute/${instituteToDelete.instID}`);
+            const response = await apiDelete(`/institute/${instituteToDelete.instID}`);
 
             if (response.success) {
               // Success handling

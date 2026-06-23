@@ -6,6 +6,7 @@ import './App.css'
 import Sidebar, { SidebarLinks } from './components/Sidebar';
 import Switch from './components/Switch';
 import Header from './components/Header';
+import Footer from './components/Footer';
 import logOut from './assets/log_out.svg';
 //Importing  Icons
 import{
@@ -105,14 +106,16 @@ const MainLayout = () => {
           </Sidebar>
             
           
-          
           {/* Main Content */}
 
           <main id="main-scroll" className="relative flex-1 h-full col-span-4 col-start-2 row-span-5 row-start-1 p-4 overflow-y-auto">
             <Header title={activePage} />
             <Outlet />
-          </main>
-         
+            <Footer />
+          </main>         
+          
+
+
       </div>
       
       {showLogout && (
@@ -133,7 +136,7 @@ const MainLayout = () => {
                  setShowLogout(false)
                  
                  // Send session ID to backend (employeeID is optional now)
-                 await apiPost('/api/logout', { 
+                 await apiPost('/logout', { 
                    session_id: sessionId, 
                    employeeID: user?.employeeID || null
                  })

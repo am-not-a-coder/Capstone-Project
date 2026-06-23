@@ -58,7 +58,7 @@ export default function Templates() {
     const fetchTemplates = async () => {
             try{
                 setLoading(true);
-                const res = await apiGet(`/api/templates`)
+                const res = await apiGet(`/templates`)
 
                 Array.isArray(res.data) ? setTemplates(res.data) : setTemplates([]);
             } catch(err){
@@ -77,7 +77,7 @@ export default function Templates() {
     useEffect(() => {
         const fetchPrograms = async () => {
             try{
-                const res = await apiGet(`/api/program`)
+                const res = await apiGet(`/program`)
 
                 Array.isArray(res.data.programs) ? setProgramOptions(res.data.programs) : setProgramOptions([]);             
             } catch(err){
@@ -104,7 +104,7 @@ export default function Templates() {
         } try{
           setLoading(true);
 
-          const res = await apiPost(`/api/programs/apply-template/${templateID}`, { programIDs: selectedProgram,})
+          const res = await apiPost(`/programs/apply-template/${templateID}`, { programIDs: selectedProgram,})
           if (res.success){
             setLoading(false);            
             setShowStatusModal(true);
@@ -145,7 +145,7 @@ export default function Templates() {
 
     const handleDelete = async (templateID) => {
         try{
-            const res = await apiDelete(`/api/templates/delete/${templateID}`);
+            const res = await apiDelete(`/templates/delete/${templateID}`);
             setShowStatusModal(true);
             setStatusMessage(res.data.message);
             setStatusType("success");

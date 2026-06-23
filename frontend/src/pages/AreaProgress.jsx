@@ -137,7 +137,7 @@ const AreaProgressPage = () => {
   useEffect(() => {
     const fetchPrograms = async () => {
       try {
-        const res = await apiGet('/api/program', { withCredentials: true })
+        const res = await apiGet('/program', { withCredentials: true })
         if (Array.isArray(res.data.programs)) {
           const programsData = res.data.programs.map(program => ({
             code: program.programCode,
@@ -165,7 +165,7 @@ const AreaProgressPage = () => {
     const fetchAreas = async () => {
       setLoading(true)
       try {
-        const res = await apiGet('/api/area', { withCredentials: true })
+        const res = await apiGet('/area', { withCredentials: true })
         if (Array.isArray(res.data.area)) {
           // Process the area data to match your component structure
           const processedAreas = res.data.area.map(area => ({
@@ -284,8 +284,8 @@ const AreaProgressPage = () => {
     try {
       // Refetch both programs and areas
       const [programRes, areaRes] = await Promise.all([
-        apiGet('/api/program', { withCredentials: true }),
-        apiGet('/api/area', { withCredentials: true })
+        apiGet('/program', { withCredentials: true }),
+        apiGet('/area', { withCredentials: true })
       ])
 
       // Update programs

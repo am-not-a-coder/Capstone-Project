@@ -21,7 +21,7 @@ const SelfRateModal = ({showModal, criteriaList, setShowSelfRateModal, onSaveRat
        
        try{
 
-            const response = await apiPost('/api/accreditation/rate/criteria', {ratings})
+            const response = await apiPost('/accreditation/rate/criteria', {ratings})
 
             onSaveRating(response.data.criteria)
             

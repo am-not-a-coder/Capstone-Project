@@ -39,7 +39,7 @@ const SubContForm = ({title,  selfRateMode, onClick, onFilePreview, subareaID, p
     
      const fetchCriteriaFromDB = async () => {
     try {
-        const res = await apiGet(`/api/accreditation/rate/criteria/${programCode}/${subareaID}`);
+        const res = await apiGet(`/accreditation/rate/criteria/${programCode}/${subareaID}`);
         
         setCriteriaState(res.data);
 
@@ -59,7 +59,7 @@ const SubContForm = ({title,  selfRateMode, onClick, onFilePreview, subareaID, p
         setOverallSubareaRating(weightedAverage);
 
         try{
-            await apiPost('/api/accreditation/rate/subarea', {subareaID, rating: weightedAverage})
+            await apiPost('/accreditation/rate/subarea', {subareaID, rating: weightedAverage})
             console.log("Subarea rating saved")
 
             if (onSubareaRatingUpdate) {

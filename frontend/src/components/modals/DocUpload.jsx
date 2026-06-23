@@ -137,7 +137,7 @@ const DocUpload = ({ onClose, showModal, currentPath, uploadSuccess}) => {
 
 
     try{
-      const response = await apiPostForm('/api/documents/upload', formData, {withCredentials: true});
+      const response = await apiPostForm('/documents/upload', formData, {withCredentials: true});
       
       // Clear the simulation interval
       clearInterval(progressInterval);

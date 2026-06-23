@@ -65,7 +65,7 @@ const AreaDetailModal = ({
   const fetchDeadlines = async () => {
     try {
       setLoading(true);
-      const response = await apiGet('/api/deadlines');                
+      const response = await apiGet('/deadlines');                
       
       setDeadlines(response.data.deadline || []);
     } catch (err) {
@@ -80,7 +80,7 @@ const AreaDetailModal = ({
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      const response = await apiGet('/api/events');           
+      const response = await apiGet('/events');           
       
       setEvents(response.data || []);
     } catch (err) {
@@ -95,7 +95,7 @@ const AreaDetailModal = ({
   const fetchAreas = async () => {
     try {
       setLoading(true);
-      const response = await apiGet('/api/area');           
+      const response = await apiGet('/area');           
       setAreas(response.data.area || []);
       console.log(response.data.area)
     } catch (err) {

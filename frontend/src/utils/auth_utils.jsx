@@ -38,7 +38,7 @@ export const getCurrentUser = () => readCache()
 
 
 export const fetchCurrentUser = async () => {
-    const res = await apiGet('/api/me')
+    const res = await apiGet('/me')
     if (res.success && res.data?.user) {
         writeCache(res.data.user)
         return res.data.user
@@ -53,7 +53,7 @@ export const cacheUserAfterLogin = async () => {
 
 export const logoutAcc = async () => {
     try {
-        await apiPost('/api/logout')
+        await apiPost('/logout')
     } catch (error) {
         console.error('Logout API error:', error)
     } finally {

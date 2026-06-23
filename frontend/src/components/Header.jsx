@@ -72,7 +72,7 @@ const Header = ({title}) => {
         try {
             setNotificationsLoading(true);
 
-            const response = await apiGet('/api/notifications?page=1&per_page=5');
+            const response = await apiGet('/notifications?page=1&per_page=5');
 
             if (response && response.success && response.data) {
                 const notifications = response.data.notifications || [];
@@ -93,7 +93,7 @@ const Header = ({title}) => {
     // Mark all notifications as read
     const markAllNotificationsAsRead = async () => {
         try {
-            const response = await apiPut('/api/notifications/mark-all-read');
+            const response = await apiPut('/notifications/mark-all-read');
             if (response && response.success) {
                 setUnreadCount(0);
             } else {
@@ -107,7 +107,7 @@ const Header = ({title}) => {
     // Fetch unread count
     const fetchUnreadCount = async () => {
         try {
-          const response = await apiGet('/api/notifications/unread-count');
+          const response = await apiGet('/notifications/unread-count');
           if (response && response.success && response.data) {
             const count = response.data.count || 0;
             setUnreadCount(count);
@@ -123,7 +123,7 @@ const Header = ({title}) => {
     // Delete a single notification from header list
     const handleDeleteNotification = async (notificationId, isRead) => {
         try {
-            const res = await apiDelete(`/api/notifications/${notificationId}`)
+            const res = await apiDelete(`/notifications/${notificationId}`)
             if (res && res.success) {
                 setNotifications(prev => prev.filter(n => n.notificationID !== notificationId))
                 if (!isRead) {
@@ -180,13 +180,13 @@ const Header = ({title}) => {
         (async () => {
           try {
             setLoading(true);
-            const res = await apiGet('/api/conversations');
+            const res = await apiGet('/conversations');
             if (!alive) return;
             const conversations = res?.data?.conversations ?? [];
             const withLast = await Promise.all(
                 conversations.map(async (c) => {
                     try {
-                        const mRes = await apiGet(`/api/conversations/${c.conversationID}/message`);
+                        const mRes = await apiGet(`/conversations/${c.conversationID}/message`);
                         const msgs = mRes?.data?.messages || [];
                         const last = msgs.length > 0 ? msgs[msgs.length - 1] : null;
                         return { ...c, lastMessage: last };
