@@ -1908,7 +1908,7 @@ def register_routes(app):
 
         return jsonify({'success': True, 'message': 'Criteria marked as done'}), 200
 
-    @app.route('/area/progress', methods=["PUT"])
+    @app.route('/api/area/progress', methods=["PUT"])
     def save_area_progress():
         data = request.get_json()
         areaID = data.get("areaID")
@@ -1928,7 +1928,7 @@ def register_routes(app):
 
         return jsonify({'success': True, 'message': 'Area progress saved!'}), 200
 
-    @app.route('/area/option', methods=["GET"])
+    @app.route('/api/area/option', methods=["GET"])
     def get_area_option():
 
         area_options = AreaReference.query.all()
